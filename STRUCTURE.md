@@ -18,17 +18,22 @@ PCB Production V2/
 ├── .gitignore
 │
 ├── docs/                        ← Documentation (archives, specs, audits)
+│   ├── INDEX.md                 ← Index des documents
+│   ├── STATUS.md                ← État du projet
 │   ├── specs/                   ← Cahiers des charges, specs techniques
 │   ├── guides/                  ← Guides utilisateur / déploiement
 │   ├── reports/                 ← Rapports d'audit et de phase
 │   └── archive/                 ← Documents historiques (ne plus modifier)
+│       ├── legacy-scripts/      ← Scripts .bat/.vbs/.ps1 obsolètes
+│       └── mockups/             ← Mockups HTML de redesign (historique)
 │
 ├── serveur/                     ← === BACKEND (FastAPI Python) ===
 │   │
 │   ├── .env                     ← Config serveur (IP, port, DB, etc.) — NE PAS COMMITTER
+│   ├── .env.example             ← Modèle de .env (copier vers .env)
 │   ├── launch.py                ← Point d'entrée du serveur
-│   ├── requirements.txt         ← Dépendances Python
-│   ├── requirements_flexible.txt
+│   ├── requirements.txt         ← Dépendances Python (versions épinglées)
+│   ├── requirements_flexible.txt ← Dépendances Python (versions souples, pour Python récent)
 │   │
 │   ├── DEMARRER_SERVEUR.bat     ← Lance le serveur (double-clic)
 │   ├── INSTALLER_SERVEUR.bat    ← Installe le venv + deps (première fois)

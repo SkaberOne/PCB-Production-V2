@@ -1,75 +1,68 @@
-# Python
+# --- Python ---
 __pycache__/
 *.py[cod]
 *$py.class
 *.so
 .Python
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
-pip-wheel-metadata/
-share/python-wheels/
 *.egg-info/
-.installed.cfg
 *.egg
-MANIFEST
+.installed.cfg
+
+# venv (LOI: garder a la racine du projet)
+.venv/
 venv/
 ENV/
 env/
-.venv
 
-# Node
+# --- Node / React ---
 node_modules/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 package-lock.json
-dist/
-build/
 
-# IDEs
+# --- Build artifacts ---
+build/
+dist/
+*.tsbuildinfo
+
+# --- IDE ---
 .vscode/
 .idea/
 *.swp
 *.swo
 *~
-.DS_Store
 *.sublime-project
 *.sublime-workspace
 
-# Environment
+# --- OS ---
+.DS_Store
+Thumbs.db
+
+# --- Environment ---
 .env
 .env.local
 .env.*.local
+# Garder .env.example (modele)
+!serveur/.env.example
 
-# Logs
+# --- Logs ---
 logs/
 *.log
 
-# Uploads & Exports
-uploads/
-exports/
-backups/
+# --- Uploads / Exports / Backups (runtime) ---
+serveur/uploads/
+serveur/exports/
+serveur/backups/
 
-# Database
+# --- Database ---
 *.mdb
 *.db
 *.sqlite
+*.sqlite3
 
-# OS
-Thumbs.db
-.DS_Store
-
-# Project specific
+# --- Project specific ---
 .cache/
 temp/
+*.bak
 */migrations/versions/__pycache__/

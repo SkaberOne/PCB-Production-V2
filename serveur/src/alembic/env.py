@@ -7,13 +7,13 @@ from sqlalchemy import pool
 
 from alembic import context
 
-PROJECT_ROOT = Path(__file__).resolve().parents[3]
-if str(PROJECT_ROOT) not in sys.path:
-    sys.path.insert(0, str(PROJECT_ROOT))
+SERVEUR_DIR = Path(__file__).resolve().parents[2]
+if str(SERVEUR_DIR) not in sys.path:
+    sys.path.insert(0, str(SERVEUR_DIR))
 
-from src.backend.config import DATABASE_URL
-from src.backend.database import Base
-from src.backend.models import bom, machines, commands  # Import all model modules to register them
+from src.config import DATABASE_URL
+from src.database import Base
+from src.models import bom, machines, commands  # Import all model modules to register them
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

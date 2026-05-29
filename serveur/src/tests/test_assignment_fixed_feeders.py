@@ -7,10 +7,10 @@ import pytest
 from sqlalchemy.orm import Session
 
 from tests.conftest import TestingSessionLocal, engine
-from src.backend.database import Base
-from src.backend.models.bom import BomReference, BomRevision, BomItem, Component
-from src.backend.models.machines import PnpCart, PnpFeeder
-from src.backend.services.assignment_fixed_feeders import AssignmentFixedFeederMixin
+from src.database import Base
+from src.models.bom import BomReference, BomRevision, BomItem, Component
+from src.models.machines import PnpCart, PnpFeeder
+from src.services.assignment_fixed_feeders import AssignmentFixedFeederMixin
 
 
 # ── Fixtures ──────────────────────────────────────────────────────────────────

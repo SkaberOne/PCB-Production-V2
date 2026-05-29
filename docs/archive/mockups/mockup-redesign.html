@@ -1,0 +1,1045 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PCB Flow — Mockup Redesign</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #09090b;
+    --surface: #18181b;
+    --surface2: #1f1f22;
+    --border: #27272a;
+    --border2: #3f3f46;
+    --green: #059669;
+    --green-light: #10b981;
+    --green-dim: rgba(5,150,105,0.12);
+    --amber: #f59e0b;
+    --amber-dim: rgba(245,158,11,0.12);
+    --blue: #38bdf8;
+    --blue-dim: rgba(56,189,248,0.12);
+    --red: #ef4444;
+    --red-dim: rgba(239,68,68,0.12);
+    --text: #f4f4f5;
+    --text2: #a1a1aa;
+    --text3: #71717a;
+    --sidebar: 220px;
+    --topbar: 56px;
+    --stepper: 48px;
+  }
+  body { font-family: 'Segoe UI', Inter, sans-serif; background: var(--bg); color: var(--text); font-size: 14px; display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+
+  /* ── TOPBAR ── */
+  .topbar {
+    height: var(--topbar);
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    padding: 0 20px 0 0;
+    gap: 16px;
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    z-index: 100;
+    flex-shrink: 0;
+  }
+  .topbar-brand {
+    width: var(--sidebar);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 0 16px;
+    border-right: 1px solid var(--border);
+    height: 100%;
+    flex-shrink: 0;
+  }
+  .brand-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green); box-shadow: 0 0 8px var(--green); }
+  .brand-name { font-weight: 700; font-size: 15px; color: var(--green); letter-spacing: 0.06em; }
+  .brand-sub { font-size: 10px; color: var(--text3); letter-spacing: 0.1em; }
+  .topbar-title { font-weight: 700; font-size: 15px; color: var(--text); flex: 1; }
+  .topbar-prod {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--green-dim);
+    border: 1px solid rgba(5,150,105,0.3);
+    border-radius: 8px;
+    padding: 6px 12px;
+    cursor: pointer;
+    transition: background 0.2s;
+  }
+  .topbar-prod:hover { background: rgba(5,150,105,0.2); }
+  .prod-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--green-light); }
+  .prod-name { font-size: 13px; font-weight: 600; color: var(--green-light); }
+  .prod-label { font-size: 11px; color: var(--text3); }
+  .no-prod { color: var(--text3); font-size: 13px; font-style: italic; }
+
+  /* ── WORKFLOW STEPPER ── */
+  .stepper-bar {
+    height: var(--stepper);
+    background: var(--bg);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    padding: 0 20px 0 calc(var(--sidebar) + 20px);
+    position: fixed;
+    top: var(--topbar);
+    left: 0; right: 0;
+    z-index: 99;
+    gap: 4px;
+    overflow-x: auto;
+  }
+  .step {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 14px;
+    border-radius: 20px;
+    cursor: pointer;
+    transition: all 0.2s;
+    white-space: nowrap;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text3);
+    position: relative;
+  }
+  .step:hover { background: var(--surface); color: var(--text2); }
+  .step.done { color: var(--green-light); }
+  .step.done .step-num { background: var(--green); color: #fff; }
+  .step.active { background: var(--surface); color: var(--text); font-weight: 600; }
+  .step.active .step-num { background: var(--green); color: #fff; box-shadow: 0 0 0 3px var(--green-dim); }
+  .step-num {
+    width: 20px; height: 20px;
+    border-radius: 50%;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 10px;
+    font-weight: 700;
+    flex-shrink: 0;
+  }
+  .step-arrow { color: var(--border2); font-size: 12px; padding: 0 2px; }
+  .step-badge {
+    background: var(--green-dim);
+    color: var(--green-light);
+    font-size: 10px;
+    font-weight: 600;
+    padding: 1px 6px;
+    border-radius: 10px;
+  }
+  .step-badge.warn { background: var(--amber-dim); color: var(--amber); }
+
+  /* ── LAYOUT ── */
+  .shell {
+    display: flex;
+    flex: 1;
+    margin-top: calc(var(--topbar) + var(--stepper));
+    height: calc(100vh - var(--topbar) - var(--stepper));
+    overflow: hidden;
+  }
+
+  /* ── SIDEBAR ── */
+  .sidebar {
+    width: var(--sidebar);
+    background: var(--bg);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    padding: 12px 8px;
+    flex-shrink: 0;
+    overflow-y: auto;
+  }
+  .nav-section-label {
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--text3);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 8px 12px 4px;
+    margin-top: 8px;
+  }
+  .nav-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 12px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.15s;
+    color: var(--text3);
+    font-size: 13px;
+    font-weight: 500;
+    margin-bottom: 2px;
+    position: relative;
+  }
+  .nav-item:hover { background: rgba(5,150,105,0.08); color: var(--text2); }
+  .nav-item.active { background: var(--green); color: #fff; font-weight: 600; }
+  .nav-item.active .nav-icon { color: #fff; }
+  .nav-icon { font-size: 16px; flex-shrink: 0; }
+  .nav-num {
+    width: 18px; height: 18px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.08);
+    font-size: 10px;
+    font-weight: 700;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  .nav-item.active .nav-num { background: rgba(255,255,255,0.2); }
+  .nav-item.done .nav-icon { color: var(--green-light); }
+  .nav-divider { height: 1px; background: var(--border); margin: 8px 4px; }
+  .sidebar-bottom { margin-top: auto; }
+
+  /* ── MAIN CONTENT ── */
+  .main { flex: 1; overflow-y: auto; padding: 24px 28px; }
+
+  /* ── PAGE: PRODUCTIONS (Dashboard redesigné) ── */
+  .page { display: none; }
+  .page.active { display: block; }
+
+  /* ── SESSION BANNER ── */
+  .session-banner {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    background: linear-gradient(135deg, rgba(5,150,105,0.1) 0%, rgba(5,150,105,0.04) 100%);
+    border: 1px solid rgba(5,150,105,0.25);
+    border-radius: 12px;
+    padding: 16px 20px;
+    margin-bottom: 24px;
+  }
+  .session-banner-icon { font-size: 28px; }
+  .session-banner-text h3 { font-size: 15px; font-weight: 700; color: var(--text); margin-bottom: 2px; }
+  .session-banner-text p { font-size: 12px; color: var(--text2); }
+  .session-banner-actions { margin-left: auto; display: flex; gap: 8px; }
+
+  /* ── BUTTONS ── */
+  .btn {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 7px 14px; border-radius: 8px; border: none;
+    font-size: 13px; font-weight: 600; cursor: pointer;
+    transition: all 0.15s; white-space: nowrap;
+  }
+  .btn-primary { background: var(--green); color: #fff; }
+  .btn-primary:hover { background: #047857; }
+  .btn-outline { background: transparent; color: var(--text); border: 1px solid var(--border2); }
+  .btn-outline:hover { background: rgba(255,255,255,0.04); border-color: #52525b; }
+  .btn-ghost { background: transparent; color: var(--text2); border: 1px solid transparent; }
+  .btn-ghost:hover { background: rgba(255,255,255,0.04); }
+  .btn-danger { background: var(--red-dim); color: var(--red); border: 1px solid rgba(239,68,68,0.2); }
+  .btn-sm { padding: 4px 10px; font-size: 12px; }
+  .btn-icon { padding: 6px; }
+
+  /* ── CARDS ── */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+  }
+  .card-header {
+    padding: 16px 20px 12px;
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  }
+  .card-title { font-size: 14px; font-weight: 700; color: var(--text); }
+  .card-sub { font-size: 12px; color: var(--text2); margin-top: 2px; }
+  .card-body { padding: 0; }
+
+  /* ── GRID ── */
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
+  .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+  .mb-4 { margin-bottom: 16px; }
+  .mb-6 { margin-bottom: 24px; }
+
+  /* ── STAT MINI CARDS ── */
+  .stat-mini {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px 16px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .stat-mini-icon {
+    width: 36px; height: 36px;
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px;
+    flex-shrink: 0;
+  }
+  .stat-mini-val { font-size: 22px; font-weight: 700; color: var(--text); line-height: 1; }
+  .stat-mini-label { font-size: 11px; color: var(--text2); margin-top: 2px; }
+
+  /* ── TABLE ── */
+  .table-wrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th { text-align: left; padding: 10px 14px; color: var(--text3); font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; background: var(--bg); border-bottom: 1px solid var(--border); white-space: nowrap; }
+  td { padding: 12px 14px; border-bottom: 1px solid var(--border); color: var(--text); vertical-align: middle; }
+  tr:last-child td { border-bottom: none; }
+  tr.row-active td { background: rgba(5,150,105,0.06); }
+  tr:nth-child(even):not(.row-active) td { background: rgba(255,255,255,0.015); }
+  tr:hover td { background: rgba(255,255,255,0.03); }
+  tr.row-active:hover td { background: rgba(5,150,105,0.1); }
+
+  /* ── CHIPS / BADGES ── */
+  .chip {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 3px 9px; border-radius: 20px;
+    font-size: 11px; font-weight: 600; white-space: nowrap;
+  }
+  .chip-green { background: var(--green-dim); color: var(--green-light); border: 1px solid rgba(16,185,129,0.2); }
+  .chip-amber { background: var(--amber-dim); color: var(--amber); border: 1px solid rgba(245,158,11,0.2); }
+  .chip-blue { background: var(--blue-dim); color: var(--blue); border: 1px solid rgba(56,189,248,0.2); }
+  .chip-muted { background: rgba(161,161,170,0.1); color: var(--text3); border: 1px solid var(--border); }
+  .chip-session { background: rgba(5,150,105,0.16); color: var(--green-light); font-size: 10px; padding: 2px 7px; }
+
+  /* ── ACTIONS CELL ── */
+  .actions { display: flex; gap: 4px; align-items: center; }
+
+  /* ── EMPTY STATE ── */
+  .empty {
+    padding: 48px 24px;
+    text-align: center;
+    display: flex; flex-direction: column; align-items: center; gap: 12px;
+  }
+  .empty-icon { font-size: 40px; opacity: 0.3; }
+  .empty-title { font-size: 15px; font-weight: 600; color: var(--text2); }
+  .empty-desc { font-size: 13px; color: var(--text3); max-width: 360px; line-height: 1.5; }
+
+  /* ── PAGE HEADER ── */
+  .page-header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 20px; gap: 16px; }
+  .page-header-text h1 { font-size: 20px; font-weight: 700; color: var(--text); }
+  .page-header-text p { font-size: 13px; color: var(--text2); margin-top: 4px; }
+  .page-header-actions { display: flex; gap: 8px; flex-shrink: 0; }
+
+  /* ── WORKFLOW GUIDE (Import BOM page) ── */
+  .guide-card {
+    background: rgba(5,150,105,0.06);
+    border: 1px solid rgba(5,150,105,0.2);
+    border-radius: 10px;
+    padding: 14px 16px;
+    margin-bottom: 16px;
+    font-size: 13px;
+    color: var(--text2);
+  }
+  .guide-card strong { color: var(--green-light); }
+
+  /* ── TABS ── */
+  .tabs { display: flex; gap: 2px; border-bottom: 1px solid var(--border); padding: 0 20px; }
+  .tab {
+    padding: 12px 16px;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text3);
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    transition: all 0.15s;
+    white-space: nowrap;
+  }
+  .tab:hover { color: var(--text2); }
+  .tab.active { color: var(--green-light); border-bottom-color: var(--green); font-weight: 600; }
+  .tab-badge { background: var(--border); border-radius: 10px; padding: 1px 6px; font-size: 10px; margin-left: 4px; }
+  .tab-badge.warn { background: var(--amber-dim); color: var(--amber); }
+
+  /* ── MODE SWITCH (BOM Viewer) ── */
+  .mode-switch {
+    display: flex;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 3px;
+    gap: 2px;
+  }
+  .mode-btn {
+    padding: 5px 12px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s;
+    color: var(--text3);
+    border: none;
+    background: transparent;
+  }
+  .mode-btn.active { background: var(--surface); color: var(--text); box-shadow: 0 1px 3px rgba(0,0,0,0.3); }
+
+  /* ── INLINE INPUT (edition mode) ── */
+  .inline-input {
+    background: var(--bg);
+    border: 1px solid var(--border2);
+    border-radius: 6px;
+    padding: 4px 8px;
+    color: var(--text);
+    font-size: 12px;
+    width: 100%;
+    outline: none;
+    font-family: inherit;
+  }
+  .inline-input:focus { border-color: var(--green); }
+
+  /* ── MACHINE SLOTS (PnP) ── */
+  .slot-strip {
+    display: flex;
+    gap: 3px;
+    flex-wrap: wrap;
+    padding: 16px;
+    background: var(--bg);
+    border-radius: 8px;
+    border: 1px solid var(--border);
+  }
+  .slot {
+    width: 28px; height: 44px;
+    border-radius: 4px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 9px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.15s;
+    border: 1px solid transparent;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .slot-empty { background: rgba(255,255,255,0.04); border-color: var(--border); color: var(--text3); }
+  .slot-filled { background: rgba(5,150,105,0.2); border-color: rgba(5,150,105,0.4); color: var(--green-light); }
+  .slot-fixed { background: rgba(56,189,248,0.15); border-color: rgba(56,189,248,0.3); color: var(--blue); }
+  .slot-hover:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.3); }
+
+  /* ── LEGEND ── */
+  .legend { display: flex; gap: 16px; padding: 10px 16px; background: var(--bg); border-radius: 8px; flex-wrap: wrap; }
+  .legend-item { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--text2); }
+  .legend-dot { width: 10px; height: 10px; border-radius: 2px; }
+
+  /* ── SCROLL AREA FIX ── */
+  .scroll { overflow-y: auto; }
+
+  /* ── NOTIFICATION TOAST ── */
+  .toast {
+    position: fixed; bottom: 20px; right: 20px;
+    background: var(--surface); border: 1px solid var(--border);
+    border-left: 3px solid var(--green);
+    border-radius: 10px; padding: 12px 16px;
+    font-size: 13px; color: var(--text);
+    display: flex; align-items: center; gap: 10px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+    z-index: 999; animation: slideIn 0.3s ease;
+    opacity: 0; pointer-events: none; transition: opacity 0.3s;
+  }
+  .toast.show { opacity: 1; pointer-events: auto; }
+  @keyframes slideIn { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+
+  /* ── SECTION SPACING ── */
+  .section { margin-bottom: 24px; }
+
+  /* ── PROGRESS BAR ── */
+  .progress-bar { height: 4px; background: var(--border); border-radius: 2px; overflow: hidden; }
+  .progress-fill { height: 100%; background: var(--green); border-radius: 2px; transition: width 0.5s ease; }
+
+  /* ── SEARCH INPUT ── */
+  .search-box {
+    display: flex; align-items: center; gap: 8px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 7px 12px;
+  }
+  .search-box input {
+    background: none; border: none; outline: none;
+    color: var(--text); font-size: 13px; width: 200px;
+  }
+  .search-box input::placeholder { color: var(--text3); }
+
+  /* ── SCROLLBAR ── */
+  ::-webkit-scrollbar { width: 5px; height: 5px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 3px; }
+</style>
+</head>
+<body>
+
+<!-- ── TOPBAR ── -->
+<header class="topbar">
+  <div class="topbar-brand">
+    <div class="brand-dot"></div>
+    <div>
+      <div class="brand-name">PCB FLOW</div>
+      <div class="brand-sub">PRODUCTION SUITE</div>
+    </div>
+  </div>
+  <div class="topbar-title" id="topbarTitle">Productions</div>
+  <div id="topbarProd" class="topbar-prod" onclick="showToast('Production prod01 — 3 BOM liées')">
+    <div class="prod-dot"></div>
+    <div>
+      <div class="prod-name">prod01 — Mai 2026</div>
+      <div class="prod-label">Production active · 3 BOM</div>
+    </div>
+  </div>
+</header>
+
+<!-- ── WORKFLOW STEPPER ── -->
+<div class="stepper-bar">
+  <div class="step done" onclick="navigate('productions')">
+    <div class="step-num">✓</div> Productions
+    <span class="step-badge">3</span>
+  </div>
+  <div class="step-arrow">›</div>
+  <div class="step done" onclick="navigate('import')">
+    <div class="step-num">✓</div> Import BOM
+    <span class="step-badge">2 BOM</span>
+  </div>
+  <div class="step-arrow">›</div>
+  <div class="step active" onclick="navigate('bom')">
+    <div class="step-num">3</div> Revue BOM
+    <span class="step-badge warn">4 warnings</span>
+  </div>
+  <div class="step-arrow">›</div>
+  <div class="step" onclick="navigate('commande')">
+    <div class="step-num">4</div> Commande
+  </div>
+  <div class="step-arrow">›</div>
+  <div class="step" onclick="navigate('machine')">
+    <div class="step-num">5</div> Machine PnP
+  </div>
+</div>
+
+<!-- ── SHELL ── -->
+<div class="shell">
+
+  <!-- SIDEBAR -->
+  <nav class="sidebar">
+    <div class="nav-section-label">Workflow</div>
+    <div class="nav-item done" onclick="navigate('productions')" id="nav-productions">
+      <span class="nav-icon">⚡</span>
+      <span style="flex:1">Productions</span>
+      <span class="nav-num">1</span>
+    </div>
+    <div class="nav-item done" onclick="navigate('import')" id="nav-import">
+      <span class="nav-icon">📥</span>
+      <span style="flex:1">Import BOM</span>
+      <span class="nav-num">2</span>
+    </div>
+    <div class="nav-item active" onclick="navigate('bom')" id="nav-bom">
+      <span class="nav-icon">📋</span>
+      <span style="flex:1">Revue BOM</span>
+      <span class="nav-num">3</span>
+    </div>
+    <div class="nav-item" onclick="navigate('commande')" id="nav-commande">
+      <span class="nav-icon">🛒</span>
+      <span style="flex:1">Commande</span>
+      <span class="nav-num">4</span>
+    </div>
+    <div class="nav-item" onclick="navigate('machine')" id="nav-machine">
+      <span class="nav-icon">🤖</span>
+      <span style="flex:1">Machine PnP</span>
+      <span class="nav-num">5</span>
+    </div>
+
+    <div class="nav-divider"></div>
+    <div class="nav-section-label">Bibliothèque</div>
+    <div class="nav-item" onclick="navigate('biblio')" id="nav-biblio">
+      <span class="nav-icon">📁</span>
+      <span style="flex:1">BOM enregistrées</span>
+    </div>
+
+    <div class="sidebar-bottom">
+      <div class="nav-divider"></div>
+      <div class="nav-item" onclick="navigate('settings')" id="nav-settings">
+        <span class="nav-icon">⚙️</span>
+        <span style="flex:1">Paramètres</span>
+      </div>
+    </div>
+  </nav>
+
+  <!-- MAIN -->
+  <main class="main">
+
+    <!-- ══ PAGE: PRODUCTIONS ══ -->
+    <div class="page" id="page-productions">
+      <div class="page-header">
+        <div class="page-header-text">
+          <h1>Productions</h1>
+          <p>Sélectionne ou crée une production pour démarrer le workflow.</p>
+        </div>
+        <div class="page-header-actions">
+          <button class="btn btn-outline" onclick="showToast('Actualisation...')">↻ Actualiser</button>
+          <button class="btn btn-primary" onclick="showToast('→ Dialogue création ouvert')">+ Nouvelle production</button>
+        </div>
+      </div>
+
+      <!-- Stat row (compact, sans TrendingUp mensonger) -->
+      <div class="grid-4 mb-6">
+        <div class="stat-mini">
+          <div class="stat-mini-icon" style="background:rgba(5,150,105,0.12)">🏭</div>
+          <div>
+            <div class="stat-mini-val">3</div>
+            <div class="stat-mini-label">Productions</div>
+          </div>
+        </div>
+        <div class="stat-mini">
+          <div class="stat-mini-icon" style="background:rgba(16,185,129,0.12)">📄</div>
+          <div>
+            <div class="stat-mini-val">7</div>
+            <div class="stat-mini-label">BOM importées</div>
+          </div>
+        </div>
+        <div class="stat-mini">
+          <div class="stat-mini-icon" style="background:rgba(245,158,11,0.12)">⚠️</div>
+          <div>
+            <div class="stat-mini-val">4</div>
+            <div class="stat-mini-label">Points à vérifier</div>
+          </div>
+        </div>
+        <div class="stat-mini">
+          <div class="stat-mini-icon" style="background:rgba(56,189,248,0.12)">✅</div>
+          <div>
+            <div class="stat-mini-val">142</div>
+            <div class="stat-mini-label">Empreintes PnP</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Table des productions -->
+      <div class="card mb-4">
+        <div class="card-header">
+          <div>
+            <div class="card-title">Liste des productions</div>
+            <div class="card-sub">Clique sur une production pour la charger et accéder au workflow.</div>
+          </div>
+          <div class="search-box">
+            <span style="color:var(--text3)">🔍</span>
+            <input placeholder="Rechercher..." />
+          </div>
+        </div>
+        <div class="card-body table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Nom / Statut</th>
+                <th>Progression</th>
+                <th>BOM liées</th>
+                <th>Mise à jour</th>
+                <th style="width:80px">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr class="row-active">
+                <td>
+                  <div style="font-weight:600;margin-bottom:4px">prod01 — Mai 2026</div>
+                  <div style="display:flex;gap:6px">
+                    <span class="chip chip-green">● Active</span>
+                    <span class="chip chip-session">Session</span>
+                  </div>
+                </td>
+                <td style="min-width:140px">
+                  <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text3);margin-bottom:4px">
+                    <span>Import → Revue</span><span style="color:var(--green-light)">60%</span>
+                  </div>
+                  <div class="progress-bar"><div class="progress-fill" style="width:60%"></div></div>
+                </td>
+                <td><span style="font-weight:600;color:var(--text)">3</span></td>
+                <td style="color:var(--text2)">15/05/2026 10:42</td>
+                <td>
+                  <div class="actions">
+                    <button class="btn btn-outline btn-sm" onclick="navigate('bom')">→ Ouvrir</button>
+                    <button class="btn btn-ghost btn-sm btn-icon" onclick="showToast('Suppression...')">🗑</button>
+                  </div>
+                </td>
+              </tr>
+              <tr>
+                <td>
+                  <div style="font-weight:600;margin-bottom:4px">prod02 — Avril 2026</div>
+                  <div><span class="chip chip-blue">Terminée</span></div>
+                </td>
+                <td>
+                  <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text3);margin-bottom:4px">
+                    <span>Complète</span><span style="color:var(--blue)">100%</span>
+                  </div>
+                  <div class="progress-bar"><div class="progress-fill" style="width:100%;background:var(--blue)"></div></div>
+                </td>
+                <td>2</td>
+                <td style="color:var(--text2)">02/04/2026 16:20</td>
+                <td>
+                  <div class="actions">
+                    <button class="btn btn-outline btn-sm" onclick="showToast('Réactivation...')">↻</button>
+                    <button class="btn btn-ghost btn-sm btn-icon" onclick="showToast('Suppression...')">🗑</button>
+                  </div>
+                </td>
+              </tr>
+              <tr>
+                <td>
+                  <div style="font-weight:600;margin-bottom:4px">test_capa — Mars 2026</div>
+                  <div><span class="chip chip-amber">Brouillon</span></div>
+                </td>
+                <td>
+                  <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text3);margin-bottom:4px">
+                    <span>Pas démarré</span><span>0%</span>
+                  </div>
+                  <div class="progress-bar"><div class="progress-fill" style="width:0%"></div></div>
+                </td>
+                <td>0</td>
+                <td style="color:var(--text2)">18/03/2026 09:11</td>
+                <td>
+                  <div class="actions">
+                    <button class="btn btn-outline btn-sm" onclick="navigate('import')">→ Démarrer</button>
+                    <button class="btn btn-ghost btn-sm btn-icon" onclick="showToast('Suppression...')">🗑</button>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ PAGE: IMPORT BOM ══ -->
+    <div class="page" id="page-import">
+      <div class="page-header">
+        <div class="page-header-text">
+          <h1>Import BOM</h1>
+          <p>Importe et pré-traite tes fichiers BOM avant la revue.</p>
+        </div>
+      </div>
+      <div class="guide-card">
+        <strong>Étape 2 sur 5</strong> — Production chargée : <strong style="color:var(--text)">prod01 — Mai 2026</strong>.
+        Importe tes fichiers BOM ci-dessous, puis clique sur <strong>→ Démarrer la revue</strong> pour passer à l'étape suivante.
+      </div>
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">📥 Dépôt de fichier</div>
+          </div>
+          <div style="padding:32px;text-align:center;border:2px dashed var(--border2);margin:16px;border-radius:10px;color:var(--text3);cursor:pointer" onclick="showToast('Sélection fichier...')">
+            <div style="font-size:32px;margin-bottom:8px">📄</div>
+            <div style="font-size:13px;font-weight:600;color:var(--text2)">Glisser-déposer un fichier BOM</div>
+            <div style="font-size:12px;margin-top:4px">.csv, .xlsx, .xls acceptés</div>
+            <button class="btn btn-outline btn-sm" style="margin-top:12px">Parcourir...</button>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">📋 BOM importées (prod01)</div>
+          </div>
+          <div class="card-body table-wrap">
+            <table>
+              <thead><tr><th>Référence</th><th>Rév.</th><th>Face</th><th>Statut</th></tr></thead>
+              <tbody>
+                <tr><td>ECB-MAIN</td><td>v2.1</td><td>Top</td><td><span class="chip chip-green">✓ Revue</span></td></tr>
+                <tr><td>ECB-MAIN</td><td>v2.1</td><td>Bot</td><td><span class="chip chip-amber">⚠ À revoir</span></td></tr>
+                <tr><td>ECB-PWR</td><td>v1.0</td><td>Top</td><td><span class="chip chip-muted">En attente</span></td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div style="padding:12px 16px;border-top:1px solid var(--border)">
+            <button class="btn btn-primary" onclick="navigate('bom')">→ Démarrer la revue BOM</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ PAGE: REVUE BOM ══ -->
+    <div class="page active" id="page-bom">
+      <div class="page-header">
+        <div class="page-header-text">
+          <h1>Revue BOM</h1>
+          <p>Valide les empreintes, types composants et valeurs harmonisées.</p>
+        </div>
+        <div class="page-header-actions">
+          <!-- Mode lecture / édition — NOUVEAU -->
+          <div class="mode-switch">
+            <button class="mode-btn active" id="modeRead" onclick="setMode('read')">👁 Lecture</button>
+            <button class="mode-btn" id="modeEdit" onclick="setMode('edit')">✏️ Édition</button>
+          </div>
+          <button class="btn btn-outline" onclick="showToast('Sauvegarde...')">💾 Sauvegarder</button>
+          <button class="btn btn-outline" onclick="showToast('Export...')">↓ Exporter</button>
+        </div>
+      </div>
+
+      <!-- Sélecteur BOM (compact) -->
+      <div class="tabs">
+        <div class="tab active">ECB-MAIN v2.1 Top <span class="tab-badge warn">4 ⚠</span></div>
+        <div class="tab">ECB-MAIN v2.1 Bot</div>
+        <div class="tab">ECB-PWR v1.0 Top</div>
+      </div>
+
+      <!-- Filtres rapides -->
+      <div style="display:flex;gap:8px;padding:12px 20px;background:var(--bg);border-bottom:1px solid var(--border);align-items:center;flex-wrap:wrap">
+        <span style="font-size:12px;color:var(--text3)">Filtrer :</span>
+        <button class="btn btn-outline btn-sm" onclick="showToast('Filtre : Tous')">Tous (89)</button>
+        <button class="btn btn-sm" style="background:var(--amber-dim);color:var(--amber);border:1px solid rgba(245,158,11,0.2)">⚠ À vérifier (4)</button>
+        <button class="btn btn-outline btn-sm">Sans empreinte (12)</button>
+        <button class="btn btn-outline btn-sm">Passifs</button>
+        <button class="btn btn-outline btn-sm">CIs</button>
+        <div style="margin-left:auto">
+          <div class="search-box"><span style="color:var(--text3)">🔍</span><input placeholder="Référence, valeur..." /></div>
+        </div>
+      </div>
+
+      <!-- Table BOM -->
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Référence</th>
+              <th>Valeur brute</th>
+              <th>Valeur harmonisée</th>
+              <th>Empreinte Eagle</th>
+              <th>Empreinte PnP</th>
+              <th>Qté</th>
+              <th>Type</th>
+              <th>Statut</th>
+            </tr>
+          </thead>
+          <tbody id="bomTableBody">
+            <!-- Généré par JS selon le mode -->
+          </tbody>
+        </table>
+      </div>
+      <div style="display:flex;justify-content:flex-end;padding:12px 16px;border-top:1px solid var(--border);gap:16px;align-items:center">
+        <span style="font-size:12px;color:var(--text3)">89 lignes · Page 1/4</span>
+        <button class="btn btn-outline btn-sm">← Préc.</button>
+        <button class="btn btn-outline btn-sm">Suiv. →</button>
+        <button class="btn btn-primary" onclick="navigate('commande')" style="margin-left:8px">→ Passer à la Commande</button>
+      </div>
+    </div>
+
+    <!-- ══ PAGE: COMMANDE ══ -->
+    <div class="page" id="page-commande">
+      <div class="page-header">
+        <div class="page-header-text">
+          <h1>Commande Composants</h1>
+          <p>Agrégation multi-BOM et génération de la liste de commande.</p>
+        </div>
+        <div class="page-header-actions">
+          <button class="btn btn-outline" onclick="showToast('Génération commande...')">⚡ Générer</button>
+          <button class="btn btn-primary" onclick="showToast('Export Excel...')">↓ Export Excel</button>
+        </div>
+      </div>
+      <div class="guide-card">
+        <strong>Étape 4 sur 5</strong> — 3 BOM chargées · <strong style="color:var(--text)">147 composants uniques</strong> agrégés.
+        Vérifie les quantités et les sources avant d'exporter.
+      </div>
+      <div class="card">
+        <div class="card-header"><div class="card-title">🛒 Liste de commande</div></div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Composant</th><th>Valeur</th><th>Empreinte</th><th>Requis</th><th>Stock</th><th>À commander</th><th>Placement</th><th>Sources</th></tr></thead>
+            <tbody>
+              <tr><td>C_100nF</td><td>100nF</td><td>0402</td><td>47</td><td>12</td><td style="color:var(--amber);font-weight:600">35</td><td>Auto</td><td>Mouser | Farnell</td></tr>
+              <tr><td>R_10k</td><td>10kΩ</td><td>0603</td><td>23</td><td>50</td><td style="color:var(--green-light);font-weight:600">0</td><td>Auto</td><td>—</td></tr>
+              <tr><td>STM32F4</td><td>MCU</td><td>LQFP64</td><td>3</td><td>0</td><td style="color:var(--red);font-weight:600">3</td><td>Manuel (J2)</td><td>Mouser</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ PAGE: MACHINE PNP ══ -->
+    <div class="page" id="page-machine">
+      <div class="page-header">
+        <div class="page-header-text">
+          <h1>Machine PnP</h1>
+          <p>Configuration des feeders et affectation de production.</p>
+        </div>
+        <div class="page-header-actions">
+          <button class="btn btn-outline" onclick="showToast('Auto-affecter...')">✨ Auto-affecter</button>
+          <button class="btn btn-primary" onclick="showToast('Lancer production...')">▶ Lancer</button>
+        </div>
+      </div>
+
+      <div class="tabs">
+        <div class="tab active">Machines</div>
+        <div class="tab">Feeders <span class="tab-badge">12</span></div>
+        <div class="tab">Carts</div>
+        <div class="tab">Affectation</div>
+      </div>
+
+      <div style="padding:16px">
+        <!-- Légende — NOUVEAU -->
+        <div class="legend mb-4">
+          <div class="legend-item"><div class="legend-dot" style="background:rgba(255,255,255,0.04);border:1px solid var(--border)"></div> Libre</div>
+          <div class="legend-item"><div class="legend-dot" style="background:rgba(5,150,105,0.3)"></div> Composant affecté</div>
+          <div class="legend-item"><div class="legend-dot" style="background:rgba(56,189,248,0.2)"></div> Feeder fixe</div>
+        </div>
+
+        <!-- Machine card -->
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <div class="card-title">🤖 Machine A — Yamaha YSM40</div>
+              <div class="card-sub">40 positions · 18 occupées · 22 libres</div>
+            </div>
+            <div style="display:flex;gap:8px">
+              <button class="btn btn-outline btn-sm">Éditer</button>
+              <button class="btn btn-primary btn-sm" onclick="showToast('Nouvelle machine...')">+ Machine</button>
+            </div>
+          </div>
+          <div style="padding:16px">
+            <div class="slot-strip" id="slotStrip"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ PAGE: BIBLIO ══ -->
+    <div class="page" id="page-biblio">
+      <div class="page-header">
+        <div class="page-header-text">
+          <h1>BOM enregistrées</h1>
+          <p>Bibliothèque de toutes les BOM harmonisées, organisées par catégorie.</p>
+        </div>
+        <div class="page-header-actions">
+          <div class="search-box"><span style="color:var(--text3)">🔍</span><input placeholder="Référence, catégorie..." /></div>
+        </div>
+      </div>
+      <div class="empty">
+        <div class="empty-icon">📁</div>
+        <div class="empty-title">Bibliothèque</div>
+        <div class="empty-desc">Les BOM importées et validées apparaissent ici, organisées par catégorie. Importe une BOM depuis l'étape 2 pour commencer.</div>
+        <button class="btn btn-primary" onclick="navigate('import')">→ Aller à Import BOM</button>
+      </div>
+    </div>
+
+    <!-- ══ PAGE: SETTINGS ══ -->
+    <div class="page" id="page-settings">
+      <div class="page-header">
+        <div class="page-header-text"><h1>Paramètres</h1><p>Base de données, mappings, machines et chemins.</p></div>
+      </div>
+      <div class="empty">
+        <div class="empty-icon">⚙️</div>
+        <div class="empty-title">Administration</div>
+        <div class="empty-desc">Configuration des référentiels, harmonisation et chemins d'accès.</div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<!-- TOAST -->
+<div class="toast" id="toast">✅ <span id="toastMsg"></span></div>
+
+<script>
+// Navigation
+const pageMap = {
+  'productions': 'page-productions',
+  'import': 'page-import',
+  'bom': 'page-bom',
+  'commande': 'page-commande',
+  'machine': 'page-machine',
+  'biblio': 'page-biblio',
+  'settings': 'page-settings'
+};
+const titleMap = {
+  'productions': 'Productions',
+  'import': 'Import BOM',
+  'bom': 'Revue BOM',
+  'commande': 'Commande Composants',
+  'machine': 'Machine PnP',
+  'biblio': 'BOM enregistrées',
+  'settings': 'Paramètres'
+};
+
+function navigate(page) {
+  // Hide all pages
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.getElementById(pageMap[page]).classList.add('active');
+
+  // Update nav
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  const navEl = document.getElementById('nav-' + page);
+  if (navEl) navEl.classList.add('active');
+
+  // Update title
+  document.getElementById('topbarTitle').textContent = titleMap[page] || page;
+
+  // Update stepper
+  document.querySelectorAll('.step').forEach(s => s.classList.remove('active'));
+  const stepMap = { 'productions': 0, 'import': 1, 'bom': 2, 'commande': 3, 'machine': 4 };
+  const steps = document.querySelectorAll('.step');
+  if (stepMap[page] !== undefined) {
+    steps[stepMap[page]].classList.add('active');
+  }
+}
+
+// Toast
+let toastTimer;
+function showToast(msg) {
+  const toast = document.getElementById('toast');
+  document.getElementById('toastMsg').textContent = msg;
+  toast.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => toast.classList.remove('show'), 2500);
+}
+
+// Mode lecture / édition dans BOM Viewer
+let isEditMode = false;
+function setMode(mode) {
+  isEditMode = mode === 'edit';
+  document.getElementById('modeRead').classList.toggle('active', !isEditMode);
+  document.getElementById('modeEdit').classList.toggle('active', isEditMode);
+  renderBomTable();
+}
+
+function renderBomTable() {
+  const data = [
+    { ref: 'C1', vBrut: '100nF/16V', vHarmo: '100nF', eFp: 'C_0402', ePnp: '0402', qty: 4, type: 'Passif', status: 'OK', warn: false },
+    { ref: 'C2', vBrut: '10uF/6.3V', vHarmo: '', eFp: 'C_0805', ePnp: '', qty: 2, type: 'Passif', status: 'Manquant', warn: true },
+    { ref: 'R1', vBrut: '10k', vHarmo: '10kΩ', eFp: 'R_0603', ePnp: '0603', qty: 8, type: 'Passif', status: 'OK', warn: false },
+    { ref: 'U1', vBrut: 'STM32F4', vHarmo: 'STM32F405RG', eFp: 'LQFP64', ePnp: 'LQFP-64', qty: 1, type: 'CI', status: 'À confirmer', warn: true },
+    { ref: 'D1', vBrut: '1N4007', vHarmo: '1N4007', eFp: 'DO-41', ePnp: '', qty: 3, type: 'Diode', status: 'Manquant', warn: true },
+  ];
+
+  const statusColor = {
+    'OK': 'chip-green', 'Manquant': 'chip-amber', 'À confirmer': 'chip-amber', 'DNP': 'chip-muted'
+  };
+
+  const rows = data.map(d => `
+    <tr class="${d.warn ? '' : ''}">
+      <td style="font-weight:600;color:${d.warn ? 'var(--amber)' : 'var(--text)'}">${d.ref}${d.warn ? ' ⚠' : ''}</td>
+      <td style="color:var(--text2)">${d.vBrut}</td>
+      <td>${isEditMode
+        ? `<input class="inline-input" value="${d.vHarmo}" placeholder="${d.vBrut}" />`
+        : `<span style="color:${d.vHarmo ? 'var(--text)' : 'var(--text3)}'>${d.vHarmo || '—'}</span>`
+      }</td>
+      <td style="color:var(--text2)">${d.eFp}</td>
+      <td>${isEditMode
+        ? `<input class="inline-input" value="${d.ePnp}" placeholder="${d.eFp}" />`
+        : `<span style="color:${d.ePnp ? 'var(--text)' : 'var(--text3)}'>${d.ePnp || '—'}</span>`
+      }</td>
+      <td style="color:var(--text2)">${d.qty}</td>
+      <td>${isEditMode
+        ? `<select class="inline-input"><option>${d.type}</option><option>Passif</option><option>CI</option><option>Diode</option></select>`
+        : d.type
+      }</td>
+      <td><span class="chip ${statusColor[d.status] || 'chip-muted'}">${d.status}</span></td>
+    </tr>
+  `).join('');
+  document.getElementById('bomTableBody').innerHTML = rows;
+}
+
+// Generate slot strip
+function renderSlots() {
+  const strip = document.getElementById('slotStrip');
+  if (!strip) return;
+  const slots = [];
+  for (let i = 1; i <= 40; i++) {
+    let cls = 'slot-empty';
+    let label = i;
+    if ([2,3,5,7,8,10,12,13,14,16].includes(i)) { cls = 'slot-filled'; }
+    if ([1,4,6].includes(i)) { cls = 'slot-fixed'; }
+    slots.push(`<div class="slot ${cls} slot-hover" title="Position ${i}" onclick="showToast('Position ${i}')">
+      <span>${i}</span>
+    </div>`);
+  }
+  strip.innerHTML = slots.join('');
+}
+
+// Init
+renderBomTable();
+renderSlots();
+navigate('bom');
+</script>
+</body>
+</html>

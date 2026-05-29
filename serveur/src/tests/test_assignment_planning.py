@@ -7,11 +7,11 @@ import pytest
 from sqlalchemy.orm import Session
 
 from tests.conftest import TestingSessionLocal, engine
-from src.backend.database import Base
-from src.backend.models.bom import BomReference, BomRevision, BomItem, Component
-from src.backend.models.machines import PnpMachine, PnpFeeder
-from src.backend.models.production import Production, ProductionBomRevision
-from src.backend.services.assignment_planning import AssignmentPlanningMixin
+from src.database import Base
+from src.models.bom import BomReference, BomRevision, BomItem, Component
+from src.models.machines import PnpMachine, PnpFeeder
+from src.models.production import Production, ProductionBomRevision
+from src.services.assignment_planning import AssignmentPlanningMixin
 
 
 # ── Fixtures ──────────────────────────────────────────────────────────────────

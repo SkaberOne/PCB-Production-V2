@@ -18,10 +18,10 @@ if PROJECT_ROOT not in sys.path:
     sys.path.insert(0, PROJECT_ROOT)
 
 from tests.conftest import client, TestingSessionLocal
-from src.backend.models.bom import BomItem, BomReference, BomRevision
-from src.backend.models.commands import Command, CommandItem
-from src.backend.models.machines import PnpMachine
-from src.backend.models.production import Production, ProductionBomRevision
+from src.models.bom import BomItem, BomReference, BomRevision
+from src.models.commands import Command, CommandItem
+from src.models.machines import PnpMachine
+from src.models.production import Production, ProductionBomRevision
 
 
 # ---------------------------------------------------------------------------

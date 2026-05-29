@@ -21,21 +21,14 @@ echo [OK] .env trouve
 :: === Recherche du venv Python ===
 set PYTHON_EXE=
 
-:: 1. venv V2 (racine du projet)
+:: venv attendu a la racine du projet (parent de serveur/)
 if exist "..\\.venv\\Scripts\\python.exe" (
     set PYTHON_EXE="..\\.venv\\Scripts\\python.exe"
-    echo [OK] .venv V2 trouve
+    echo [OK] .venv trouve
     goto check_uvicorn
 )
 
-:: 2. venv dans l'ancien dossier (fallback)
-if exist "C:\\Users\\Eric\\Documents\\Programme VS Code\\PCB Production (outdated)\\.venv\\Scripts\\python.exe" (
-    set PYTHON_EXE="C:\\Users\\Eric\\Documents\\Programme VS Code\\PCB Production (outdated)\\.venv\\Scripts\\python.exe"
-    echo [OK] .venv (outdated) trouve - utilise comme fallback
-    goto check_uvicorn
-)
-
-echo [ERREUR] Aucun .venv Python trouve.
+echo [ERREUR] Aucun .venv Python trouve a la racine du projet.
 echo Lancez serveur\INSTALLER_SERVEUR.bat pour installer les dependances.
 pause
 exit /b 1

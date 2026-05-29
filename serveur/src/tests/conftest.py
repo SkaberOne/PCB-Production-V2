@@ -10,19 +10,19 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 from fastapi.testclient import TestClient
 
-PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
-if PROJECT_ROOT not in sys.path:
-    sys.path.insert(0, PROJECT_ROOT)
+SERVEUR_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+if SERVEUR_DIR not in sys.path:
+    sys.path.insert(0, SERVEUR_DIR)
 
 # Import models first to register them in Base
-from src.backend.database import Base
-from src.backend.models.bom import (
+from src.database import Base
+from src.models.bom import (
     BomReference, BomRevision, BomItem, Component,
     ComponentTypeRule, FootprintMapping, MachineFootprintRule,
 )
-from src.backend.models.commands import Command, CommandItem, ProductionPlan, PlanAssignment
-from src.backend.models.machines import PnpCart, PnpFeeder, PnpMachine
-from src.backend.models.production import Production, ProductionBomRevision
+from src.models.commands import Command, CommandItem, ProductionPlan, PlanAssignment
+from src.models.machines import PnpCart, PnpFeeder, PnpMachine
+from src.models.production import Production, ProductionBomRevision
 
 SQLALCHEMY_TEST_DATABASE_URL = "sqlite:///:memory:"
 
@@ -34,9 +34,9 @@ engine = create_engine(
 TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base.metadata.create_all(bind=engine)
 
-from src.backend.app import app
-from src.backend.database import get_db as db_get_db
-from src.backend.routes.bom import bom_file_service, get_db as bom_get_db
+from src.app import app
+from src.database import get_db as db_get_db
+from src.routes.bom import bom_file_service, get_db as bom_get_db
 
 
 def override_get_db():

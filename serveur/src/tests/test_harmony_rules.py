@@ -7,7 +7,7 @@ PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..
 if PROJECT_ROOT not in sys.path:
     sys.path.insert(0, PROJECT_ROOT)
 
-from src.backend.services.harmony_rules import (
+from src.services.harmony_rules import (
     extract_numeric_and_unit,
     harmonize_resistor_value,
     harmonize_capacitor_value,
