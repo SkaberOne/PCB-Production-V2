@@ -191,4 +191,4 @@ logger.info("ECB Production Manager started in %s mode", settings.api_env)
 if settings.database_url.startswith("sqlite"):
     logger.info("Database: SQLite (%s)", settings.database_url)
 else:
-    logger.i
+    logger.info("Database: %s", settings.database_url.split("@")[-1] if "@" in settings.database_url else settings.database_url)

@@ -14,6 +14,11 @@ SERVEUR_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."
 if SERVEUR_DIR not in sys.path:
     sys.path.insert(0, SERVEUR_DIR)
 
+# Force SQLite in-memory for tests BEFORE src.config is loaded
+# (config.py builds settings.database_url at import time; default is SQL Server)
+os.environ["DATABASE_URL"] = "sqlite:///:memory:"
+os.environ.pop("API_KEY", None)  # tests run in open mode
+
 # Import models first to register them in Base
 from src.database import Base
 from src.models.bom import (
