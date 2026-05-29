@@ -1,0 +1,61 @@
+import React from 'react';
+import apiClient from '../api/client';
+import { extractRequestError } from '../utils/machinePnp';
+
+/**
+ * Manages the core PnP workspace data: machines, feeder types, carts, productions.
+ * Provides global feedback, actionLoading, deleteDialog state, and loadWorkspace.
+ */
+export function useWorkspaceData() {
+    const [machines, setMachines] = React.useState([]);
+    const [feeders, setFeeders] = React.useState([]);
+    const [carts, setCarts] = React.useState([]);
+    const [productions, setProductions] = React.useState([]);
+    const [loading, setLoading] = React.useState(false);
+    const [feedback, setFeedback] = React.useState({ type: 'info', message: '' });
+    const [actionLoading, setActionLoading] = React.useState('');
+    const [deleteDialog, setDeleteDialog] = React.useState({ open: false, type: '', item: null });
+
+    const loadWorkspace = React.useCallback(async () => {
+        setLoading(true);
+        try {
+            const [machinesResponse, feedersResponse, cartsResponse, productionsResponse] = await Promise.all([
+                apiClient.get('/marketplace/machines', { params: { limit: 200 } }),
+                apiClient.get('/marketplace/feeder-types', { params: { limit: 200 } }),
+                apiClient.get('/marketplace/carts', { params: { limit: 200 } }),
+                apiClient.get('/marketplace/productions'),
+            ]);
+            setMachines(machinesResponse.data?.data || []);
+            setFeeders(feedersResponse.data?.data || []);
+            setCarts(cartsResponse.data?.data || []);
+            setProductions(productionsResponse.data?.items || productionsResponse.data?.data || []);
+            setFeedback({ type: 'info', message: '' });
+        } catch (requestError) {
+            setFeedback({
+                type: 'error',
+                message: extractRequestError(requestError, 'Impossible de charger la configuration PnP.'),
+            });
+        } finally {
+            setLoading(false);
+        }
+    }, []);
+
+    React.useEffect(() => {
+        loadWorkspace();
+    }, [loadWorkspace]);
+
+    return {
+        machines,
+        feeders,
+        carts,
+        productions,
+        loading,
+        feedback,
+        setFeedback,
+        actionLoading,
+        setActionLoading,
+        deleteDialog,
+        setDeleteDialog,
+        loadWorkspace,
+    };
+}

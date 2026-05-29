@@ -1,0 +1,512 @@
+"""Machine production planning helpers."""
+
+import logging
+from datetime import datetime
+from typing import Dict, List, Tuple
+
+from sqlalchemy.orm import Session, joinedload
+
+from ..models.bom import BomItem, BomRevision, Component
+from ..models.commands import ProductionPlan
+from ..models.machines import PnpCart, PnpMachine
+from ..models.production import Production, ProductionBomRevision
+from .assignment_helpers import (
+    build_assignment_payload,
+    build_bom_assignment_summaries,
+    build_slot_payload,
+    build_unassigned_payload,
+    cart_kind_value,
+    component_display_label,
+    component_slot_usage,
+    extract_feeder_size_mm,
+    serialize_machine,
+    serialize_machine_production,
+    sort_production_bom_links,
+)
+from .component_library_service import ComponentLibraryService
+
+logger = logging.getLogger(__name__)
+
+
+class AssignmentPlanningMixin:
+    """Helpers for machine-to-production planning and validation."""
+
+    @classmethod
+    def _get_machine_with_relations(cls, db: Session, machine_id: int) -> PnpMachine:
+        machine = (
+            db.query(PnpMachine)
+            .options(
+                joinedload(PnpMachine.feeders),
+                joinedload(PnpMachine.production_plans),
+                joinedload(PnpMachine.productions)
+                .joinedload(Production.bom_links)
+                .joinedload(ProductionBomRevision.revision)
+                .joinedload(BomRevision.reference),
+            )
+            .filter(PnpMachine.id == machine_id)
+            .first()
+        )
+        if not machine:
+            raise ValueError(f"Machine {machine_id} not found")
+        return machine
+
+    @classmethod
+    def _get_machine_and_production_context(
+        cls,
+        db: Session,
+        machine_id: int,
+        production_id: int,
+        include_items: bool = False,
+    ) -> Tuple[PnpMachine, Production]:
+        machine = (
+            db.query(PnpMachine)
+            .options(joinedload(PnpMachine.feeders))
+            .filter(PnpMachine.id == machine_id)
+            .first()
+        )
+        if not machine:
+            raise ValueError(f"Machine {machine_id} not found")
+
+        production_options = [
+            joinedload(Production.bom_links)
+            .joinedload(ProductionBomRevision.revision)
+            .joinedload(BomRevision.reference),
+        ]
+        if include_items:
+            production_options.append(
+                joinedload(Production.bom_links)
+                .joinedload(ProductionBomRevision.revision)
+                .joinedload(BomRevision.items)
+            )
+
+        production = (
+            db.query(Production)
+            .options(*production_options)
+            .filter(Production.id == production_id)
+            .first()
+        )
+        if not production:
+            raise ValueError(f"Production {production_id} not found")
+        if production.machine_id != machine_id:
+            raise ValueError(f"Production {production_id} is not assigned to machine {machine_id}")
+        return machine, production
+
+    @classmethod
+    def update_machine_production_bom_order(
+        cls,
+        db: Session,
+        machine_id: int,
+        production_id: int,
+        bom_revision_ids: List[int],
+    ) -> Dict:
+        _machine, production = cls._get_machine_and_production_context(
+            db=db,
+            machine_id=machine_id,
+            production_id=production_id,
+            include_items=False,
+        )
+
+        normalized_revision_ids = [int(revision_id) for revision_id in bom_revision_ids if revision_id]
+        if not normalized_revision_ids:
+            raise ValueError("At least one BOM revision must be provided")
+
+        current_links = {link.bom_revision_id: link for link in production.bom_links}
+        current_revision_ids = set(current_links.keys())
+        requested_revision_ids = set(normalized_revision_ids)
+        if current_revision_ids != requested_revision_ids:
+            missing_ids = sorted(current_revision_ids - requested_revision_ids)
+            extra_ids = sorted(requested_revision_ids - current_revision_ids)
+            details = []
+            if missing_ids:
+                details.append("missing: " + ", ".join(str(revision_id) for revision_id in missing_ids))
+            if extra_ids:
+                details.append("unknown: " + ", ".join(str(revision_id) for revision_id in extra_ids))
+            raise ValueError("BOM order must include exactly the linked BOM revisions (" + "; ".join(details) + ")")
+
+        for index, revision_id in enumerate(normalized_revision_ids, start=1):
+            current_links[revision_id].sequence_order = index
+
+        production.manufacturing_order_validated_at = None
+        production.updated_at = datetime.utcnow()
+        db.commit()
+        db.refresh(production)
+        return serialize_machine_production(production)
+
+    @classmethod
+    def _collect_machine_production_usage(
+        cls,
+        db: Session,
+        production: Production,
+    ) -> Tuple[List[Dict], Dict[int, Dict], int]:
+        ordered_links = sort_production_bom_links(production.bom_links)
+        quantity_to_produce_by_revision: Dict[int, int] = {
+            int(link.bom_revision_id): max(int(link.quantity_to_produce or 1), 1)
+            for link in ordered_links
+            if int(link.bom_revision_id or 0) > 0
+        }
+
+        components = (
+            db.query(Component)
+            .options(joinedload(Component.fixed_cart))
+            .order_by(Component.id.asc())
+            .all()
+        )
+        component_lookup = ComponentLibraryService.build_lookup(components)
+        usage_index: Dict[int, Dict] = {}
+        unmatched_bom_items = 0
+        ordered_boms: List[Dict] = []
+
+        for sequence_index, link in enumerate(ordered_links, start=1):
+            revision = link.revision
+            reference = revision.reference if revision else None
+            side = revision.type.value if revision and hasattr(revision.type, "value") else (revision.type if revision else "")
+            board_build_key = (
+                f"{reference.id}:{revision.revision}"
+                if reference and revision
+                else f"revision:{revision.id if revision else sequence_index}"
+            )
+            bom_label = " / ".join(
+                part for part in [reference.reference if reference else "", revision.revision if revision else "", side or ""] if part
+            )
+            ordered_boms.append(
+                {
+                    "bom_reference_id": reference.id if reference else None,
+                    "bom_revision_id": revision.id if revision else None,
+                    "reference": reference.reference if reference else "",
+                    "category": reference.category if reference else None,
+                    "revision": revision.revision if revision else "",
+                    "side": side or "",
+                    "sequence_order": link.sequence_order or sequence_index,
+                    "label": bom_label,
+                    "board_build_key": board_build_key,
+                    "quantity_to_produce": quantity_to_produce_by_revision.get(revision.id, 1) if revision else 1,
+                }
+            )
+
+            if not revision:
+                continue
+
+            revision_quantity_to_produce = quantity_to_produce_by_revision.get(revision.id, 1)
+            if revision_quantity_to_produce < 1:
+                continue
+
+            for bom_item in list(revision.items or []):
+                if bom_item.dnp:
+                    continue
+
+                matched_component = ComponentLibraryService.match_bom_item(component_lookup, bom_item)
+                if not matched_component:
+                    unmatched_bom_items += 1
+                    continue
+
+                usage_entry = usage_index.setdefault(
+                    matched_component.id,
+                    {
+                        "component": matched_component,
+                        "slot_usage": component_slot_usage(matched_component),
+                        "feeder_size_mm": extract_feeder_size_mm(matched_component.feeder_type),
+                        "bom_revision_ids": set(),
+                        "bom_labels_by_revision": {},
+                        "total_quantity": 0,
+                        "board_quantity_by_revision": {},
+                        "total_quantity_by_revision": {},
+                        "build_quantity_by_board_key": {},
+                        "first_bom_index": sequence_index,
+                        "last_bom_index": sequence_index,
+                    },
+                )
+                bom_item_board_quantity = max(int(bom_item.quantity or 1), 1)
+                usage_entry["bom_revision_ids"].add(revision.id)
+                usage_entry["bom_labels_by_revision"][revision.id] = bom_label
+                usage_entry["board_quantity_by_revision"][revision.id] = (
+                    usage_entry["board_quantity_by_revision"].get(revision.id, 0) + bom_item_board_quantity
+                )
+                usage_entry["total_quantity_by_revision"][revision.id] = (
+                    usage_entry["total_quantity_by_revision"].get(revision.id, 0)
+                    + (bom_item_board_quantity * revision_quantity_to_produce)
+                )
+                usage_entry["build_quantity_by_board_key"][board_build_key] = revision_quantity_to_produce
+                usage_entry["total_quantity"] += bom_item_board_quantity * revision_quantity_to_produce
+                usage_entry["first_bom_index"] = min(usage_entry["first_bom_index"], sequence_index)
+                usage_entry["last_bom_index"] = max(usage_entry["last_bom_index"], sequence_index)
+
+        return ordered_boms, usage_index, unmatched_bom_items
+
+    @classmethod
+    def _fixed_plan_sort_key(cls, entry: Dict) -> Tuple:
+        component = entry["component"]
+        cart = component.fixed_cart
+        kind_priority = {
+            PnpCart.KindEnum.COMMON.value: 0,
+            PnpCart.KindEnum.CATEGORY.value: 1,
+            PnpCart.KindEnum.CUSTOM.value: 2,
+        }
+        cart_kind = cart_kind_value(cart) or PnpCart.KindEnum.CUSTOM.value
+        return (
+            kind_priority.get(cart_kind, 99),
+            -entry["slot_usage"],
+            (cart.name if cart else "").upper(),
+            -len(entry["bom_revision_ids"]),
+            entry["first_bom_index"],
+            component_display_label(component).upper(),
+            component.id,
+        )
+
+    @classmethod
+    def _dynamic_plan_sort_key(cls, entry: Dict) -> Tuple:
+        component = entry["component"]
+        bom_span = entry["last_bom_index"] - entry["first_bom_index"]
+        return (
+            -len(entry["bom_revision_ids"]),
+            -bom_span,
+            entry["first_bom_index"],
+            -entry["slot_usage"],
+            -entry["total_quantity"],
+            component_display_label(component).upper(),
+            component.id,
+        )
+
+    @classmethod
+    def get_machine_production_feeder_plan(
+        cls,
+        db: Session,
+        machine_id: int,
+        production_id: int,
+    ) -> Dict:
+        machine, production = cls._get_machine_and_production_context(
+            db=db,
+            machine_id=machine_id,
+            production_id=production_id,
+            include_items=True,
+        )
+
+        ordered_links = sort_production_bom_links(production.bom_links)
+        for index, link in enumerate(ordered_links, start=1):
+            if link.sequence_order != index:
+                link.sequence_order = index
+        db.flush()
+
+        ordered_boms, usage_index, unmatched_bom_items = cls._collect_machine_production_usage(db=db, production=production)
+        total_build_quantity_by_board_key: Dict[str, int] = {}
+        for bom in ordered_boms:
+            board_build_key = str(bom.get("board_build_key") or "")
+            if not board_build_key:
+                continue
+            total_build_quantity_by_board_key[board_build_key] = max(
+                total_build_quantity_by_board_key.get(board_build_key, 0),
+                max(int(bom.get("quantity_to_produce") or 1), 1),
+            )
+        total_build_quantity = sum(total_build_quantity_by_board_key.values())
+        machine_feeder_sizes = sorted(
+            {
+                int(feeder.size_mm)
+                for feeder in list(machine.feeders or [])
+                if feeder.size_mm is not None
+            }
+        )
+
+        fixed_entries: List[Dict] = []
+        dynamic_entries: List[Dict] = []
+        for entry in usage_index.values():
+            component = entry["component"]
+            if bool(component.is_fixed_feeder):
+                fixed_entries.append(entry)
+            else:
+                dynamic_entries.append(entry)
+
+        positions: Dict[int, Dict] = {}
+        slot_assignments: List[Dict] = []
+        unassigned_components: List[Dict] = []
+
+        def assign_entry(entry: Dict, placement_group: str) -> None:
+            feeder_size_mm = entry["feeder_size_mm"]
+            if machine_feeder_sizes:
+                if feeder_size_mm is None:
+                    unassigned_components.append(build_unassigned_payload(entry, "Taille de feeder inconnue", placement_group))
+                    return
+                if feeder_size_mm not in machine_feeder_sizes:
+                    unassigned_components.append(
+                        build_unassigned_payload(
+                            entry,
+                            f"Taille {feeder_size_mm} mm non disponible sur cette machine",
+                            placement_group,
+                        )
+                    )
+                    return
+
+            required_slots = entry["slot_usage"]
+            for slot_start in range(1, max(int(machine.num_positions or 0) - required_slots + 2, 1)):
+                slot_positions = list(range(slot_start, slot_start + required_slots))
+                if slot_positions[-1] > int(machine.num_positions or 0):
+                    continue
+                if any(position in positions for position in slot_positions):
+                    continue
+
+                assignment = build_assignment_payload(
+                    entry=entry,
+                    slot_positions=slot_positions,
+                    placement_group=placement_group,
+                    assignment_index=len(slot_assignments) + 1,
+                    ordered_boms=ordered_boms,
+                )
+                slot_assignments.append(assignment)
+                for position in slot_positions:
+                    positions[position] = assignment
+                return
+
+            unassigned_components.append(build_unassigned_payload(entry, "Capacite machine insuffisante", placement_group))
+
+        for entry in sorted(fixed_entries, key=cls._fixed_plan_sort_key):
+            assign_entry(entry, "FIXED")
+
+        for entry in sorted(dynamic_entries, key=cls._dynamic_plan_sort_key):
+            assign_entry(entry, "DYNAMIC")
+
+        slots = []
+        total_positions = int(machine.num_positions or 0)
+        for position in range(1, total_positions + 1):
+            slots.append(build_slot_payload(position, positions.get(position)))
+
+        assigned_fixed_count = sum(1 for assignment in slot_assignments if assignment["placement_group"] == "FIXED")
+        assigned_dynamic_count = sum(1 for assignment in slot_assignments if assignment["placement_group"] == "DYNAMIC")
+        stable_assignment_indexes = [
+            assignment["assignment_index"]
+            for assignment in slot_assignments
+            if assignment["is_stable_between_boms"]
+        ]
+        bom_assignment_summaries = build_bom_assignment_summaries(ordered_boms, slot_assignments)
+
+        return {
+            "machine_id": machine.id,
+            "machine_name": machine.name,
+            "machine_positions": total_positions,
+            "machine_feeder_sizes": machine_feeder_sizes,
+            "production_id": production.id,
+            "production_name": production.name,
+            "quantity_source": "PRODUCTION",
+            "total_build_quantity": total_build_quantity,
+            "manufacturing_order_validated_at": (
+                production.manufacturing_order_validated_at.isoformat()
+                if production.manufacturing_order_validated_at
+                else None
+            ),
+            "is_order_validated": production.manufacturing_order_validated_at is not None,
+            "ordered_boms": ordered_boms,
+            "slot_assignments": slot_assignments,
+            "stable_assignment_indexes": stable_assignment_indexes,
+            "stable_assignment_count": len(stable_assignment_indexes),
+            "bom_assignment_summaries": bom_assignment_summaries,
+            "slots": slots,
+            "unassigned_components": unassigned_components,
+            "assigned_component_count": len(slot_assignments),
+            "assigned_fixed_component_count": assigned_fixed_count,
+            "assigned_dynamic_component_count": assigned_dynamic_count,
+            "fixed_candidate_count": len(fixed_entries),
+            "dynamic_candidate_count": len(dynamic_entries),
+            "occupied_slot_count": len(positions),
+            "free_slot_count": max(total_positions - len(positions), 0),
+            "unassigned_component_count": len(unassigned_components),
+            "unmatched_bom_item_count": unmatched_bom_items,
+        }
+
+    @classmethod
+    def validate_machine_production_order(
+        cls,
+        db: Session,
+        machine_id: int,
+        production_id: int,
+    ) -> Dict:
+        _machine, production = cls._get_machine_and_production_context(
+            db=db,
+            machine_id=machine_id,
+            production_id=production_id,
+            include_items=False,
+        )
+        ordered_links = sort_production_bom_links(production.bom_links)
+        if not ordered_links:
+            raise ValueError("Aucune BOM n'est liee a cette production.")
+
+        for index, link in enumerate(ordered_links, start=1):
+            link.sequence_order = index
+
+        production.manufacturing_order_validated_at = datetime.utcnow()
+        production.updated_at = datetime.utcnow()
+        db.commit()
+        db.refresh(production)
+
+        return {
+            "message": "Ordre de fabrication valide. Implantation feeders calculee.",
+            "production": serialize_machine_production(production),
+            "plan": cls.get_machine_production_feeder_plan(
+                db=db,
+                machine_id=machine_id,
+                production_id=production_id,
+            ),
+        }
+
+    @staticmethod
+    def get_machine_summary(db: Session, machine_id: int) -> Dict:
+        machine = AssignmentPlanningMixin._get_machine_with_relations(db=db, machine_id=machine_id)
+        active_plans = db.query(ProductionPlan).filter(ProductionPlan.machine_id == machine_id).all()
+        machine_summary = serialize_machine(machine)
+
+        feeder_details = [
+            {
+                "id": feeder.id,
+                "size_mm": feeder.size_mm,
+                "capacity": feeder.capacity,
+                "description": feeder.description,
+            }
+            for feeder in machine.feeders
+        ]
+        production_details = [
+            serialize_machine_production(production)
+            for production in sorted(
+                machine.productions or [],
+                key=lambda item: item.updated_at or item.created_at or datetime.min,
+                reverse=True,
+            )
+        ]
+
+        return {
+            **machine_summary,
+            "active_production_plans": len(active_plans),
+            "productions": production_details,
+            "feeders": feeder_details,
+            "production_plans": [
+                {
+                    "id": plan.id,
+                    "command_id": plan.command_id,
+                    "created_at": plan.created_at.isoformat(),
+                }
+                for plan in active_plans
+            ],
+        }
+
+    @staticmethod
+    def check_machine_capacity(
+        db: Session,
+        machine_id: int,
+        plan_id: int,
+    ) -> Dict:
+        machine = db.query(PnpCart).filter(PnpCart.id == machine_id).first()
+        if not machine:
+            raise ValueError(f"Machine {machine_id} not found")
+
+        plan = db.query(ProductionPlan).filter(ProductionPlan.id == plan_id).first()
+        if not plan:
+            raise ValueError(f"Production plan {plan_id} not found")
+
+        assignments = db.query(ProductionPlan).filter(ProductionPlan.id == plan_id).all()
+        num_assignments = len(assignments)
+        has_capacity = num_assignments <= machine.num_positions
+
+        return {
+            "machine_id": machine_id,
+            "plan_id": plan_id,
+            "machine_positions": machine.num_positions,
+            "assigned_positions": num_assignments,
+            "available_positions": machine.num_positions - num_assignments,
+            "has_capacity": has_capacity,
+            "capacity_utilization": round((num_assignments / machine.num_positions) * 100, 2),
+        }

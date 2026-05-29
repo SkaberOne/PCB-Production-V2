@@ -1,0 +1,3 @@
+Placeholder file for Electron build resources.
+
+Add icons or installer assets here when the desktop branding is finalized.

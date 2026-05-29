@@ -1,0 +1,59 @@
+{
+  "name": "ecb-production-desktop",
+  "version": "1.0.0",
+  "description": "ECB Production Manager - Desktop App",
+  "author": "ECB Production Manager",
+  "main": "src/main.js",
+  "homepage": "./",
+  "dependencies": {
+    "electron-squirrel-startup": "^1.0.1"
+  },
+  "devDependencies": {
+    "electron": "^34.0.0",
+    "electron-builder": "^24.6.4",
+    "electron-devtools-installer": "^3.2.0"
+  },
+  "scripts": {
+    "start": "electron .",
+    "start:web": "npm --prefix ../frontend start",
+    "build:renderer": "npm --prefix ../frontend run build",
+    "build:desktop": "electron-builder",
+    "build:portable": "npm run build:renderer && electron-builder --publish never --win portable",
+    "build": "npm run build:renderer && npm run build:desktop",
+    "dist": "npm run build:renderer && electron-builder --publish never",
+    "dist:portable": "npm run build:renderer && electron-builder --publish never --win portable"
+  },
+  "build": {
+    "appId": "com.ecb.production",
+    "productName": "ECB Production Manager",
+    "files": [
+      "src/**/*",
+      "package.json",
+      "node_modules/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": "../frontend/build",
+        "to": "frontend/build",
+        "filter": [
+          "**/*"
+        ]
+      }
+    ],
+    "directories": {
+      "buildResources": "public"
+    },
+    "win": {
+      "target": [
+        "nsis",
+        "portable"
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
+    }
+  }
+}

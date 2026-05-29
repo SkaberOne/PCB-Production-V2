@@ -1,0 +1,64 @@
+"""SQLAlchemy models for production workspaces linked to BOM revisions."""
+
+import enum
+
+from sqlalchemy import Column, DateTime, Enum, ForeignKey, Integer, JSON, String, Text, UniqueConstraint
+from sqlalchemy.orm import relationship
+
+from ..database import Base, utcnow
+
+
+class Production(Base):
+    """A user-managed production workspace grouping several BOM revisions."""
+
+    __tablename__ = "PRODUCTIONS"
+
+    class StatusEnum(str, enum.Enum):
+        DRAFT = "DRAFT"
+        ACTIVE = "ACTIVE"
+        COMPLETED = "COMPLETED"
+        ARCHIVED = "ARCHIVED"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(200), unique=True, nullable=False, index=True)
+    machine_id = Column(Integer, ForeignKey("PNP_MACHINES.id"), nullable=True, index=True)
+    status = Column(Enum(StatusEnum), default=StatusEnum.ACTIVE)
+    notes = Column(Text, nullable=True)
+    erp_context = Column(JSON, nullable=True)
+    manufacturing_order_validated_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=utcnow)
+    updated_at = Column(DateTime, default=utcnow, onupdate=utcnow)
+
+    bom_links = relationship(
+        "ProductionBomRevision",
+        back_populates="production",
+        cascade="all, delete-orphan",
+        order_by="ProductionBomRevision.added_at",
+    )
+    commands = relationship("Command", back_populates="production")
+    machine = relationship("PnpMachine", back_populates="productions")
+
+    def __repr__(self):
+        return f"<Production {self.name}>"
+
+
+class ProductionBomRevision(Base):
+    """Association between a production workspace and a stored BOM revision."""
+
+    __tablename__ = "PRODUCTION_BOM_REVISIONS"
+    __table_args__ = (
+        UniqueConstraint("production_id", "bom_revision_id", name="uq_production_bom_revision"),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    production_id = Column(Integer, ForeignKey("PRODUCTIONS.id"), nullable=False)
+    bom_revision_id = Column(Integer, ForeignKey("BOM_REVISIONS.id"), nullable=False)
+    sequence_order = Column(Integer, nullable=True)
+    quantity_to_produce = Column(Integer, nullable=True, default=1)
+    added_at = Column(DateTime, default=utcnow)
+
+    production = relationship("Production", back_populates="bom_links")
+    revision = relationship("BomRevision")
+
+    def __repr__(self):
+        return f"<ProductionBomRevision production={self.production_id} bom={self.bom_revision_id}>"

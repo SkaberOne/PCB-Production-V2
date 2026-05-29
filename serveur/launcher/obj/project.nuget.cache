@@ -1,0 +1,13 @@
+{
+  "version": 2,
+  "dgSpecHash": "EnV8SvJcC+4=",
+  "success": true,
+  "projectFilePath": "C:\\Users\\Eric\\Documents\\Programme VS Code\\PCB Production\\tools\\backend-launcher\\BackendLauncher.csproj",
+  "expectedPackageFiles": [
+    "C:\\Users\\Eric\\.nuget\\packages\\microsoft.net.illink.tasks\\9.0.14\\microsoft.net.illink.tasks.9.0.14.nupkg.sha512",
+    "C:\\Users\\Eric\\.nuget\\packages\\microsoft.netcore.app.runtime.win-x64\\9.0.14\\microsoft.netcore.app.runtime.win-x64.9.0.14.nupkg.sha512",
+    "C:\\Users\\Eric\\.nuget\\packages\\microsoft.windowsdesktop.app.runtime.win-x64\\9.0.14\\microsoft.windowsdesktop.app.runtime.win-x64.9.0.14.nupkg.sha512",
+    "C:\\Users\\Eric\\.nuget\\packages\\microsoft.aspnetcore.app.runtime.win-x64\\9.0.14\\microsoft.aspnetcore.app.runtime.win-x64.9.0.14.nupkg.sha512"
+  ],
+  "logs": []
+}
