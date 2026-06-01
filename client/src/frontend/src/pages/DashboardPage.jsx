@@ -882,13 +882,18 @@ function DashboardPage() {
                                                     <TableCell sx={{ borderColor: '#27272a' }}><Skeleton variant="rounded" width={60} height={24} sx={{ bgcolor: '#27272a' }} /></TableCell>
                                                 </TableRow>
                                             ))
-                                        ) : productions.map((prod) => (
-                                            <TableRow key={prod.id} hover sx={{ cursor: 'pointer' }} onClick={() => navigate(`/productions/${prod.id}`)}>
-                                                <TableCell sx={{ borderColor: '#27272a', color: '#f4f4f5' }}>{prod.name}</TableCell>
-                                                <TableCell sx={{ borderColor: '#27272a', color: '#a1a1aa' }}>{prod.status}</TableCell>
-                                                <TableCell sx={{ borderColor: '#27272a', color: '#a1a1aa' }}>{prod.machine_name || '--'}</TableCell>
-                                                <TableCell sx={{ borderColor: '#27272a' }}></TableCell>
-                                            </TableRow>
+                                        ) : filteredProductions.map((prod) => (
+                                            <DashboardProductionRow
+                                                key={prod.id}
+                                                production={prod}
+                                                isSessionActive={activeProduction?.id === prod.id}
+                                                isBusy={actionLoadingId === prod.id}
+                                                onRequestOpenProduction={handleRequestOpenProduction}
+                                                onRequestDeleteProduction={handleRequestDeleteProduction}
+                                                onRequestRenameProduction={handleRequestRenameProduction}
+                                                onRequestArchiveProduction={handleArchiveProduction}
+                                                onRequestDuplicateProduction={handleDuplicateProduction}
+                                            />
                                         ))}
                                     </TableBody>
                                 </Table>

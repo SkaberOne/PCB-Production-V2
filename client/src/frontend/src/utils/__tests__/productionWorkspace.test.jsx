@@ -5,15 +5,25 @@ import { BomSessionProvider, useBomSession } from '../../context/BomSessionConte
 import { hydrateProductionWorkspace, hydrateStoredBomSelection } from '../productionWorkspace';
 import { suppressActDeprecatedWarning } from '../../testActWarnings';
 
-jest.mock('axios', () => ({
-    __esModule: true,
-    default: {
+jest.mock('axios', () => {
+    // L'instance partage les mêmes jest.fn que le default, donc régler
+    // axios.default.get pilote aussi apiClient.get (= axios.create()).
+    const instance = {
         get: jest.fn(),
         post: jest.fn(),
+        put: jest.fn(),
         patch: jest.fn(),
         delete: jest.fn(),
-    },
-}));
+        interceptors: {
+            request: { use: jest.fn() },
+            response: { use: jest.fn() },
+        },
+    };
+    return {
+        __esModule: true,
+        default: { ...instance, create: jest.fn(() => instance) },
+    };
+});
 
 const wrapper = ({ children }) => (
     <BomSessionProvider>{children}</BomSessionProvider>

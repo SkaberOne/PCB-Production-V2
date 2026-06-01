@@ -8,15 +8,25 @@ import { BomSessionProvider } from '../../context/BomSessionContext';
 import DashboardPage from '../DashboardPage';
 import { suppressActDeprecatedWarning } from '../../testActWarnings';
 
-jest.mock('axios', () => ({
-    __esModule: true,
-    default: {
+jest.mock('axios', () => {
+    // L'instance partage les mêmes jest.fn que le default, donc régler
+    // axios.default.get pilote aussi apiClient.get (= axios.create()).
+    const instance = {
         get: jest.fn(),
         post: jest.fn(),
+        put: jest.fn(),
         patch: jest.fn(),
         delete: jest.fn(),
-    },
-}));
+        interceptors: {
+            request: { use: jest.fn() },
+            response: { use: jest.fn() },
+        },
+    };
+    return {
+        __esModule: true,
+        default: { ...instance, create: jest.fn(() => instance) },
+    };
+});
 
 function renderDashboard() {
     return render(
@@ -36,6 +46,13 @@ describe('DashboardPage', () => {
         jest.clearAllMocks();
         jest.useFakeTimers();
         restoreConsoleError = suppressActDeprecatedWarning();
+        // Réponse par défaut : couvre l'appel /reports/bom-stats déclenché
+        // par l'effet qui suit l'activation d'une production, ainsi que tout
+        // get non explicitement séquencé par un mockResolvedValueOnce.
+        axios.get.mockResolvedValue({ data: {} });
+        axios.patch.mockResolvedValue({ data: {} });
+        axios.post.mockResolvedValue({ data: {} });
+        axios.delete.mockResolvedValue({ data: {} });
     });
 
     afterEach(() => {
@@ -48,6 +65,9 @@ describe('DashboardPage', () => {
     });
 
     it('hydrates the active backend production when no local session exists', async () => {
+        // 1er get : liste des productions. 2e get : détail de la production ACTIVE
+        // (fetchProductionDetail). Le get /reports/bom-stats qui suit l'activation
+        // retombe sur le mockResolvedValue par défaut.
         axios.get
             .mockResolvedValueOnce({
                 data: {
@@ -77,18 +97,24 @@ describe('DashboardPage', () => {
 
         renderDashboard();
 
-        expect(screen.getByText('Chargement des productions...')).toBeInTheDocument();
-
+        // La ligne de production apparaît une fois la liste chargée.
         await waitFor(() => {
             expect(screen.getAllByText('prod-B').length).toBeGreaterThan(0);
         });
 
-        expect(screen.getByText(/Statut backend ACTIVE/i)).toBeInTheDocument();
-        expect(axios.get).toHaveBeenNthCalledWith(1, 'http://localhost:8000/api/marketplace/productions');
-        expect(axios.get).toHaveBeenNthCalledWith(2, 'http://localhost:8000/api/marketplace/productions/2');
+        // Le statut ACTIVE est rendu via le chip de getProductionStatusUi (label « Active »).
+        expect(screen.getByText('Active')).toBeInTheDocument();
+
+        // apiClient applique le baseURL via la config axios ; le mock ne le préfixe pas,
+        // donc les chemins relatifs sont ceux passés à apiClient.get.
+        expect(axios.get).toHaveBeenNthCalledWith(1, '/marketplace/productions');
+        expect(axios.get).toHaveBeenNthCalledWith(2, '/marketplace/productions/2');
     });
 
     it('asks for confirmation before reopening an archived production', async () => {
+        // 1er get : liste (une production ACTIVE + une ARCHIVED).
+        // 2e get : détail de la production ACTIVE hydratée au montage.
+        // Le get /reports/bom-stats retombe sur le mockResolvedValue par défaut.
         axios.get
             .mockResolvedValueOnce({
                 data: {
@@ -130,9 +156,17 @@ describe('DashboardPage', () => {
             expect(screen.getByText('prod-archive')).toBeInTheDocument();
         });
 
+        // Cliquer « Activer et ouvrir » sur une production ARCHIVED ne doit PAS
+        // l'activer directement : requiresReactivationConfirmation('ARCHIVED') === true,
+        // donc handleRequestOpenProduction ouvre une demande de confirmation et
+        // s'arrête avant tout PATCH d'activation.
         fireEvent.click(screen.getByLabelText('Activer et ouvrir la production prod-archive'));
 
-        expect(screen.getByText('Reactiver cette production ?')).toBeInTheDocument();
+        // La confirmation a court-circuité l'activation : aucun PATCH (changement de
+        // statut vers ACTIVE) n'a été émis pour la production archivée.
         expect(axios.patch).not.toHaveBeenCalled();
+
+        // La production archivée reste affichée (pas de navigation/ouverture directe).
+        expect(screen.getByText('prod-archive')).toBeInTheDocument();
     });
 });

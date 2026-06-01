@@ -1,11 +1,22 @@
-jest.mock('axios', () => ({
-    __esModule: true,
-    default: {
-        patch: jest.fn(),
+jest.mock('axios', () => {
+    // L'instance partage les mêmes jest.fn que le default, donc régler
+    // axios.default.patch pilote aussi apiClient.patch (= axios.create()).
+    const instance = {
         get: jest.fn(),
+        post: jest.fn(),
         put: jest.fn(),
-    },
-}));
+        patch: jest.fn(),
+        delete: jest.fn(),
+        interceptors: {
+            request: { use: jest.fn() },
+            response: { use: jest.fn() },
+        },
+    };
+    return {
+        __esModule: true,
+        default: { ...instance, create: jest.fn(() => instance) },
+    };
+});
 
 import axios from 'axios';
 import {
@@ -83,15 +94,17 @@ describe('importReview helpers', () => {
 
         expect(axios.patch).toHaveBeenNthCalledWith(
             1,
-            'http://localhost:8000/api/bom/files/7',
+            '/bom/files/7',
             { reference: 'NEW_REF', revision: 'REV_B' },
+            { signal: undefined },
         );
         expect(axios.patch).toHaveBeenNthCalledWith(
             2,
-            'http://localhost:8000/api/bom/references/22/category',
+            '/bom/references/22/category',
             { category: 'AMPLI' },
+            { signal: undefined },
         );
-        expect(axios.get).toHaveBeenCalledWith('http://localhost:8000/api/bom/files/7/session');
+        expect(axios.get).toHaveBeenCalledWith('/bom/files/7/session', { signal: undefined });
         expect(persistedEntry).toMatchObject({
             bom_reference_id: 22,
             bom_revision_id: 7,
@@ -205,27 +218,23 @@ describe('importReview helpers', () => {
         });
 
         expect(axios.patch).toHaveBeenNthCalledWith(
+            1,
+            '/bom/files/5',
+            { reference: 'PSU_CARD', revision: 'REV_C' },
+            { signal: undefined },
+        );
+        expect(axios.patch).toHaveBeenNthCalledWith(
             2,
-            'http://localhost:8000/api/bom/references/33/category',
+            '/bom/references/33/category',
             { category: 'POWER' },
+            { signal: undefined },
         );
-        expect(axios.put).toHaveBeenCalledWith(
-            'http://localhost:8000/api/bom/33/revisions/5/review',
-            {
-                items: [
-                    {
-                        id: 101,
-                        value_harmonized: '10R',
-                        footprint_pnp: 'R0805',
-                        notes: null,
-                        dnp: false,
-                    },
-                ],
-                create_mappings: true,
-                mark_as_active: false,
-            },
-        );
-        expect(persistedBom).toMatchObject({
+        expect(axios.get).toHaveBeenCalledWith('/bom/files/5/session', { signal: undefined });
+        // Le flux ne fait plus de PUT /review ni d'appel à setImportedBom : il persiste
+        // les métadonnées par lot et retourne { settledResults, activeRevisionMeta }.
+        expect(axios.put).not.toHaveBeenCalled();
+        expect(setImportedBom).not.toHaveBeenCalled();
+        expect(persistedBom.activeRevisionMeta).toMatchObject({
             bom_reference_id: 33,
             bom_revision_id: 5,
             reference: 'PSU_CARD',
@@ -233,11 +242,5 @@ describe('importReview helpers', () => {
             side: 'TOP',
             category: 'POWER',
         });
-        expect(setImportedBom).toHaveBeenCalledWith(expect.objectContaining({
-            bom_reference_id: 33,
-            bom_revision_id: 5,
-            side: 'TOP',
-            category: 'POWER',
-        }));
     });
 });

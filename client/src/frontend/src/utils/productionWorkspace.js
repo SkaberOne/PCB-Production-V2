@@ -172,5 +172,37 @@ export async function hydrateStoredBomSelection({
     }
 }
 
-// Alias for backward compatibility
-export { hydrateStoredBomSelection as hydrateProductionWorkspace };
+// Hydrate la session de travail à partir d'un objet production détaillé.
+// Active d'abord la production (sidebar + scope storage), puis charge la
+// sélection de BOM dérivée de production.bom_revisions.
+export async function hydrateProductionWorkspace({
+    productionDetail,
+    activateProductionSession,
+    setSelectedBomEntries,
+    setImportedBom,
+    updateImportWorkspace,
+    clearCurrentBom,
+    ...rest
+}) {
+    // 1. Active la production AVANT l'hydratation : activateProductionSession
+    //    réinitialise le scope storage / bomWorkspace pour le nouvel id, donc
+    //    l'appeler après écraserait la sélection qu'on vient de charger.
+    if (activateProductionSession) {
+        activateProductionSession(productionDetail);
+    }
+
+    // 2. Dérive la sélection de BOM des révisions liées à la production.
+    const selection = Array.isArray(productionDetail?.bom_revisions)
+        ? productionDetail.bom_revisions
+        : [];
+
+    // 3. Délègue le chargement par révision.
+    return hydrateStoredBomSelection({
+        selection,
+        setSelectedBomEntries,
+        setImportedBom,
+        updateImportWorkspace,
+        clearCurrentBom,
+        ...rest,
+    });
+}

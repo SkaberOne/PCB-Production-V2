@@ -6,9 +6,12 @@
  *  - Mock useBomSession to supply a minimal BOM session context.
  *  - Assert rendered output at the DOM level — no implementation details.
  *
- * On mount the page fires 6 parallel fetches (useWorkspaceData ×4,
- * useBomCategories ×1, useFixedFeeders ×1). All are covered by the
- * default mockResolvedValue that returns empty collections.
+ * On mount the page only loads the machines list via loadMachines()
+ * (`GET /marketplace/machines?limit=100`). The Feeders and Chariots tabs
+ * fetch their own data lazily, when selected. When the machines list is
+ * non-empty the first machine auto-selects and a summary fetch fires
+ * (`GET /marketplace/machines/{id}/summary`); the default mockResolvedValue
+ * covers it so nothing times out.
  */
 
 import React from 'react';
@@ -23,6 +26,7 @@ jest.mock('../api/client', () => ({
     get: jest.fn(),
     post: jest.fn(),
     put: jest.fn(),
+    patch: jest.fn(),
     delete: jest.fn(),
 }));
 
@@ -44,7 +48,7 @@ const EMPTY_SESSION = {
     },
 };
 
-/** Default response shape — covers data[] and items[] patterns used by hooks. */
+/** Default response shape — covers data[] and items[] patterns used by the page. */
 const EMPTY_RESPONSE = { data: { data: [], items: [] } };
 
 // ── Setup / teardown ─────────────────────────────────────────────────────────
@@ -63,28 +67,31 @@ afterEach(() => {
 describe('MachinePnpPage', () => {
     it('renders the page heading immediately', () => {
         render(<MachinePnpPage />);
-        expect(screen.getByRole('heading', { name: /machine pnp/i })).toBeInTheDocument();
-    });
-
-    it('shows loading text while workspace is fetching', () => {
-        // Promises that never resolve keep the component in the loading state.
-        apiClient.get.mockImplementation(() => new Promise(() => {}));
-        render(<MachinePnpPage />);
+        // The H4 heading is the page title; "Machine PnP" is only an overline span.
         expect(
-            screen.getByText(/chargement de la configuration pnp/i),
+            screen.getByRole('heading', { name: /gestion machine et production/i }),
         ).toBeInTheDocument();
     });
 
-    it('renders all three navigation tabs after workspace loads', async () => {
+    it('shows a loading spinner while the machines list is fetching', () => {
+        // Promises that never resolve keep the component in the loading state.
+        apiClient.get.mockImplementation(() => new Promise(() => {}));
         render(<MachinePnpPage />);
+        // The loading UI is a CircularProgress (role="progressbar"), not text.
+        expect(screen.getByRole('progressbar')).toBeInTheDocument();
+    });
+
+    it('renders all three navigation tabs', async () => {
+        render(<MachinePnpPage />);
+        // Tabs are always rendered (independent of data loading).
         await waitFor(() =>
-            expect(screen.getByRole('tab', { name: /machines/i })).toBeInTheDocument(),
+            expect(screen.getByRole('tab', { name: /séquence/i })).toBeInTheDocument(),
         );
         expect(screen.getByRole('tab', { name: /feeders/i })).toBeInTheDocument();
         expect(screen.getByRole('tab', { name: /chariots/i })).toBeInTheDocument();
     });
 
-    it('shows an error alert when the workspace API call fails', async () => {
+    it('shows an error alert when the machines API call fails', async () => {
         apiClient.get.mockRejectedValue(new Error('Network error'));
         render(<MachinePnpPage />);
         await waitFor(() =>
@@ -92,24 +99,19 @@ describe('MachinePnpPage', () => {
         );
     });
 
-    it('calls the four core workspace endpoints on mount', async () => {
+    it('calls the machines endpoint on mount', async () => {
         render(<MachinePnpPage />);
         await waitFor(() => {
             const calledUrls = apiClient.get.mock.calls.map(([url]) => url);
             expect(calledUrls).toEqual(
-                expect.arrayContaining([
-                    '/marketplace/machines',
-                    '/marketplace/feeder-types',
-                    '/marketplace/carts',
-                    '/marketplace/productions',
-                ]),
+                expect.arrayContaining(['/marketplace/machines?limit=100']),
             );
         });
     });
 
-    it('displays a machine row when the machines endpoint returns data', async () => {
+    it('displays a machine card when the machines endpoint returns data', async () => {
         apiClient.get.mockImplementation((url) => {
-            if (url === '/marketplace/machines') {
+            if (url === '/marketplace/machines?limit=100') {
                 return Promise.resolve({
                     data: {
                         data: [
@@ -118,6 +120,7 @@ describe('MachinePnpPage', () => {
                     },
                 });
             }
+            // /marketplace/machines/{id}/summary and any other URL.
             return Promise.resolve(EMPTY_RESPONSE);
         });
 
@@ -129,7 +132,7 @@ describe('MachinePnpPage', () => {
 
     it('renders multiple machines when several are returned', async () => {
         apiClient.get.mockImplementation((url) => {
-            if (url === '/marketplace/machines') {
+            if (url === '/marketplace/machines?limit=100') {
                 return Promise.resolve({
                     data: {
                         data: [

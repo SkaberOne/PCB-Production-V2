@@ -4,8 +4,10 @@
  * Strategy:
  *  - Mock apiClient to control /bom/files/{id}/session responses.
  *  - Mock useBomSession to inject controlled BOM workspace state.
- *  - BomViewerPage makes NO API calls when selectedBomEntries is empty —
- *    tests validate that boundary and the fetch-on-selection path.
+ *  - Selected entries live in `bomWorkspace.selectedRevisionEntries` (the page
+ *    reads them from there, not from a top-level `selectedBomEntries`).
+ *  - BomViewerPage makes NO API calls when no entries are selected —
+ *    tests validate that boundary and the prefetch-on-selection path.
  *
  * Wrapped in MemoryRouter because BomViewerPage calls useNavigate.
  */
@@ -23,6 +25,7 @@ jest.mock('../api/client', () => ({
     get: jest.fn(),
     post: jest.fn(),
     put: jest.fn(),
+    patch: jest.fn(),
     delete: jest.fn(),
 }));
 
@@ -37,6 +40,7 @@ const noop = jest.fn();
 const DEFAULT_WORKSPACE = {
     activeTab: 'review',
     activeRevisionId: null,
+    selectedRevisionEntries: [],
     revisionsById: {},
     quantitiesByReference: {},
     stockValidation: { isValidated: false, validatedAt: null },
@@ -45,7 +49,6 @@ const DEFAULT_WORKSPACE = {
 
 const DEFAULT_SESSION = {
     currentBom: null,
-    selectedBomEntries: [],
     bomWorkspace: DEFAULT_WORKSPACE,
     activeProduction: null,
     setImportedBom: noop,
@@ -71,6 +74,20 @@ function renderPage(sessionOverrides = {}) {
             <BomViewerPage />
         </MemoryRouter>,
     );
+}
+
+/**
+ * Builds a session override that selects the given entries.
+ * Entries are read by the page from `bomWorkspace.selectedRevisionEntries`.
+ */
+function withEntries(entries, workspaceOverrides = {}) {
+    return {
+        bomWorkspace: {
+            ...DEFAULT_WORKSPACE,
+            selectedRevisionEntries: entries,
+            ...workspaceOverrides,
+        },
+    };
 }
 
 /** Minimal BOM entry shape that satisfies BomViewerPage's prefetch effect. */
@@ -110,7 +127,7 @@ describe('BomViewerPage', () => {
         ).toBeInTheDocument();
     });
 
-    it('makes no API calls on mount when selectedBomEntries is empty', () => {
+    it('makes no API calls on mount when no revision is selected', () => {
         renderPage();
         expect(apiClient.get).not.toHaveBeenCalled();
     });
@@ -120,7 +137,7 @@ describe('BomViewerPage', () => {
             data: { bom_revision_id: 42, items: [] },
         });
 
-        renderPage({ selectedBomEntries: [makeEntry(42)] });
+        renderPage(withEntries([makeEntry(42)]));
 
         await waitFor(() =>
             expect(apiClient.get).toHaveBeenCalledWith('/bom/files/42/session'),
@@ -129,14 +146,12 @@ describe('BomViewerPage', () => {
 
     it('skips the API call when the revision is already cached', async () => {
         const entry = makeEntry(7);
-        renderPage({
-            selectedBomEntries: [entry],
-            bomWorkspace: {
-                ...DEFAULT_WORKSPACE,
+        renderPage(
+            withEntries([entry], {
                 // Revision 7 is already in the cache → no fetch needed.
                 revisionsById: { 7: { bom_revision_id: 7, items: [] } },
-            },
-        });
+            }),
+        );
 
         // Allow all effects to settle.
         await new Promise((resolve) => setTimeout(resolve, 60));
@@ -152,7 +167,7 @@ describe('BomViewerPage', () => {
         apiClient.get.mockRejectedValue(notFoundError);
 
         renderPage({
-            selectedBomEntries: [makeEntry(99, 'MISSING')],
+            ...withEntries([makeEntry(99, 'MISSING')]),
             removeBomWorkspaceRevision,
             clearCurrentBom,
         });
@@ -165,9 +180,9 @@ describe('BomViewerPage', () => {
     it('fetches sessions for multiple selected entries in order', async () => {
         apiClient.get.mockResolvedValue({ data: { items: [] } });
 
-        renderPage({
-            selectedBomEntries: [makeEntry(10, 'BOARD-A'), makeEntry(11, 'BOARD-B')],
-        });
+        renderPage(
+            withEntries([makeEntry(10, 'BOARD-A'), makeEntry(11, 'BOARD-B')]),
+        );
 
         await waitFor(() => {
             expect(apiClient.get).toHaveBeenCalledWith('/bom/files/10/session');
@@ -178,6 +193,8 @@ describe('BomViewerPage', () => {
     it('renders action buttons in the page header', () => {
         renderPage();
         expect(screen.getByRole('button', { name: /exporter/i })).toBeInTheDocument();
-        expect(screen.getByRole('button', { name: /validate/i })).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: /valider/i })).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: /supprimer bom active/i })).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: /sauvegarder brouillon/i })).toBeInTheDocument();
     });
 });

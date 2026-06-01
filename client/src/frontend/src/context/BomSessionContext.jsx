@@ -877,6 +877,9 @@ export function BomSessionProvider({ children }) {
         resetImportWorkspace,
         bomWorkspace,
         setBomWorkspace,
+        // Vue dérivée des révisions sélectionnées (lecture seule pour les
+        // consommateurs ; la source canonique est bomWorkspace.selectedRevisionEntries).
+        selectedBomEntries: bomWorkspace.selectedRevisionEntries,
         setImportedBom,
         updateBomItem,
         setSelectedBomEntries,
