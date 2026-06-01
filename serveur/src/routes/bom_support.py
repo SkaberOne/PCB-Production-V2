@@ -12,6 +12,7 @@ from fastapi import HTTPException
 from sqlalchemy import func
 from sqlalchemy.orm import Session, joinedload
 
+from ..database import utcnow
 from ..models.bom import (
     BomCategory,
     BomItem,
@@ -64,8 +65,8 @@ def _ensure_bom_category(db: Session, category_name: Optional[str]) -> Optional[
     if not category:
         category = BomCategory(
             name=normalized_name,
-            created_at=datetime.utcnow(),
-            updated_at=datetime.utcnow(),
+            created_at=utcnow(),
+            updated_at=utcnow(),
         )
         db.add(category)
         db.flush()

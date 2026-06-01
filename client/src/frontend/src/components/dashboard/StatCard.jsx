@@ -2,8 +2,17 @@ import React from 'react';
 import { Card, CardContent, Stack, Typography, Box } from '@mui/material';
 import { colors } from '../../theme';
 
+// Une valeur est considérée "vide" si elle est null, undefined, ou un placeholder texte ("--", "—", "...")
+const EMPTY_VALUE_PLACEHOLDERS = new Set(['--', '—', '...', '']);
+function isEmptyValue(value) {
+    if (value === null || value === undefined) return true;
+    if (typeof value === 'string' && EMPTY_VALUE_PLACEHOLDERS.has(value.trim())) return true;
+    return false;
+}
+
 function StatCard({ label, value, hint, icon: Icon, color = colors.green, onClick }) {
     const isClickable = Boolean(onClick);
+    const isEmpty = isEmptyValue(value);
     return (
         <Card
             onClick={onClick}
@@ -62,13 +71,14 @@ function StatCard({ label, value, hint, icon: Icon, color = colors.green, onClic
                     <Typography
                         variant="h4"
                         sx={{
-                            color: colors.textPrimary,
-                            fontWeight: 700,
-                            fontSize: '1.6rem',
+                            color: isEmpty ? colors.textTertiary || '#52525b' : colors.textPrimary,
+                            fontWeight: isEmpty ? 500 : 700,
+                            fontSize: isEmpty ? '1rem' : '1.6rem',
                             lineHeight: 1.2,
+                            fontStyle: isEmpty ? 'italic' : 'normal',
                         }}
                     >
-                        {value}
+                        {isEmpty ? 'En attente de session' : value}
                     </Typography>
                     {hint && (
                         <Typography variant="caption" sx={{ color: colors.textSecondary, fontSize: '0.75rem' }}>

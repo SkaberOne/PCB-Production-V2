@@ -83,10 +83,10 @@ def make_active_bom_with_item(db, component, reference="PROJ-01", revision="A", 
     db.flush()
     item = BomItem(
         bom_revision_id=rev.id,
-        reference_designator="R1",
+        reference_item="R1",
         quantity=2,
         footprint_pnp=component.footprint_pnp,
-        value=component.value,
+        value_harmonized=component.value,
         dnp=False,
     )
     db.add(item)

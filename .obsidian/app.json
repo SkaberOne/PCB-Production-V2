@@ -1,0 +1,15 @@
+{
+  "promptDelete": false,
+  "alwaysUpdateLinks": true,
+  "newFileLocation": "folder",
+  "newFileFolderPath": "docs",
+  "attachmentFolderPath": "docs/attachments",
+  "useMarkdownLinks": false,
+  "showLineNumber": true,
+  "spellcheck": true,
+  "spellcheckLanguages": ["fr", "en-US"],
+  "readableLineLength": true,
+  "strictLineBreaks": false,
+  "showUnsupportedFiles": false,
+  "showFrontmatter": true
+}

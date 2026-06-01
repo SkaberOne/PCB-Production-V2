@@ -7,6 +7,12 @@ __pycache__/
 *.egg-info/
 *.egg
 .installed.cfg
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+*.cover
 
 # venv (LOI: garder a la racine du projet)
 .venv/
@@ -25,6 +31,12 @@ package-lock.json
 build/
 dist/
 *.tsbuildinfo
+# .NET launcher (si réintroduit)
+serveur/launcher/bin/
+serveur/launcher/obj/
+# Exécutables de launcher (générés)
+LANCER_*.exe
+*.exe
 
 # --- IDE ---
 .vscode/
@@ -66,3 +78,11 @@ serveur/backups/
 temp/
 *.bak
 */migrations/versions/__pycache__/
+
+# --- Obsidian vault ---
+# Versionner la config minimale et les plugins, ignorer le workspace personnel
+.obsidian/workspace.json
+.obsidian/workspaces.json
+.obsidian/cache
+.obsidian/graph.json
+docs/attachments/

@@ -8,6 +8,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from sqlalchemy.orm import Session
 
+from ..database import utcnow
 from ..models.bom import BomReference, BomRevision
 from ..schemas.bom import BomImportResponse
 from .bom import get_db
@@ -67,13 +68,13 @@ async def import_bom_file(
                 reference=reference,
                 category=_ensure_bom_category(db, category),
                 description=description,
-                created_at=datetime.utcnow(),
-                updated_at=datetime.utcnow(),
+                created_at=utcnow(),
+                updated_at=utcnow(),
             )
             db.add(bom_ref)
             db.flush()
         else:
-            bom_ref.updated_at = datetime.utcnow()
+            bom_ref.updated_at = utcnow()
             if category is not None:
                 bom_ref.category = _ensure_bom_category(db, category)
             if description is not None:
@@ -83,14 +84,14 @@ async def import_bom_file(
         if existing_revisions:
             bom_revision = existing_revisions[0]
             _collapse_duplicate_revisions(db, bom_revision, existing_revisions[1:])
-            bom_revision.created_at = datetime.utcnow()
+            bom_revision.created_at = utcnow()
             bom_revision.status = BomRevision.StatusEnum.DRAFT
         else:
             bom_revision = BomRevision(
                 bom_ref_id=bom_ref.id,
                 revision=revision,
                 type=BomRevision.TypeEnum(side),
-                created_at=datetime.utcnow(),
+                created_at=utcnow(),
                 status=BomRevision.StatusEnum.DRAFT,
             )
             db.add(bom_revision)

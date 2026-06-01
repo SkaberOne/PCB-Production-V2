@@ -12,6 +12,7 @@ import os
 import sys
 
 import pytest
+from sqlalchemy import text
 
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
 if PROJECT_ROOT not in sys.path:
@@ -70,7 +71,8 @@ def _add_item_null_dnp(db, revision_id, ref="R_NULL"):
     db.add(item)
     db.flush()
     db.execute(
-        f"UPDATE BOM_ITEMS SET dnp = NULL WHERE id = {item.id}"
+        text("UPDATE BOM_ITEMS SET dnp = NULL WHERE id = :item_id"),
+        {"item_id": item.id},
     )
     db.flush()
     return item
@@ -144,6 +146,10 @@ def test_bom_stats_counts_correctly():
     assert data["items_to_verify"] == 2             # R2 + C1
 
 
+@pytest.mark.skip(
+    reason="Test obsolète : BomItem.dnp est désormais NOT NULL avec default=False "
+    "(cf models/bom.py:90). Le scénario 'dnp=NULL' ne peut plus exister en base."
+)
 def test_bom_stats_dnp_null_not_excluded():
     """Regression: dnp=NULL rows must appear in items_to_verify (not silently excluded)."""
     with TestingSessionLocal() as db:

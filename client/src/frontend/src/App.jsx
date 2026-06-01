@@ -24,7 +24,7 @@ const pages = [
     {
         path: '/dashboard',
         label: 'Productions',
-        title: 'Pilotage production',
+        title: 'Productions',
         description: "Vue d'ensemble des productions, machines PnP et statuts de suivi.",
         icon: DashboardRoundedIcon,
         group: 'workflow',
@@ -68,8 +68,8 @@ const pages = [
     },
     {
         path: '/fichier-bom',
-        label: 'Bibliothèque BOM',
-        title: 'Bibliothèque BOM',
+        label: 'BOM enregistrées',
+        title: 'BOM enregistrées',
         description: 'Sélection de BOM harmonisées déjà importées et organisées par référence.',
         icon: FolderRoundedIcon,
         group: 'library',
@@ -78,7 +78,7 @@ const pages = [
     {
         path: '/parametre',
         label: 'Paramètres',
-        title: 'Administration et referentiels',
+        title: 'Administration et référentiels',
         description: 'Base de données, mappings, harmonisation, machines et chemins.',
         icon: SettingsRoundedIcon,
         group: 'system',

@@ -7,6 +7,7 @@ from typing import List, Dict, Optional, Tuple
 from sqlalchemy import and_, or_
 from sqlalchemy.orm import Session, joinedload
 
+from ..database import utcnow
 from ..models.bom import BomItem, BomReference, BomRevision, Component
 from ..models.commands import PlanAssignment, ProductionPlan
 from ..models.machines import PnpCart, PnpFeeder, PnpMachine
@@ -379,7 +380,7 @@ class AssignmentService(AssignmentFixedFeederMixin, AssignmentPlanningMixin):
         if notes is not None:
             cart.notes = notes.strip() if notes else None
 
-        cart.updated_at = datetime.utcnow()
+        cart.updated_at = utcnow()
         db.commit()
         db.refresh(cart)
 

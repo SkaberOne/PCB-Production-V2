@@ -39,6 +39,7 @@ import {
     areSelectedCommandEntriesLoaded,
     countLoadedCommandEntries,
 } from '../utils/commandPlanning';
+import { downloadCsvFile } from '../utils/csvDownload';
 
 // ─── Static style constants (#17) ─────────────────────────────────────────────
 const PANEL_CARD_SX = {
@@ -58,19 +59,6 @@ const TAB_SX = {
 };
 
 // ─── Helper: download file (#11 CSV export) ────────────────────────────────────
-function downloadCsvFile(fileName, content) {
-    const bom = '﻿'; // UTF-8 BOM for Excel compatibility
-    const blob = new Blob([bom + content], { type: 'text/csv;charset=utf-8' });
-    const url = window.URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = fileName;
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    window.URL.revokeObjectURL(url);
-}
-
 // ─── BomViewerPage ─────────────────────────────────────────────────────────────
 function BomViewerPage() {
     const navigate = useNavigate();
@@ -395,7 +383,7 @@ function BomViewerPage() {
             if (unresolved.length) {
                 setSaveState({
                     loading: false, type: 'error',
-                    message: `Validation bloquée : confirme les types ambigus dans ${unresolved.join(', ')} ou passe d'abord par Save draft.`,
+                    message: `Validation bloquée : confirme les types ambigus dans ${unresolved.join(', ')} ou passe d'abord par "Sauvegarder brouillon".`,
                 });
                 return;
             }
@@ -609,7 +597,7 @@ function BomViewerPage() {
                             disabled={!selectedEntries.length || saveState.loading}
                             onClick={() => handleSaveAll('draft')}
                         >
-                            Save draft
+                            Sauvegarder brouillon
                         </Button>
                         <Button
                             variant="contained"
@@ -617,7 +605,7 @@ function BomViewerPage() {
                             disabled={!selectedEntries.length || saveState.loading}
                             onClick={() => handleSaveAll('validate')}
                         >
-                            Validate
+                            Valider
                         </Button>
                     </Stack>
                 )}

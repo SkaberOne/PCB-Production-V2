@@ -12,6 +12,7 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy import asc, desc, func, or_
 from sqlalchemy.orm import Session, joinedload
 
+from ..database import utcnow
 from ..models.bom import Component, ComponentTypeRule, FootprintMapping, MachineFootprintRule
 from ..schemas.bom import (
     ComponentLibraryImportResponse,
@@ -567,12 +568,12 @@ def export_component_type_rules(db: Session = Depends(get_db)):
     )
     payload = {
         "version": 1,
-        "exported_at": datetime.utcnow().isoformat() + "Z",
+        "exported_at": utcnow().strftime('%Y-%m-%dT%H:%M:%SZ'),
         "rule_count": len(rules),
         "rules": [_serialize_component_type_rule(rule).model_dump() for rule in rules],
     }
     stream = BytesIO(json.dumps(payload, indent=2).encode("utf-8"))
-    filename = f"component_type_rules_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}.json"
+    filename = f"component_type_rules_{utcnow().strftime('%Y%m%d_%H%M%S')}.json"
     headers = {"Content-Disposition": f'attachment; filename="{filename}"'}
     return StreamingResponse(
         stream,
@@ -769,7 +770,7 @@ def export_component_library(db: Session = Depends(get_db)):
     """Export the current component library in the external Excel format."""
     components = db.query(Component).all()
     workbook_stream = component_library_service.export_workbook(components)
-    filename = f"component_library_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}.xlsx"
+    filename = f"component_library_{utcnow().strftime('%Y%m%d_%H%M%S')}.xlsx"
     headers = {"Content-Disposition": f'attachment; filename="{filename}"'}
     return StreamingResponse(
         workbook_stream,

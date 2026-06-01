@@ -161,7 +161,7 @@ class ReportService:
                 component_type_expr.label("component_type"),
                 total_required_expr.label("total_required"),
             )
-            .join(CommandItem, CommandItem.bom_item_id == BomItem.id)
+            .join(CommandItem, CommandItem.bom_revision_id == BomItem.bom_revision_id)
             .group_by(value_expr, footprint_expr, component_type_expr)
             .order_by(total_required_expr.desc())
             .limit(limit)

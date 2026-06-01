@@ -1,98 +1,85 @@
-# STRUCTURE DU DOSSIER - ECB Production Manager
+# STRUCTURE DU PROJET — ECB Production Manager
 > **LOI : Claude doit respecter cette structure sans déroger.**
 > Tout nouveau fichier créé doit être placé dans le bon dossier selon ce document.
 
 ---
 
-## Arborescence complète
+## Arborescence
 
 ```
-PCB Production V2/
+PCB-Production-V2/
 │
-├── CLAUDE.md                    ← Process de travail AI (lire en premier)
-├── STRUCTURE.md                 ← CE FICHIER - loi de la structure
-├── APP_DESCRIPTION.md           ← Description app, stack, fonctionnalités
-├── README.md                    ← Démarrage rapide utilisateur
+├── CLAUDE.md                       ← Process AI (lire en premier)
+├── README.md                       ← Démarrage rapide
+├── STRUCTURE.md                    ← CE FICHIER — loi de la structure
 │
-├── .venv/                       ← Venv Python (NE PAS TOUCHER, NE PAS DÉPLACER)
 ├── .gitignore
+├── .obsidian/                      ← Vault Obsidian (config minimale versionnée)
+├── .venv/                          ← Venv Python (gitignored, NE PAS DÉPLACER)
+├── .git/
 │
-├── docs/                        ← Documentation (archives, specs, audits)
-│   ├── INDEX.md                 ← Index des documents
-│   ├── STATUS.md                ← État du projet
-│   ├── specs/                   ← Cahiers des charges, specs techniques
-│   ├── guides/                  ← Guides utilisateur / déploiement
-│   ├── reports/                 ← Rapports d'audit et de phase
-│   └── archive/                 ← Documents historiques (ne plus modifier)
-│       ├── legacy-scripts/      ← Scripts .bat/.vbs/.ps1 obsolètes
-│       └── mockups/             ← Mockups HTML de redesign (historique)
+├── auto_push.bat                   ← Push GitHub (double-clic)
+├── restart_serveur.bat             ← Kill + redémarre backend
+├── test_api.bat                    ← Smoke test endpoints
 │
-├── serveur/                     ← === BACKEND (FastAPI Python) ===
-│   │
-│   ├── .env                     ← Config serveur (IP, port, DB, etc.) — NE PAS COMMITTER
-│   ├── .env.example             ← Modèle de .env (copier vers .env)
-│   ├── launch.py                ← Point d'entrée du serveur
-│   ├── requirements.txt         ← Dépendances Python (versions épinglées)
-│   ├── requirements_flexible.txt ← Dépendances Python (versions souples, pour Python récent)
-│   │
-│   ├── DEMARRER_SERVEUR.bat     ← Lance le serveur (double-clic)
-│   ├── INSTALLER_SERVEUR.bat    ← Installe le venv + deps (première fois)
-│   │
-│   ├── src/                     ← Code source Python
+├── docs/                           ← Documentation + vault Obsidian
+│   ├── INDEX.md                    ← Entry point du vault
+│   ├── Projet.md                   ← Description technique (vision + archi + data model)
+│   ├── Plan_Deploiement.md         ← Structure projet + env dev + workflow
+│   ├── CHANGELOG.md                ← Historique sessions + commits
+│   ├── Roadmap.md                  ← Stratégie + backlog priorisé
+│   ├── audits/                     ← Audit_YYYY-MM-DD_titre.md (format normalisé)
+│   ├── adr/                        ← Architecture Decision Records (NNNN-titre.md)
+│   ├── guides/                     ← GETTING_STARTED, DEPLOYMENT, TROUBLESHOOTING
+│   ├── specs/                      ← Specs techniques (API, HARMONY_RULES, ARCHI, etc.)
+│   └── archive/                    ← Documents historiques (ne plus modifier)
+│
+├── serveur/                        ← === BACKEND FastAPI Python ===
+│   ├── .env                        ← Config (NE PAS COMMITTER)
+│   ├── .env.example                ← Modèle
+│   ├── launch.py                   ← Entrée uvicorn
+│   ├── requirements.txt            ← Deps épinglées
+│   ├── requirements_flexible.txt   ← Deps souples (Python récent)
+│   ├── pytest.ini                  ← Config pytest
+│   ├── DEMARRER_SERVEUR.bat
+│   ├── INSTALLER_SERVEUR.bat
+│   ├── src/
 │   │   ├── __init__.py
-│   │   ├── app.py               ← Application FastAPI
-│   │   ├── auth.py              ← Authentification API Key
-│   │   ├── config.py            ← Settings Pydantic (lit .env)
-│   │   ├── database.py          ← Connexion SQLAlchemy
-│   │   ├── alembic.ini          ← Config migrations
-│   │   ├── alembic/             ← Scripts de migration DB
-│   │   ├── models/              ← Modèles SQLAlchemy
-│   │   ├── routes/              ← Routes FastAPI (bom, marketplace, reports)
-│   │   ├── schemas/             ← Schémas Pydantic (validation I/O)
-│   │   ├── services/            ← Logique métier
-│   │   ├── utils/               ← Utilitaires (parser, cache, etc.)
-│   │   └── tests/               ← Tests pytest
-│   │
-│   ├── database/                ← Fichiers base de données
-│   │   ├── dev.db               ← SQLite local (dev/prod simple)
-│   │   └── machine_footprint_catalog.txt
-│   │
-│   ├── uploads/                 ← BOM importées (runtime - gitignore)
-│   │   └── bom/
-│   ├── exports/                 ← BOM exportées harmonisées (runtime - gitignore)
-│   │   └── bom_harmonized/
-│   ├── backups/                 ← Sauvegardes DB (runtime - gitignore)
-│   └── logs/                    ← Logs serveur (runtime - gitignore)
-│       └── app.log
+│   │   ├── app.py                  ← FastAPI app
+│   │   ├── auth.py                 ← X-API-Key
+│   │   ├── config.py               ← Settings Pydantic
+│   │   ├── database.py             ← Engine + SessionLocal + utcnow()
+│   │   ├── alembic.ini · alembic/  ← Migrations DB
+│   │   ├── models/                 ← SQLAlchemy ORM
+│   │   ├── routes/                 ← Endpoints HTTP
+│   │   ├── schemas/                ← Pydantic I/O
+│   │   ├── services/               ← Logique métier
+│   │   ├── utils/                  ← Parsers, cache, helpers
+│   │   └── tests/                  ← pytest + conftest
+│   ├── database/                   ← dev.db SQLite (gitignored)
+│   └── uploads/ exports/ backups/ logs/  ← Runtime (gitignored)
 │
-└── client/                      ← === CLIENT (React + Electron) ===
-    │
-    ├── client.env               ← Config client (URL serveur) — adapter pour réseau
-    │
-    ├── DEMARRER_CLIENT.bat      ← Lance le client (double-clic)
-    ├── CONSTRUIRE_CLIENT.bat    ← Build Electron portable (.exe)
-    │
-    ├── src/
-    │   ├── frontend/            ← Application React 18
-    │   │   ├── package.json
-    │   │   ├── public/
-    │   │   └── src/
-    │   │       ├── api/         ← Client HTTP (axios)
-    │   │       ├── components/  ← Composants React (bom, machine, common, layout)
-    │   │       ├── context/     ← Contextes React (BomSessionContext)
-    │   │       ├── hooks/       ← Hooks custom
-    │   │       ├── pages/       ← Pages (Dashboard, BOM, Machine, Command, etc.)
-    │   │       ├── utils/       ← Utilitaires frontend
-    │   │       ├── App.jsx
-    │   │       └── theme.js
-    │   │
-    │   └── desktop/             ← Shell Electron
-    │       ├── package.json
-    │       └── src/
-    │           ├── main.js      ← Process principal Electron
-    │           └── preload.js
-    │
-    └── dist/                    ← App packagée (générée par build - gitignore)
+└── client/                         ← === FRONTEND React + Electron ===
+    ├── client.env                  ← URL API (adapté réseau)
+    ├── DEMARRER_CLIENT.bat
+    ├── CONSTRUIRE_CLIENT.bat
+    └── src/
+        ├── frontend/               ← React 18 SPA
+        │   ├── package.json
+        │   ├── public/
+        │   └── src/
+        │       ├── api/            ← client.js (axios)
+        │       ├── components/     ← bom · command · dashboard · import · library · machine · common · layout
+        │       ├── context/        ← BomSessionContext
+        │       ├── hooks/          ← useMachineConfig, useBomCategories, etc.
+        │       ├── pages/          ← Dashboard · ImportBom · BomViewer · Command · MachinePnp · BomFiles · Settings
+        │       ├── utils/          ← bomFileExplorer, csvDownload, concurrencyPool, etc.
+        │       └── theme.js
+        └── desktop/                ← Shell Electron
+            ├── package.json
+            └── src/
+                ├── main.js         ← Process principal + IPC ALLOWED_PATHS
+                └── preload.js
 ```
 
 ---
@@ -104,17 +91,60 @@ PCB Production V2/
 | Code Python (API) | `serveur/src/` |
 | Config serveur | `serveur/.env` |
 | Tests Python | `serveur/src/tests/` |
-| Composants React | `client/src/frontend/src/components/` |
+| Composants React | `client/src/frontend/src/components/{domaine}/` |
 | Pages React | `client/src/frontend/src/pages/` |
+| Utils JS | `client/src/frontend/src/utils/` |
 | Config client | `client/client.env` |
-| Documentation spec | `docs/specs/` |
-| Rapport / audit | `docs/reports/` |
+| Spec technique | `docs/specs/` |
+| Audit/rapport | `docs/audits/` (format `Audit_YYYY-MM-DD_titre.md`) |
+| ADR | `docs/adr/` (format `NNNN-titre.md`) |
 | Guide utilisateur | `docs/guides/` |
-| Fichiers obsolètes | `docs/archive/` |
-| Nouveaux scripts bash/bat dev | **Ne pas créer à la racine** |
+| Doc historique | `docs/archive/` |
+| Scripts dev | Racine si universel (auto_push.bat) sinon `serveur/` ou `client/` |
 
-## Ce qui NE doit PAS être à la racine
-- Scripts `.bat` de lancement (→ `serveur/` ou `client/`)
-- Fichiers de configuration `.env` (→ `serveur/.env`)
+---
+
+## Ce qui ne doit PAS être à la racine
+- Scripts spécifiques `.bat` (sauf utilitaires universels comme `auto_push.bat`)
+- Fichiers de configuration `.env` (→ `serveur/.env` ou `client/client.env`)
 - Code source (→ `serveur/src/` ou `client/src/`)
-- Fichiers temporaires, logs, `.a_supprimer`
+- Fichiers binaires `.exe`, `.dll`
+- Fichiers temporaires, logs, runtime artifacts
+
+---
+
+## Conventions de nommage
+
+### Audits
+Format : `Audit_YYYY-MM-DD_titre_court.md`
+- ✅ `Audit_2026-05-29_final.md`
+- ✅ `Audit_2026-05-15_design.md`
+- ❌ `AUDIT_FINAL.md` (pas de date)
+
+### ADR
+Format : `NNNN-titre-kebab.md`
+- ✅ `0001-monorepo-structure.md`
+- ✅ `0002-sqlite-tests-limitations.md`
+- ❌ `ADR-MONOREPO.md` (pas numéroté)
+
+### Composants React
+Format : `NomComposant.jsx` en PascalCase, placés dans `components/{domaine}/`
+- ✅ `components/command/StockStatusChip.jsx`
+- ✅ `components/library/BomLibraryDetail.jsx`
+- ❌ `components/stock-status-chip.jsx` (kebab)
+- ❌ `pages/StockStatusChip.jsx` (mauvais dossier)
+
+### Utils JS
+Format : `nomUtil.js` en camelCase, dans `client/src/frontend/src/utils/`
+- ✅ `utils/csvDownload.js`
+- ✅ `utils/concurrencyPool.js`
+- ❌ `utils/CSV_Download.js`
+
+---
+
+## Mises à jour de cette structure
+
+Toute modification de cette structure doit :
+1. Faire l'objet d'un ADR dans `docs/adr/`
+2. Être documentée dans `docs/CHANGELOG.md`
+3. Être appliquée immédiatement (pas de structure "à 2 vitesses")

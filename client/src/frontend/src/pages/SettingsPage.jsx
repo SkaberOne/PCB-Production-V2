@@ -1470,7 +1470,7 @@ function SettingsPage() {
             setMachineFootprintFile(null);
             setMachineFootprintFeedback({
                 status: 'error',
-                message: 'Seuls les fichiers texte .txt ou .csv separes par ; sont supportes pour le catalogue MachineFootprint.',
+                message: 'Seuls les fichiers texte .txt ou .csv séparés par ; sont supportés pour le catalogue MachineFootprint.',
                 details: [],
             });
             return;
@@ -1495,7 +1495,7 @@ function SettingsPage() {
 
     const saveComponent = React.useCallback(async () => {
         if (!selectedComponentId || !componentForm.reference.trim()) {
-            setEditorFeedback({ status: 'error', message: 'Selectionnez un composant et renseignez une reference valide.', details: [] });
+            setEditorFeedback({ status: 'error', message: 'Sélectionnez un composant et renseignez une référence valide.', details: [] });
             return;
         }
         setComponentSaving(true);
@@ -1601,7 +1601,7 @@ function SettingsPage() {
         if (!isSupportedMachineFootprintFile(machineFootprintFile)) {
             setMachineFootprintFeedback({
                 status: 'error',
-                message: 'Seuls les fichiers texte .txt ou .csv separes par ; sont supportes pour le catalogue MachineFootprint.',
+                message: 'Seuls les fichiers texte .txt ou .csv séparés par ; sont supportés pour le catalogue MachineFootprint.',
                 details: [],
             });
             return;
@@ -1624,7 +1624,7 @@ function SettingsPage() {
         } catch (error) {
             setMachineFootprintFeedback({
                 status: 'error',
-                message: error.response?.data?.detail || error.response?.data?.message || error.message || 'Erreur lors de l import du catalogue MachineFootprint',
+                message: error.response?.data?.detail || error.response?.data?.message || error.message || "Erreur lors de l'import du catalogue MachineFootprint",
                 details: [],
             });
         } finally {
@@ -1663,8 +1663,8 @@ function SettingsPage() {
         <Stack spacing={4}>
             <PageHeader
                 eyebrow="Administration"
-                title="Administration et referentiels"
-                description="Le module Parametre centralise la base de données, les règles d'harmonisation, les machines et les chemins locaux."
+                title="Administration et référentiels"
+                description="Le module Paramètres centralise la base de données, les règles d'harmonisation, les machines et les chemins locaux."
             />
             {editorFeedback.status !== 'idle' ? (
                 <Alert severity={editorFeedback.status} onClose={() => setEditorFeedback(emptyFeedback)}>
@@ -1729,7 +1729,7 @@ function SettingsPage() {
                         <Stack spacing={3}>
                             <Stack direction="row" spacing={1.5} alignItems="center">
                                 <LibraryBooksRoundedIcon sx={{ color: '#3b82f6' }} />
-                                <Typography variant="h6">Bibliothèque composants</Typography>
+                                <Typography variant="h6">Catalogue composants</Typography>
                             </Stack>
                             <Typography variant="body2" sx={{ color: '#a1a1aa' }}>
                             La liste de composants est chargée côté serveur, avec recherche, tri, pagination et un focus rapide sur les ajouts créés depuis les BOM.
@@ -1744,7 +1744,7 @@ function SettingsPage() {
                                 style={{ display: 'none' }}
                             />
                             <Typography variant="body2" sx={{ color: 'text.secondary', flexGrow: 1 }}>
-                                {libraryFile ? `Fichier selectionne : ${libraryFile.name}` : 'Aucun fichier selectionne.'}
+                                {libraryFile ? `Fichier sélectionné : ${libraryFile.name}` : 'Aucun fichier sélectionné.'}
                             </Typography>
                             <Button variant="contained" onClick={importLibrary} disabled={libraryImporting || !libraryFile}>{libraryImporting ? 'Import en cours...' : 'Importer la bibliothèque'}</Button>
                             <Button variant="outlined" startIcon={<DownloadRoundedIcon />} onClick={exportLibrary} disabled={libraryExporting}>{libraryExporting ? 'Export en cours...' : 'Exporter'}</Button>
@@ -1782,10 +1782,10 @@ function SettingsPage() {
                                         />
                                         <Typography variant="body2" sx={{ color: 'text.secondary', flexGrow: 1 }}>
                                             {machineFootprintFile
-                                                ? `Fichier selectionne : ${machineFootprintFile.name}`
+                                                ? `Fichier sélectionné : ${machineFootprintFile.name}`
                                                 : machineFootprintCatalog.length > 0
                                                     ? `Catalogue actif : ${machineFootprintCatalog.length} empreinte(s) chargée(s) depuis la base de données.`
-                                                    : 'Aucun catalogue en base — importez un fichier TXT/CSV pour demarrer.'}
+                                                    : 'Aucun catalogue en base — importez un fichier TXT/CSV pour démarrer.'}
                                         </Typography>
                                         <Button variant="contained" onClick={importMachineFootprints} disabled={machineFootprintImporting || !machineFootprintFile}>
                                             {machineFootprintImporting ? 'Import en cours...' : 'Importer le catalogue'}
@@ -1933,7 +1933,7 @@ function SettingsPage() {
                                                 <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', lineHeight: 1.5 }}>
                                                     {selectedComponentId
                                                         ? 'Édition rapide sans quitter la bibliothèque.'
-                                                        : "Selectionne une ligne pour ouvrir l'editeur."}
+                                                        : "Sélectionne une ligne pour ouvrir l'éditeur."}
                                                 </Typography>
                                             </Stack>
 
@@ -2291,7 +2291,7 @@ function SettingsPage() {
                                                                         size="small"
                                                                         color={componentTypeRulePreviewSelection.length ? 'primary' : 'default'}
                                                                         variant={componentTypeRulePreviewSelection.length ? 'filled' : 'outlined'}
-                                                                        label={`${componentTypeRulePreviewSelection.length} selectionnee(s)`}
+                                                                        label={`${componentTypeRulePreviewSelection.length} sélectionnée(s)`}
                                                                     />
                                                                     <Chip
                                                                         size="small"
@@ -2304,7 +2304,7 @@ function SettingsPage() {
                                                                         onClick={selectVisibleTypeRulePreviewPrefixes}
                                                                         disabled={componentTypeRuleUndoRestoring || componentTypeRulePartialRestoring || !visibleTypeRulePreviewPrefixes.length}
                                                                     >
-                                                                        Selectionner visibles
+                                                                        Sélectionner visibles
                                                                     </Button>
                                                                     <Button
                                                                         size="small"
@@ -2391,7 +2391,7 @@ function SettingsPage() {
                                                                                                 clickable
                                                                                                 color={componentTypeRulePreviewSelection.includes(detail.prefix) ? 'primary' : 'default'}
                                                                                                 variant={componentTypeRulePreviewSelection.includes(detail.prefix) ? 'filled' : 'outlined'}
-                                                                                                label={componentTypeRulePreviewSelection.includes(detail.prefix) ? 'Selectionnee' : 'Selectionner'}
+                                                                                                label={componentTypeRulePreviewSelection.includes(detail.prefix) ? 'Sélectionnée' : 'Sélectionner'}
                                                                                                 onClick={() => toggleTypeRulePreviewSelection(detail.prefix)}
                                                                                             />
                                                                                         </Stack>

@@ -313,10 +313,10 @@ class TestGetMachineProductionFeederPlan:
         component = make_component(db)
         db.add(BomItem(
             bom_revision_id=revision.id,
-            reference_designator="R1",
+            reference_item="R1",
             quantity=2,
             footprint_pnp=component.footprint_pnp,
-            value=component.value,
+            value_harmonized=component.value,
             dnp=False,
         ))
         link_revision(db, production, revision, order=1, quantity=5)
@@ -338,10 +338,10 @@ class TestGetMachineProductionFeederPlan:
         component = make_component(db)
         db.add(BomItem(
             bom_revision_id=revision.id,
-            reference_designator="R1",
+            reference_item="R1",
             quantity=1,
             footprint_pnp=component.footprint_pnp,
-            value=component.value,
+            value_harmonized=component.value,
             dnp=True,  # DNP → should not appear in plan assignments
         ))
         link_revision(db, production, revision)

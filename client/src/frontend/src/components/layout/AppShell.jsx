@@ -74,18 +74,8 @@ function NavGroup({ label, pages, location }) {
                                     fontWeight: selected ? 600 : 500
                                 }}
                             />
-                            {page.step != null && (
-                                <Typography
-                                    sx={{
-                                        fontSize: '0.65rem',
-                                        color: selected ? 'rgba(255,255,255,0.55)' : '#3f3f46',
-                                        fontWeight: 700,
-                                        lineHeight: 1
-                                    }}
-                                >
-                                    {page.step}
-                                </Typography>
-                            )}
+                            {/* Numéros d'étape retirés (audit 2026-05-29 I2) — le WorkflowStrip
+                                au-dessus affiche déjà la progression numérotée avec leurs cercles. */}
                         </ListItemButton>
                     );
                 })}

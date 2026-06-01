@@ -6,6 +6,7 @@ from typing import Dict, List, Tuple
 
 from sqlalchemy.orm import Session, joinedload
 
+from ..database import utcnow
 from ..models.bom import BomItem, BomRevision, Component
 from ..models.commands import ProductionPlan
 from ..models.machines import PnpCart, PnpMachine
@@ -127,7 +128,7 @@ class AssignmentPlanningMixin:
             current_links[revision_id].sequence_order = index
 
         production.manufacturing_order_validated_at = None
-        production.updated_at = datetime.utcnow()
+        production.updated_at = utcnow()
         db.commit()
         db.refresh(production)
         return serialize_machine_production(production)
@@ -429,8 +430,8 @@ class AssignmentPlanningMixin:
         for index, link in enumerate(ordered_links, start=1):
             link.sequence_order = index
 
-        production.manufacturing_order_validated_at = datetime.utcnow()
-        production.updated_at = datetime.utcnow()
+        production.manufacturing_order_validated_at = utcnow()
+        production.updated_at = utcnow()
         db.commit()
         db.refresh(production)
 

@@ -40,8 +40,10 @@ REVISION_CHAIN = [
 ]
 
 HEAD_REVISION = REVISION_CHAIN[-1]
-ALEMBIC_INI = str(PROJECT_ROOT / "src" / "backend" / "alembic.ini")
-MIGRATIONS_DIR = str(PROJECT_ROOT / "src" / "backend" / "alembic")
+# Layout actuel : serveur/src/alembic.ini + serveur/src/alembic/
+# Ancien (obsolète) : src/backend/alembic — laissé pour mémoire seulement
+ALEMBIC_INI = str(PROJECT_ROOT / "serveur" / "src" / "alembic.ini")
+MIGRATIONS_DIR = str(PROJECT_ROOT / "serveur" / "src" / "alembic")
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────

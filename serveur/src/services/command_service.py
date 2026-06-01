@@ -12,6 +12,7 @@ from openpyxl import Workbook
 from sqlalchemy import and_, desc, or_
 from sqlalchemy.orm import Session, joinedload
 
+from ..database import utcnow
 from ..models.bom import BomItem, BomReference, BomRevision, Component
 from ..models.commands import Command, CommandItem
 from ..models.machines import PnpMachine
@@ -439,7 +440,7 @@ class CommandService:
         
         old_status = command.status.value
         command.status = Command.StatusEnum(new_status)
-        command.updated_at = datetime.utcnow()
+        command.updated_at = utcnow()
         db.commit()
         db.refresh(command)
         
@@ -486,7 +487,7 @@ class CommandService:
         if notes_provided:
             command.notes = notes.strip() if notes else None
 
-        command.updated_at = datetime.utcnow()
+        command.updated_at = utcnow()
         db.commit()
         db.refresh(command)
 

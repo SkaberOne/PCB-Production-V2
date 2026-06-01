@@ -2,23 +2,17 @@
 
 from fastapi import APIRouter
 
-from ..database import SessionLocal
+from ..database import get_db  # re-exported pour les routes bom_*
 from .bom_support import bom_file_service, bom_service, component_library_service
+
+# Re-export explicite pour les imports `from .bom import get_db`
+__all__ = ["router", "get_db"]
 
 router = APIRouter(
     prefix="/bom",
     tags=["bom"],
     responses={404: {"description": "Not found"}},
 )
-
-
-def get_db():
-    """Yield a database session for the lifetime of the request."""
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
 
 
 from .bom_components import router as bom_components_router

@@ -334,7 +334,7 @@ export default function BomLibraryCard() {
                             <Stack direction="row" alignItems="center" spacing={1}>
                                 <LibraryBooksRoundedIcon sx={{ color: '#6366f1', fontSize: 20 }} />
                                 <Typography variant="h6" sx={{ color: '#f4f4f5', fontWeight: 600 }}>
-                                    Bibliothèque BOM
+                                    BOM enregistrées
                                 </Typography>
                             </Stack>
                             <Typography variant="body2" sx={{ color: '#a1a1aa' }}>

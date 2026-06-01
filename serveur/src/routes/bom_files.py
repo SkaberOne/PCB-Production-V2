@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import func, or_
 from sqlalchemy.orm import Session, joinedload
 
+from ..database import utcnow
 from ..models.bom import BomCategory, BomItem, BomReference, BomRevision
 from ..models.commands import CommandItem
 from ..models.production import ProductionBomRevision
@@ -177,8 +178,8 @@ def create_bom_category(
     category = BomCategory(
         name=normalized_name,
         description=_clean_optional_text(payload.description),
-        created_at=datetime.utcnow(),
-        updated_at=datetime.utcnow(),
+        created_at=utcnow(),
+        updated_at=utcnow(),
     )
     db.add(category)
     db.commit()
@@ -206,7 +207,7 @@ def update_bom_reference_category(
         raise HTTPException(status_code=404, detail="BOM reference not found")
 
     bom_ref.category = _ensure_bom_category(db, payload.category)
-    bom_ref.updated_at = datetime.utcnow()
+    bom_ref.updated_at = utcnow()
     db.commit()
     db.refresh(bom_ref)
     return BomReferenceSchema.model_validate(bom_ref)
@@ -241,8 +242,8 @@ def rename_saved_bom_file(
         target_reference = BomReference(
             reference=new_reference,
             category=revision.reference.category if revision.reference else None,
-            created_at=datetime.utcnow(),
-            updated_at=datetime.utcnow(),
+            created_at=utcnow(),
+            updated_at=utcnow(),
         )
         db.add(target_reference)
         db.flush()
@@ -270,7 +271,7 @@ def rename_saved_bom_file(
 
     revision.bom_ref_id = target_reference.id
     revision.revision = new_revision
-    target_reference.updated_at = datetime.utcnow()
+    target_reference.updated_at = utcnow()
 
     db.commit()
     db.refresh(revision)

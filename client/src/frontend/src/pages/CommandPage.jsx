@@ -4,15 +4,12 @@ import DownloadRoundedIcon from '@mui/icons-material/DownloadRounded';
 import RestartAltRoundedIcon from '@mui/icons-material/RestartAltRounded';
 import {
     Alert,
-    Autocomplete,
     Button,
     Card,
     CardContent,
     Chip,
-    CircularProgress,
     Grid,
     InputAdornment,
-    Skeleton,
     Stack,
     Table,
     TableBody,
@@ -31,6 +28,9 @@ import { useNavigate } from 'react-router-dom';
 import EmptyState from '../components/common/EmptyState';
 import GuideBanner from '../components/common/GuideBanner';
 import PageHeader from '../components/common/PageHeader';
+import CommandLineRow from '../components/command/CommandLineRow';
+import ErpContextForm, { EMPTY_ERP } from '../components/command/ErpContextForm';
+import StockStatusChip from '../components/command/StockStatusChip';
 import { useBomSession } from '../context/BomSessionContext';
 import { colors } from '../theme';
 import {
@@ -47,33 +47,13 @@ import {
     mergeCommandLinesWithPlanning,
 } from '../utils/commandPlanning';
 import {
-    compactCellSx,
     compactPaginationSx,
     compactTableContainerSx,
     compactTableSx,
-    compactWrapCellSx,
 } from '../utils/compactTable';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
-
-const EMPTY_ERP = {
-    projet: '',
-    statut: '',
-    delai: '',
-    remarque: '',
-    validateur: '',
-    fournisseurParDefaut: '',
-};
-
-const ERP_STATUT_OPTIONS = [
-    "Demande d'achat",
-    'En cours de validation',
-    'Validée',
-    'En commande',
-    'Reçue partiellement',
-    'Reçue totalement',
-    'Annulée',
-];
+// EMPTY_ERP et ERP_STATUT_OPTIONS vivent désormais dans components/command/ErpContextForm.jsx
 
 const CARD_SX = {
     backgroundColor: colors.surfaceCard,
@@ -90,87 +70,6 @@ const SORTABLE_COLUMNS = [
     { key: 'manualPlacement', label: 'Pose' },
     { key: 'sources', label: 'Source' },
 ];
-
-// ─── Sub-components ───────────────────────────────────────────────────────────
-
-const CommandLineRow = React.memo(function CommandLineRow({ line, override, onOverrideChange }) {
-    const effectiveQty = override !== undefined ? override : line.quantityToOrder;
-
-    return (
-        <TableRow>
-            <TableCell sx={compactCellSx}>{line.componentName || line.value}</TableCell>
-            <TableCell sx={compactCellSx}>{line.value}</TableCell>
-            <TableCell sx={compactCellSx}>{line.footprint}</TableCell>
-            <TableCell sx={compactCellSx}>{line.requiredQuantity}</TableCell>
-            <TableCell sx={compactCellSx}>{line.stockAvailableQty}</TableCell>
-            <TableCell sx={{ ...compactCellSx, width: 100 }}>
-                <TextField
-                    size="small"
-                    type="number"
-                    value={effectiveQty}
-                    onChange={(e) => {
-                        const val = parseInt(e.target.value, 10);
-                        if (!Number.isNaN(val) && val >= 0) {
-                            onOverrideChange(line.key, val);
-                        }
-                    }}
-                    inputProps={{ min: 0, style: { padding: '2px 6px', fontSize: '0.79rem', MozAppearance: 'textfield' } }}
-                    sx={{
-                        width: 72,
-                        '& input[type=number]::-webkit-inner-spin-button, & input[type=number]::-webkit-outer-spin-button': {
-                            WebkitAppearance: 'none',
-                            margin: 0,
-                        },
-                        '& .MuiOutlinedInput-root': {
-                            backgroundColor:
-                                override !== undefined && override !== line.quantityToOrder
-                                    ? 'rgba(5,150,105,0.12)'
-                                    : 'transparent',
-                        },
-                    }}
-                    variant="outlined"
-                />
-            </TableCell>
-            <TableCell sx={compactCellSx}>
-                {line.manualPlacement ? `Oui${line.feederSlot ? ` (${line.feederSlot})` : ''}` : 'Auto'}
-            </TableCell>
-            <TableCell sx={compactCellSx} title={line.sources?.join(' | ')}>
-                {line.sources?.length ? line.sources.join(' | ') : '-'}
-            </TableCell>
-        </TableRow>
-    );
-});
-
-function StockStatusChip({ isValidated, isLoading }) {
-    if (isLoading) {
-        return (
-            <Chip
-                icon={<CircularProgress size={12} color="inherit" />}
-                label="Rechargement..."
-                size="small"
-                sx={{ backgroundColor: colors.border, color: colors.textSecondary }}
-            />
-        );
-    }
-
-    if (isValidated) {
-        return (
-            <Chip
-                label="✓ Stock validé"
-                size="small"
-                sx={{ backgroundColor: 'rgba(5,150,105,0.18)', color: '#34d399', fontWeight: 600 }}
-            />
-        );
-    }
-
-    return (
-        <Chip
-            label="⚠ En attente de validation"
-            size="small"
-            sx={{ backgroundColor: 'rgba(245,158,11,0.15)', color: '#fbbf24', fontWeight: 600 }}
-        />
-    );
-}
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
@@ -858,93 +757,11 @@ function CommandPage() {
             </Card>
 
             {/* ── Contexte export ERP ── */}
-            <Card sx={CARD_SX}>
-                <CardContent>
-                    <Typography variant="h6" sx={{ mb: 1, color: colors.textPrimary, fontWeight: 600 }}>
-                        Contexte export ERP
-                    </Typography>
-                    <Typography variant="body2" sx={{ color: colors.textSecondary, mb: 3 }}>
-                        Renseigne ces champs avant chaque export pour alimenter les colonnes de contexte du fichier Excel généré par le backend.
-                    </Typography>
-
-                    <Grid container spacing={2}>
-                        <Grid item xs={12} sm={6} md={4}>
-                            <TextField
-                                fullWidth
-                                label="Projet"
-                                value={exportContext.projet}
-                                onChange={handleExportContextChange('projet')}
-                                disabled={isExporting}
-                            />
-                        </Grid>
-
-                        {/* Statut ERP — Autocomplete avec valeurs prédéfinies + freeSolo */}
-                        <Grid item xs={12} sm={6} md={4}>
-                            <Autocomplete
-                                freeSolo
-                                options={ERP_STATUT_OPTIONS}
-                                value={exportContext.statut}
-                                onInputChange={(_event, newValue) => handleExportContextChange('statut')(newValue)}
-                                disabled={isExporting}
-                                renderInput={(params) => (
-                                    <TextField
-                                        {...params}
-                                        label="Statut ERP"
-                                        placeholder="Sélectionner ou saisir..."
-                                    />
-                                )}
-                            />
-                        </Grid>
-
-                        {/* Délai — DatePicker natif */}
-                        <Grid item xs={12} sm={6} md={4}>
-                            <TextField
-                                fullWidth
-                                label="Délai"
-                                type="date"
-                                value={exportContext.delai}
-                                onChange={handleExportContextChange('delai')}
-                                disabled={isExporting}
-                                InputLabelProps={{ shrink: true }}
-                            />
-                        </Grid>
-
-                        <Grid item xs={12} sm={6} md={6}>
-                            <TextField
-                                fullWidth
-                                label="Remarque"
-                                value={exportContext.remarque}
-                                onChange={handleExportContextChange('remarque')}
-                                disabled={isExporting}
-                                multiline
-                                minRows={2}
-                            />
-                        </Grid>
-
-                        <Grid item xs={12} sm={6} md={3}>
-                            <TextField
-                                fullWidth
-                                label="Validateur"
-                                value={exportContext.validateur}
-                                onChange={handleExportContextChange('validateur')}
-                                disabled={isExporting}
-                            />
-                        </Grid>
-
-
-                        <Grid item xs={12} sm={6} md={3}>
-                            <TextField
-                                fullWidth
-                                label="Fournisseur par défaut"
-                                value={exportContext.fournisseurParDefaut}
-                                onChange={handleExportContextChange('fournisseurParDefaut')}
-                                disabled={isExporting}
-                                helperText="Optionnel — s'applique à toute la commande"
-                            />
-                        </Grid>
-                    </Grid>
-                </CardContent>
-            </Card>
+            <ErpContextForm
+                exportContext={exportContext}
+                onFieldChange={handleExportContextChange}
+                isExporting={isExporting}
+            />
 
             {/* ── Liste commande + Aperçu session ── */}
             <Grid container spacing={3}>

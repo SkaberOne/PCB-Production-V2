@@ -6,6 +6,7 @@ from typing import Dict, List, Optional
 from sqlalchemy import desc
 from sqlalchemy.orm import Session, joinedload
 
+from ..database import utcnow
 from ..models.bom import BomRevision
 from ..models.commands import Command
 from ..models.machines import PnpMachine
@@ -152,7 +153,7 @@ class ProductionWorkspaceService:
                 synchronize_session=False,
             )
             target.status = Production.StatusEnum.ACTIVE
-            target.updated_at = datetime.utcnow()
+            target.updated_at = utcnow()
             return target
 
         active_productions = (
@@ -171,7 +172,7 @@ class ProductionWorkspaceService:
                 {Production.status: Production.StatusEnum.DRAFT},
                 synchronize_session=False,
             )
-            keep_active.updated_at = datetime.utcnow()
+            keep_active.updated_at = utcnow()
             return keep_active
 
         if len(active_productions) == 1:
@@ -184,7 +185,7 @@ class ProductionWorkspaceService:
         )
         if fallback:
             fallback.status = Production.StatusEnum.ACTIVE
-            fallback.updated_at = datetime.utcnow()
+            fallback.updated_at = utcnow()
         return fallback
 
     @staticmethod
@@ -309,7 +310,7 @@ class ProductionWorkspaceService:
         if notes is not None:
             production.notes = notes.strip() or None
 
-        production.updated_at = datetime.utcnow()
+        production.updated_at = utcnow()
         db.commit()
         db.refresh(production)
         return ProductionWorkspaceService.get_production_detail(db, production.id)
@@ -322,7 +323,7 @@ class ProductionWorkspaceService:
     ) -> Dict:
         production = ProductionWorkspaceService.get_production_or_raise(db, production_id)
         production.erp_context = erp_context or {}
-        production.updated_at = datetime.utcnow()
+        production.updated_at = utcnow()
         db.commit()
         db.refresh(production)
         return ProductionWorkspaceService.get_production_detail(db, production.id)
@@ -369,7 +370,7 @@ class ProductionWorkspaceService:
 
         ProductionWorkspaceService._normalize_bom_link_sequence(production)
         production.manufacturing_order_validated_at = None
-        production.updated_at = datetime.utcnow()
+        production.updated_at = utcnow()
         if production.status == Production.StatusEnum.DRAFT:
             ProductionWorkspaceService._ensure_single_active_production(
                 db,
@@ -397,7 +398,7 @@ class ProductionWorkspaceService:
         db.refresh(production)
         ProductionWorkspaceService._normalize_bom_link_sequence(production)
         production.manufacturing_order_validated_at = None
-        production.updated_at = datetime.utcnow()
+        production.updated_at = utcnow()
         db.commit()
         db.refresh(production)
         return ProductionWorkspaceService.get_production_detail(db, production.id)
@@ -432,7 +433,7 @@ class ProductionWorkspaceService:
             current_links[revision_id].sequence_order = index
 
         production.manufacturing_order_validated_at = None
-        production.updated_at = datetime.utcnow()
+        production.updated_at = utcnow()
         db.commit()
         db.refresh(production)
         return ProductionWorkspaceService.get_production_detail(db, production.id)
@@ -473,7 +474,7 @@ class ProductionWorkspaceService:
         for revision_id, quantity_to_produce in normalized_items.items():
             current_links[revision_id].quantity_to_produce = quantity_to_produce
 
-        production.updated_at = datetime.utcnow()
+        production.updated_at = utcnow()
         db.commit()
         db.refresh(production)
         return ProductionWorkspaceService.get_production_detail(db, production.id)
@@ -488,8 +489,8 @@ class ProductionWorkspaceService:
             raise ValueError("Aucune BOM n'est liee a cette production.")
 
         ProductionWorkspaceService._normalize_bom_link_sequence(production)
-        production.manufacturing_order_validated_at = datetime.utcnow()
-        production.updated_at = datetime.utcnow()
+        production.manufacturing_order_validated_at = utcnow()
+        production.updated_at = utcnow()
         db.commit()
         db.refresh(production)
         return ProductionWorkspaceService.get_production_detail(db, production.id)
