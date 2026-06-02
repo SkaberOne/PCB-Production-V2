@@ -865,6 +865,41 @@ export function BomSessionProvider({ children }) {
         setActiveProduction(null);
     }, [setActiveProduction]);
 
+    // Purge complète de la session d'une production supprimée : annule la
+    // persistance différée, retire ses entrées localStorage scopées, et — si
+    // c'était la session active — vide currentBom + espaces de travail en mémoire
+    // (sans repasser par flush qui ré-écrirait les données).
+    const purgeProductionSession = React.useCallback((targetProductionId) => {
+        const normalizedId = targetProductionId ?? null;
+        const wasActive = normalizedId === activeProductionIdRef.current;
+
+        if (typeof window !== 'undefined') {
+            clearScheduledTask(bomWorkspacePersistRef);
+            clearScheduledTask(currentBomPersistRef);
+            clearScheduledTask(importWorkspacePersistRef);
+
+            if (normalizedId !== null) {
+                removeScopedStorage(CURRENT_BOM_STORAGE_PREFIX, normalizedId);
+                removeScopedStorage(IMPORT_WORKSPACE_STORAGE_PREFIX, normalizedId);
+                removeScopedStorage(BOM_WORKSPACE_STORAGE_PREFIX, normalizedId);
+            }
+        }
+
+        if (!wasActive) {
+            return;
+        }
+
+        activeProductionIdRef.current = null;
+        currentBomRef.current = null;
+        importWorkspaceRef.current = createDefaultImportWorkspace();
+        bomWorkspaceRef.current = createDefaultBomWorkspace();
+
+        setCurrentBom(null);
+        setImportWorkspace(createDefaultImportWorkspace());
+        setBomWorkspace(createDefaultBomWorkspace());
+        setActiveProductionState(null);
+    }, []);
+
     // Alias pour compatibilité avec les composants qui utilisent flushSessionPersistence
     const flushSessionPersistence = flushCurrentSessionPersistence;
 
@@ -895,6 +930,7 @@ export function BomSessionProvider({ children }) {
         clearCurrentBom,
         setActiveProduction,
         clearActiveProduction,
+        purgeProductionSession,
         activateProductionSession,
         activeProduction,
         flushCurrentSessionPersistence,

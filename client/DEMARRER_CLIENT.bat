@@ -8,10 +8,10 @@ echo   ECB Production Manager - CLIENT
 echo ========================================
 echo.
 
-:: Charger config client
+:: Charger config client (ignore les lignes de commentaire commencant par #)
 if exist "client.env" (
-    for /f "usebackq tokens=1,* delims==" %%A in ("client.env") do (
-        if not "%%A"=="" if not "%%A:~0,1%"=="#" set "%%A=%%B"
+    for /f "usebackq tokens=1,* delims==" %%A in (`findstr /v /b /c:"#" "client.env"`) do (
+        set "%%A=%%B"
     )
 )
 
@@ -50,8 +50,27 @@ echo Ctrl+C pour arreter.
 echo.
 
 cd src\desktop
-start npm run start:web
-ping -n 4 127.0.0.1 >nul
+start "ECB - Serveur React (ne pas fermer)" npm run start:web
+
+:: Attendre que le serveur React (localhost:3000) soit reellement pret
+:: avant de lancer Electron (la 1ere compilation peut prendre ~30s).
+echo Attente du demarrage de React (localhost:3000)...
+set /a _tries=0
+:wait_react
+curl -s -o nul http://localhost:3000 >nul 2>&1
+if not errorlevel 1 goto react_ready
+set /a _tries+=1
+if %_tries% geq 60 (
+    echo [ERREUR] React n'a pas demarre dans le temps imparti.
+    echo Verifiez la fenetre "ECB - Serveur React".
+    pause
+    goto end
+)
+timeout /t 2 /nobreak >nul
+goto wait_react
+
+:react_ready
+echo [OK] Serveur React pret. Lancement de l'application...
 npm start
 
 :end

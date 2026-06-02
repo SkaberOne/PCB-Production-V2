@@ -176,3 +176,13 @@ const template = [
                         type: 'info',
                         title: 'A propos',
                         message: 'PCB Production Manager',
+                        detail: `Version ${appVersion}`,
+                        buttons: ['OK']
+                    });
+                }
+            }
+        ]
+    }
+];
+
+Menu.setApplicationMenu(Menu.buildFromTemplate(template));

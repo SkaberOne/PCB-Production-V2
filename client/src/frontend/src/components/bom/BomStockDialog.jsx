@@ -19,7 +19,7 @@ import { compactInputSx } from '../../utils/compactTable';
 import { getStockStatusChipColor, normalizeStockStatus } from '../../utils/bomStockUi';
 
 const panelCardSx = {
-    backgroundColor: '#18181b',
+    backgroundColor: '#111111',
     border: '1px solid #27272a',
 };
 
@@ -38,7 +38,7 @@ function BomStockDialog({
             maxWidth="md"
             PaperProps={{
                 sx: {
-                    backgroundColor: '#111827',
+                    backgroundColor: '#18181b',
                     color: '#f4f4f5',
                     border: '1px solid #27272a',
                     borderRadius: 3,
@@ -59,15 +59,15 @@ function BomStockDialog({
             <DialogContent sx={{ pt: 3 }}>
                 {line ? (
                     <Stack spacing={3} sx={{ mt: 0.5 }}>
-                        <Alert severity="info" sx={{ backgroundColor: 'rgba(59, 130, 246, 0.12)', color: '#dbeafe' }}>
+                        <Alert severity="info">
                             Les informations sont enregistrées immédiatement pendant la saisie.
                         </Alert>
 
                         <Grid container spacing={2}>
                             <Grid item xs={12} sm={3}>
-                                <Card sx={{ ...panelCardSx, backgroundColor: '#0f172a' }}>
+                                <Card sx={panelCardSx}>
                                     <CardContent>
-                                        <Typography variant="caption" sx={{ color: '#94a3b8' }}>
+                                        <Typography variant="caption" sx={{ color: '#a1a1aa' }}>
                                             Besoin total
                                         </Typography>
                                         <Typography variant="h5" sx={{ mt: 0.5, fontWeight: 700 }}>
@@ -77,9 +77,9 @@ function BomStockDialog({
                                 </Card>
                             </Grid>
                             <Grid item xs={12} sm={3}>
-                                <Card sx={{ ...panelCardSx, backgroundColor: '#0f172a' }}>
+                                <Card sx={panelCardSx}>
                                     <CardContent>
-                                        <Typography variant="caption" sx={{ color: '#94a3b8' }}>
+                                        <Typography variant="caption" sx={{ color: '#a1a1aa' }}>
                                             Stock dispo
                                         </Typography>
                                         <Typography variant="h5" sx={{ mt: 0.5, fontWeight: 700 }}>
@@ -89,9 +89,9 @@ function BomStockDialog({
                                 </Card>
                             </Grid>
                             <Grid item xs={12} sm={3}>
-                                <Card sx={{ ...panelCardSx, backgroundColor: '#0f172a' }}>
+                                <Card sx={panelCardSx}>
                                     <CardContent>
-                                        <Typography variant="caption" sx={{ color: '#94a3b8' }}>
+                                        <Typography variant="caption" sx={{ color: '#a1a1aa' }}>
                                             À commander
                                         </Typography>
                                         <Typography variant="h5" sx={{ mt: 0.5, fontWeight: 700 }}>
@@ -101,9 +101,9 @@ function BomStockDialog({
                                 </Card>
                             </Grid>
                             <Grid item xs={12} sm={3}>
-                                <Card sx={{ ...panelCardSx, backgroundColor: '#0f172a' }}>
+                                <Card sx={panelCardSx}>
                                     <CardContent>
-                                        <Typography variant="caption" sx={{ color: '#94a3b8', display: 'block', mb: 1 }}>
+                                        <Typography variant="caption" sx={{ color: '#a1a1aa', display: 'block', mb: 1 }}>
                                             Statut
                                         </Typography>
                                         <Chip
@@ -119,7 +119,7 @@ function BomStockDialog({
 
                         <Grid container spacing={3}>
                             <Grid item xs={12} md={6}>
-                                <Card sx={{ ...panelCardSx, backgroundColor: '#0f172a', height: '100%' }}>
+                                <Card sx={{ ...panelCardSx, height: '100%' }}>
                                     <CardContent>
                                         <Stack spacing={2}>
                                             <Box>
@@ -179,7 +179,7 @@ function BomStockDialog({
                                                 </Grid>
                                             </Grid>
 
-                                            <Alert severity="success" sx={{ backgroundColor: 'rgba(16, 185, 129, 0.12)', color: '#d1fae5' }}>
+                                            <Alert severity="success">
                                                 Quantité estimée en bobine : {line.reelEstimatedQty ?? '-'}
                                             </Alert>
                                         </Stack>
@@ -188,7 +188,7 @@ function BomStockDialog({
                             </Grid>
 
                             <Grid item xs={12} md={6}>
-                                <Card sx={{ ...panelCardSx, backgroundColor: '#0f172a', height: '100%' }}>
+                                <Card sx={{ ...panelCardSx, height: '100%' }}>
                                     <CardContent>
                                         <Stack spacing={2}>
                                             <Box>
@@ -236,11 +236,11 @@ function BomStockDialog({
                                             </Grid>
 
                                             {line.manualPlacement ? (
-                                                <Alert severity="warning" sx={{ backgroundColor: 'rgba(245, 158, 11, 0.12)', color: '#fef3c7' }}>
+                                                <Alert severity="warning">
                                                     Ce composant est actuellement considéré en pose manuelle.
                                                 </Alert>
                                             ) : (
-                                                <Alert severity="info" sx={{ backgroundColor: 'rgba(59, 130, 246, 0.12)', color: '#dbeafe' }}>
+                                                <Alert severity="info">
                                                     Aucun indicateur de pose manuelle n'est actif pour ce composant.
                                                 </Alert>
                                             )}

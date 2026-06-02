@@ -1,7 +1,5 @@
 import React from 'react';
-import AddRoundedIcon from '@mui/icons-material/AddRounded';
 import DeleteOutlineRoundedIcon from '@mui/icons-material/DeleteOutlineRounded';
-import DownloadRoundedIcon from '@mui/icons-material/DownloadRounded';
 import SaveRoundedIcon from '@mui/icons-material/SaveRounded';
 import {
     Alert,
@@ -19,7 +17,6 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 
 // ── Sub-components ────────────────────────────────────────────────────────────
 import BomQuantityPanel from '../components/bom/BomQuantityPanel';
-import BomPickerDialog from '../components/bom/BomPickerDialog';
 import BomSelectionPanel from '../components/bom/BomSelectionPanel';
 import BomReviewTab from '../components/bom/BomReviewTab';
 import BomStockDialog from '../components/bom/BomStockDialog';
@@ -34,7 +31,6 @@ import { normalizeBomWorkspaceEntry } from '../utils/bomWorkspace';
 import {
     buildAggregatedComponentPreview,
     buildReviewPayload,
-    buildReviewedBomCsv,
     getQuantityRows,
     getSelectedEntries,
 } from '../utils/bomReviewView';
@@ -42,7 +38,6 @@ import {
     areSelectedCommandEntriesLoaded,
     countLoadedCommandEntries,
 } from '../utils/commandPlanning';
-import { downloadCsvFile } from '../utils/csvDownload';
 
 // ─── Static style constants (#17) ─────────────────────────────────────────────
 const PANEL_CARD_SX = {
@@ -93,7 +88,6 @@ function BomViewerPage() {
     const [selectionFeedback, setSelectionFeedback] = React.useState({ type: 'info', message: '' });
     const [stockDialogKey, setStockDialogKey] = React.useState(null);
     const [confirmDeleteOpen, setConfirmDeleteOpen] = React.useState(false);
-    const [pickerOpen, setPickerOpen] = React.useState(false);
     const [undoStack, setUndoStack] = React.useState([]); // (#22)
     const reviewCardRef = React.useRef(null); // (#14)
 
@@ -207,32 +201,6 @@ function BomViewerPage() {
         nextParams.delete('revision');
         setSearchParams(nextParams, { replace: true });
     }, [searchParams, selectedBomEntries, loadRevisionSession, setActiveBomRevision, setSearchParams]);
-
-    // ── Ajout de BOM via le dialog de sélection multiple ──────────────────────
-    const handlePickBomRevisions = React.useCallback(async (revisionIds) => {
-        setPickerOpen(false);
-        const ids = Array.from(new Set((revisionIds || []).map(Number).filter(Boolean)));
-        if (!ids.length) return;
-
-        setSelectionFeedback({ type: 'info', message: `Chargement de ${ids.length} BOM…` });
-        const results = await Promise.allSettled(
-            ids.map((id, index) => loadRevisionSession(
-                { bom_revision_id: id },
-                index === 0 && !activeRevisionId,
-            )),
-        );
-        const failed = results.filter((result) => result.status === 'rejected').length;
-        const added = ids.length - failed;
-        setSelectionFeedback(failed
-            ? {
-                type: 'warning',
-                message: `${added}/${ids.length} BOM ajoutée(s) à la session (${failed} échec). Clique « Valider » pour les relier à la production.`,
-            }
-            : {
-                type: 'success',
-                message: `${added} BOM ajoutée(s) à la session. Clique « Valider » pour les relier à la production active.`,
-            });
-    }, [activeRevisionId, loadRevisionSession]);
 
     // ── Active BOM + computed values ──────────────────────────────────────────
     const activeBom = bomWorkspace.revisionsById[activeRevisionId]
@@ -552,14 +520,6 @@ function BomViewerPage() {
         }
     };
 
-    // ── CSV export (#11) ──────────────────────────────────────────────────────
-    const handleExportActiveBom = () => {
-        if (!activeBom) return;
-        const stem = [activeBom.reference || 'BOM', activeBom.revision || 'REV', activeBom.side || 'TOP']
-            .filter(Boolean).join('_').replace(/[^a-zA-Z0-9_-]+/g, '_');
-        downloadCsvFile(`${stem}_review.csv`, buildReviewedBomCsv(activeBom));
-    };
-
     // ── Stock draft handlers ──────────────────────────────────────────────────
     const handleStockDraftChange = React.useCallback(
         (componentKey, field, asNumber = false) => async (event) => {
@@ -655,21 +615,6 @@ function BomViewerPage() {
                 actions={(
                     <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
                         <Button
-                            variant="contained"
-                            startIcon={<AddRoundedIcon />}
-                            onClick={() => setPickerOpen(true)}
-                        >
-                            Choisir des BOM
-                        </Button>
-                        <Button
-                            variant="outlined"
-                            startIcon={<DownloadRoundedIcon />}
-                            disabled={!activeBom}
-                            onClick={handleExportActiveBom}
-                        >
-                            Exporter CSV
-                        </Button>
-                        <Button
                             variant="outlined"
                             color="error"
                             startIcon={<DeleteOutlineRoundedIcon />}
@@ -719,7 +664,6 @@ function BomViewerPage() {
                         loadingRevisionId={loadingRevisionId}
                         bomWorkspace={bomWorkspace}
                         onActivateEntry={handleActivateEntry}
-                        onLoadBom={() => setPickerOpen(true)}
                     />
                 </Grid>
             </Grid>
@@ -786,13 +730,6 @@ function BomViewerPage() {
                 onConfirm={handleConfirmDeleteBom}
                 onClose={() => setConfirmDeleteOpen(false)}
                 severity="error"
-            />
-
-            <BomPickerDialog
-                open={pickerOpen}
-                onClose={() => setPickerOpen(false)}
-                onConfirm={handlePickBomRevisions}
-                alreadySelectedIds={selectedEntries.map((entry) => entry.bom_revision_id)}
             />
         </Stack>
     );

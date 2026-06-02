@@ -361,6 +361,7 @@ function DashboardPage() {
         updateImportWorkspace,
         clearCurrentBom,
         clearActiveProduction,
+        purgeProductionSession,
     } = useBomSession();
     const sessionStats = getBomSessionStats(currentBom);
     // Ref to read activeProduction inside callbacks without adding it to deps (breaks infinite loop)
@@ -727,9 +728,7 @@ function DashboardPage() {
         setActionLoadingId(deleteDialog.production.id);
         try {
             await apiClient.delete(`/marketplace/productions/${deleteDialog.production.id}`);
-            if (activeProduction?.id === deleteDialog.production.id) {
-                clearActiveProduction();
-            }
+            purgeProductionSession(deleteDialog.production.id);
             setDeleteDialog({ open: false, production: null });
             setFeedback({
                 type: 'success',
@@ -902,6 +901,154 @@ function DashboardPage() {
                     </Card>
                 </Grid>
             </Grid>
+
+            <Dialog
+                open={createDialogOpen}
+                onClose={() => setCreateDialogOpen(false)}
+                fullWidth
+                maxWidth="sm"
+            >
+                <DialogTitle>Nouvelle production</DialogTitle>
+                <DialogContent>
+                    <TextField
+                        autoFocus
+                        fullWidth
+                        margin="dense"
+                        label="Nom de la production"
+                        value={createName}
+                        onChange={(e) => setCreateName(e.target.value)}
+                        onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                                e.preventDefault();
+                                handleCreateProduction();
+                            }
+                        }}
+                        error={Boolean(createDialogError)}
+                        helperText={createDialogError || ' '}
+                    />
+                </DialogContent>
+                <DialogActions>
+                    <Button
+                        onClick={() => setCreateDialogOpen(false)}
+                        disabled={actionLoadingId === 'create'}
+                    >
+                        Annuler
+                    </Button>
+                    <Button
+                        variant="contained"
+                        onClick={handleCreateProduction}
+                        disabled={actionLoadingId === 'create' || !createName.trim()}
+                    >
+                        {actionLoadingId === 'create' ? 'Création...' : 'Créer'}
+                    </Button>
+                </DialogActions>
+            </Dialog>
+
+            <Dialog
+                open={renameDialog.open}
+                onClose={handleCloseRenameDialog}
+                fullWidth
+                maxWidth="sm"
+            >
+                <DialogTitle>Renommer la production</DialogTitle>
+                <DialogContent>
+                    <TextField
+                        autoFocus
+                        fullWidth
+                        margin="dense"
+                        label="Nouveau nom"
+                        value={renameDialog.name}
+                        onChange={(e) => setRenameDialog((prev) => ({ ...prev, name: e.target.value }))}
+                        onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                                e.preventDefault();
+                                handleConfirmRename();
+                            }
+                        }}
+                    />
+                </DialogContent>
+                <DialogActions>
+                    <Button
+                        onClick={handleCloseRenameDialog}
+                        disabled={actionLoadingId === renameDialog.production?.id}
+                    >
+                        Annuler
+                    </Button>
+                    <Button
+                        variant="contained"
+                        onClick={handleConfirmRename}
+                        disabled={
+                            actionLoadingId === renameDialog.production?.id
+                            || !renameDialog.name.trim()
+                        }
+                    >
+                        Renommer
+                    </Button>
+                </DialogActions>
+            </Dialog>
+
+            <Dialog
+                open={deleteDialog.open}
+                onClose={handleCloseDeleteDialog}
+                fullWidth
+                maxWidth="sm"
+            >
+                <DialogTitle>Supprimer la production</DialogTitle>
+                <DialogContent>
+                    <Typography variant="body2">
+                        Êtes-vous sûr de vouloir supprimer définitivement la production
+                        {' '}
+                        <strong>{deleteDialog.production?.name}</strong>
+                        {' '}
+                        ? Cette action est irréversible.
+                    </Typography>
+                </DialogContent>
+                <DialogActions>
+                    <Button
+                        onClick={handleCloseDeleteDialog}
+                        disabled={actionLoadingId === deleteDialog.production?.id}
+                    >
+                        Annuler
+                    </Button>
+                    <Button
+                        variant="contained"
+                        color="error"
+                        onClick={handleDeleteProduction}
+                        disabled={actionLoadingId === deleteDialog.production?.id}
+                    >
+                        {actionLoadingId === deleteDialog.production?.id ? 'Suppression...' : 'Supprimer'}
+                    </Button>
+                </DialogActions>
+            </Dialog>
+
+            <Dialog
+                open={reactivationDialog.open}
+                onClose={handleCloseReactivationDialog}
+                fullWidth
+                maxWidth="sm"
+            >
+                <DialogTitle>Réactiver la production</DialogTitle>
+                <DialogContent>
+                    <Typography variant="body2">
+                        La production
+                        {' '}
+                        <strong>{reactivationDialog.production?.name}</strong>
+                        {' '}
+                        est
+                        {' '}
+                        {String(reactivationDialog.production?.status || '').toUpperCase() === 'COMPLETED'
+                            ? 'terminée'
+                            : 'archivée'}
+                        . Voulez-vous la réactiver et la charger ?
+                    </Typography>
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={handleCloseReactivationDialog}>Annuler</Button>
+                    <Button variant="contained" onClick={handleConfirmReactivation}>
+                        Réactiver et ouvrir
+                    </Button>
+                </DialogActions>
+            </Dialog>
         </Stack>
     );
 }

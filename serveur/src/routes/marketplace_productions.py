@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from ..database import get_db
+from ..models.production import Production
 from ..schemas.marketplace import (
     AttachProductionBomRequest,
     CreateProductionRequest,
@@ -14,6 +15,18 @@ from ..schemas.marketplace import (
     UpdateProductionRequest,
 )
 from ..services.production_workspace_service import ProductionWorkspaceService
+
+
+def _build_duplicate_name(db: Session, source_name: str) -> str:
+    """Return a unique name for a duplicated production (``Copie de ...``)."""
+    base = f"Copie de {source_name}"
+    candidate = base
+    suffix = 2
+    while db.query(Production.id).filter(Production.name == candidate).first():
+        candidate = f"{base} ({suffix})"
+        suffix += 1
+    return candidate
+
 
 router = APIRouter(prefix="/productions")
 
@@ -34,9 +47,42 @@ def create_production(
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error updating ERP context: {str(e)}")
-    except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error creating production: {str(e)}")
+
+
+@router.delete("/{production_id}")
+def delete_production(
+    production_id: int,
+    db: Session = Depends(get_db),
+):
+    """Delete a production workspace and its BOM links."""
+    try:
+        ProductionWorkspaceService.delete_production(db=db, production_id=production_id)
+        return {"status": "deleted", "id": production_id}
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error deleting production: {str(e)}")
+
+
+@router.post("/{production_id}/duplicate")
+def duplicate_production(
+    production_id: int,
+    db: Session = Depends(get_db),
+):
+    """Duplicate a production workspace under a new unique name."""
+    try:
+        source = ProductionWorkspaceService.get_production_or_raise(db, production_id)
+        new_name = _build_duplicate_name(db, source.name)
+        return ProductionWorkspaceService.duplicate_production(
+            db=db,
+            production_id=production_id,
+            new_name=new_name,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error duplicating production: {str(e)}")
 
 
 @router.get("")
@@ -51,8 +97,6 @@ def list_productions(
         }
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error updating ERP context: {str(e)}")
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error listing productions: {str(e)}")
 
@@ -91,8 +135,6 @@ def update_production(
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error updating ERP context: {str(e)}")
-    except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error updating production: {str(e)}")
 
 
@@ -112,8 +154,6 @@ def attach_bom_revisions_to_production(
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error updating ERP context: {str(e)}")
-    except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error attaching BOMs to production: {str(e)}")
 
 
@@ -132,8 +172,6 @@ def detach_bom_revisions_from_production(
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error updating ERP context: {str(e)}")
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error detaching BOMs from production: {str(e)}")
 
@@ -159,8 +197,6 @@ def update_production_bom_quantities(
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error updating ERP context: {str(e)}")
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error updating production BOM quantities: {str(e)}")
 

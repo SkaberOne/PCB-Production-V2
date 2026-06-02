@@ -196,7 +196,6 @@ describe('BomViewerPage', () => {
     it('renders action buttons in the page header', () => {
         // Les boutons d'action ne sont rendus que pour une production active.
         renderPage({ activeProduction: { id: 1, name: 'Prod test' } });
-        expect(screen.getByRole('button', { name: /exporter/i })).toBeInTheDocument();
         expect(screen.getByRole('button', { name: /valider/i })).toBeInTheDocument();
         expect(screen.getByRole('button', { name: /supprimer bom active/i })).toBeInTheDocument();
         expect(screen.getByRole('button', { name: /sauvegarder brouillon/i })).toBeInTheDocument();

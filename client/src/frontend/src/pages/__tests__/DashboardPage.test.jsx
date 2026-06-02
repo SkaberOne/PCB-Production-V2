@@ -166,7 +166,9 @@ describe('DashboardPage', () => {
         // statut vers ACTIVE) n'a été émis pour la production archivée.
         expect(axios.patch).not.toHaveBeenCalled();
 
-        // La production archivée reste affichée (pas de navigation/ouverture directe).
-        expect(screen.getByText('prod-archive')).toBeInTheDocument();
+        // La production archivee reste affichee (pas de navigation/ouverture directe).
+        // Le nom apparait dans la ligne ET dans le dialog de confirmation,
+        // d'ou getAllByText.
+        expect(screen.getAllByText('prod-archive').length).toBeGreaterThan(0);
     });
 });

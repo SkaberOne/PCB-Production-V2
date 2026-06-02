@@ -1,6 +1,9 @@
 import React from 'react';
 import AddRoundedIcon from '@mui/icons-material/AddRounded';
 import ClearRoundedIcon from '@mui/icons-material/ClearRounded';
+import DeleteOutlineRoundedIcon from '@mui/icons-material/DeleteOutlineRounded';
+import DriveFileRenameOutlineRoundedIcon from '@mui/icons-material/DriveFileRenameOutlineRounded';
+import MoreVertRoundedIcon from '@mui/icons-material/MoreVertRounded';
 import OpenInNewRoundedIcon from '@mui/icons-material/OpenInNewRounded';
 import RefreshRoundedIcon from '@mui/icons-material/RefreshRounded';
 import SettingsRoundedIcon from '@mui/icons-material/SettingsRounded';
@@ -17,11 +20,19 @@ import {
     DialogContent,
     DialogContentText,
     DialogTitle,
+    FormControl,
     Grid,
+    IconButton,
+    InputLabel,
+    ListItemIcon,
+    ListItemText,
+    Menu,
     MenuItem,
+    Select,
     Skeleton,
     Stack,
     TextField,
+    Tooltip,
     Typography,
 } from '@mui/material';
 import apiClient from '../api/client';
@@ -68,6 +79,7 @@ function ImportBomPage() {
         updateImportWorkspace,
         clearCurrentBom,
         clearActiveProduction,
+        purgeProductionSession,
         flushCurrentSessionPersistence: flushSessionPersistence,
     } = useBomSession();
 
@@ -83,6 +95,12 @@ function ImportBomPage() {
     // Dialog de confirmation quand on remplace une production déjà active
     const [replaceConfirmOpen, setReplaceConfirmOpen] = React.useState(false);
     const pendingLoadIdRef = React.useRef(null);
+
+    // Menu d'actions sur la production active (switch / renommer / supprimer)
+    const [menuAnchor, setMenuAnchor] = React.useState(null);
+    const [renameDialogOpen, setRenameDialogOpen] = React.useState(false);
+    const [renameValue, setRenameValue] = React.useState('');
+    const [deleteConfirmOpen, setDeleteConfirmOpen] = React.useState(false);
 
     // AbortController pour éviter les race conditions sur loadProductions
     const loadProductionsAbortRef = React.useRef(null);
@@ -273,6 +291,99 @@ function ImportBomPage() {
         productionAsync.setSuccess('Production active retirée de la session.');
     };
 
+    // Switch immédiat depuis le menu déroulant : charge la production choisie,
+    // en demandant confirmation si une autre production est déjà active.
+    const handleSwitchProduction = (event) => {
+        const nextId = String(event.target.value || '');
+        if (!nextId || nextId === selectedProductionId) {
+            return;
+        }
+
+        if (activeProduction?.id && String(activeProduction.id) !== nextId) {
+            pendingLoadIdRef.current = nextId;
+            setReplaceConfirmOpen(true);
+            return;
+        }
+
+        setSelectedProductionId(nextId);
+        doLoadProduction(nextId);
+    };
+
+    const handleOpenMenu = (event) => setMenuAnchor(event.currentTarget);
+    const handleCloseMenu = () => setMenuAnchor(null);
+
+    const handleOpenRenameDialog = () => {
+        setMenuAnchor(null);
+        setRenameValue(activeProduction?.name || '');
+        setRenameDialogOpen(true);
+    };
+
+    const handleCloseRenameDialog = () => {
+        setRenameDialogOpen(false);
+        setRenameValue('');
+    };
+
+    const handleConfirmRename = async () => {
+        const trimmed = renameValue.trim();
+        if (!trimmed || !activeProduction?.id) {
+            return;
+        }
+
+        // Validation doublon côté client (en excluant la production courante)
+        const duplicate = productions.find(
+            (p) => String(p.id) !== String(activeProduction.id)
+                && p.name.trim().toLowerCase() === trimmed.toLowerCase(),
+        );
+        if (duplicate) {
+            productionAsync.setError(`Une production nommée "${duplicate.name}" existe déjà.`);
+            return;
+        }
+
+        productionAsync.setLoading();
+        try {
+            const response = await apiClient.patch(`/marketplace/productions/${activeProduction.id}`, {
+                name: trimmed,
+            });
+            setActiveProduction(response.data);
+            setRenameDialogOpen(false);
+            setRenameValue('');
+            await loadProductions();
+            productionAsync.setSuccess(`Production renommée en « ${trimmed} ».`);
+        } catch (requestError) {
+            productionAsync.setError(
+                requestError.response?.data?.detail || requestError.message || 'Erreur lors du renommage de la production',
+            );
+        }
+    };
+
+    const handleOpenDeleteConfirm = () => {
+        setMenuAnchor(null);
+        setDeleteConfirmOpen(true);
+    };
+
+    const handleConfirmDelete = async () => {
+        if (!activeProduction?.id) {
+            return;
+        }
+
+        const deletedId = activeProduction.id;
+        const deletedName = activeProduction.name;
+
+        productionAsync.setLoading();
+        try {
+            await apiClient.delete(`/marketplace/productions/${deletedId}`);
+            purgeProductionSession(deletedId);
+            setSelectedProductionId('');
+            setDeleteConfirmOpen(false);
+            await loadProductions();
+            productionAsync.setSuccess(`Production « ${deletedName} » supprimée.`);
+        } catch (requestError) {
+            productionAsync.setError(
+                requestError.response?.data?.detail || requestError.message || 'Erreur lors de la suppression de la production',
+            );
+        }
+    };
+
     const handleContinueReview = async () => {
         if (!hasImportedBom) {
             return;
@@ -349,6 +460,12 @@ function ImportBomPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [replaceConfirmOpen, productions]);
 
+    // Valeur du Select : '' tant que la production active n'est pas dans la liste
+    // chargée (évite le warning MUI "out-of-range value").
+    const productionSelectValue = productions.some((p) => String(p.id) === selectedProductionId)
+        ? selectedProductionId
+        : '';
+
     return (
         <Stack spacing={3}>
             <PageHeader
@@ -381,15 +498,143 @@ function ImportBomPage() {
             <Card sx={{ backgroundColor: '#18181b', border: '1px solid #27272a' }}>
                 <CardContent>
                     <Stack spacing={2.5}>
-                        <Typography variant="h6" sx={{ color: '#f4f4f5', fontWeight: 600 }}>
-                            {activeProduction ? 'Production active' : 'Configurer la production'}
-                        </Typography>
+                        <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={1}>
+                            <Typography variant="h6" sx={{ color: '#f4f4f5', fontWeight: 600 }}>
+                                {activeProduction ? 'Production active' : 'Aucune production active'}
+                            </Typography>
+                            {activeProduction && (
+                                <Tooltip title="Actions sur la production">
+                                    <IconButton
+                                        size="small"
+                                        aria-label="Actions sur la production active"
+                                        onClick={handleOpenMenu}
+                                        sx={{ color: '#a1a1aa', '&:hover': { color: '#f4f4f5' } }}
+                                    >
+                                        <MoreVertRoundedIcon fontSize="small" />
+                                    </IconButton>
+                                </Tooltip>
+                            )}
+                        </Stack>
+
                         <Typography variant="body2" sx={{ color: '#a1a1aa' }}>
-                            Charge une production existante ou crée-en une nouvelle avant de rattacher les BOM harmonisées à ton workflow.
+                            {activeProduction
+                                ? 'Change de production active, renomme-la ou supprime-la. La création se fait depuis la page Production.'
+                                : 'Sélectionne une production existante pour la charger. La création se fait depuis la page Production.'}
                         </Typography>
+
+                        <FormControl
+                            size="small"
+                            fullWidth
+                            disabled={productionsLoading || productions.length === 0}
+                        >
+                            <InputLabel id="switch-production-label">Production</InputLabel>
+                            <Select
+                                labelId="switch-production-label"
+                                label="Production"
+                                value={productionSelectValue}
+                                onChange={handleSwitchProduction}
+                                displayEmpty
+                                startAdornment={(
+                                    <SwapHorizRoundedIcon sx={{ color: '#52525b', mr: 1, fontSize: 18 }} />
+                                )}
+                            >
+                                {productions.length === 0 && (
+                                    <MenuItem value="" disabled>
+                                        {productionsLoading ? 'Chargement…' : 'Aucune production disponible'}
+                                    </MenuItem>
+                                )}
+                                {productions.map((production) => (
+                                    <MenuItem key={production.id} value={String(production.id)}>
+                                        {production.name}
+                                    </MenuItem>
+                                ))}
+                            </Select>
+                        </FormControl>
                     </Stack>
                 </CardContent>
             </Card>
+
+            <Menu anchorEl={menuAnchor} open={Boolean(menuAnchor)} onClose={handleCloseMenu}>
+                <MenuItem onClick={handleOpenRenameDialog}>
+                    <ListItemIcon>
+                        <DriveFileRenameOutlineRoundedIcon fontSize="small" sx={{ color: '#a1a1aa' }} />
+                    </ListItemIcon>
+                    <ListItemText>Renommer</ListItemText>
+                </MenuItem>
+                <MenuItem onClick={handleOpenDeleteConfirm}>
+                    <ListItemIcon>
+                        <DeleteOutlineRoundedIcon fontSize="small" sx={{ color: '#f87171' }} />
+                    </ListItemIcon>
+                    <ListItemText sx={{ '& .MuiTypography-root': { color: '#f87171' } }}>Supprimer</ListItemText>
+                </MenuItem>
+            </Menu>
+
+            <Dialog open={replaceConfirmOpen} onClose={handleCancelReplaceProduction}>
+                <DialogTitle>Changer de production active ?</DialogTitle>
+                <DialogContent>
+                    <DialogContentText>
+                        La production active va être remplacée par « {pendingProductionName} ». Le travail en cours non sauvegardé sera perdu.
+                    </DialogContentText>
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={handleCancelReplaceProduction}>Annuler</Button>
+                    <Button variant="contained" onClick={handleConfirmReplaceProduction}>
+                        Charger
+                    </Button>
+                </DialogActions>
+            </Dialog>
+
+            <Dialog open={renameDialogOpen} onClose={handleCloseRenameDialog} fullWidth maxWidth="xs">
+                <DialogTitle>Renommer la production</DialogTitle>
+                <DialogContent>
+                    <TextField
+                        autoFocus
+                        margin="dense"
+                        label="Nom de la production"
+                        fullWidth
+                        value={renameValue}
+                        onChange={(event) => setRenameValue(event.target.value)}
+                        onKeyDown={(event) => {
+                            if (event.key === 'Enter') {
+                                event.preventDefault();
+                                handleConfirmRename();
+                            }
+                        }}
+                    />
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={handleCloseRenameDialog}>Annuler</Button>
+                    <Button
+                        variant="contained"
+                        onClick={handleConfirmRename}
+                        disabled={!renameValue.trim() || productionAsync.state.loading}
+                    >
+                        Renommer
+                    </Button>
+                </DialogActions>
+            </Dialog>
+
+            <Dialog open={deleteConfirmOpen} onClose={() => setDeleteConfirmOpen(false)}>
+                <DialogTitle>Supprimer la production ?</DialogTitle>
+                <DialogContent>
+                    <DialogContentText>
+                        La production « {activeProduction?.name} » sera définitivement supprimée. Cette action est irréversible.
+                    </DialogContentText>
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={() => setDeleteConfirmOpen(false)}>Annuler</Button>
+                    <Button
+                        color="error"
+                        variant="contained"
+                        onClick={handleConfirmDelete}
+                        disabled={productionAsync.state.loading}
+                    >
+                        Supprimer
+                    </Button>
+                </DialogActions>
+            </Dialog>
+
+            <BomLibraryCard />
 
             <BomImport />
         </Stack>

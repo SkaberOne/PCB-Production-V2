@@ -12,6 +12,7 @@ from openpyxl import Workbook, load_workbook
 
 from sqlalchemy.orm import Session
 from tests.conftest import client, TestingSessionLocal
+from src.models.production import Production
 
 def test_machine_listing_exposes_description_and_counts():
     """Machine list should expose the fields needed by the Machine PnP page."""
@@ -1238,4 +1239,48 @@ def test_update_footprint_mapping():
     assert data["machine_compatible"] == "PNP-02"
     assert data["notes"] == "Mis a jour depuis Parametre"
 
+
+def test_production_can_be_deleted():
+    """DELETE /productions/{id} removes the production and 404s afterwards."""
+    create_response = client.post(
+        "/api/marketplace/productions",
+        json={"name": "prod-to-delete"},
+    )
+    assert create_response.status_code == 200
+    production_id = create_response.json()["id"]
+
+    delete_response = client.delete(f"/api/marketplace/productions/{production_id}")
+    assert delete_response.status_code == 200
+    assert delete_response.json()["status"] == "deleted"
+
+    get_response = client.get(f"/api/marketplace/productions/{production_id}")
+    assert get_response.status_code == 404
+
+    second_delete = client.delete(f"/api/marketplace/productions/{production_id}")
+    assert second_delete.status_code == 404
+
+
+def test_production_can_be_duplicated():
+    """POST /productions/{id}/duplicate creates a copy under a unique name."""
+    create_response = client.post(
+        "/api/marketplace/productions",
+        json={"name": "prod-source"},
+    )
+    assert create_response.status_code == 200
+    source_id = create_response.json()["id"]
+
+    duplicate_response = client.post(f"/api/marketplace/productions/{source_id}/duplicate")
+    assert duplicate_response.status_code == 200
+    first_copy = duplicate_response.json()
+    assert first_copy["id"] != source_id
+    assert first_copy["name"] == "Copie de prod-source"
+    assert first_copy["status"] == "DRAFT"
+
+    second_duplicate = client.post(f"/api/marketplace/productions/{source_id}/duplicate")
+    assert second_duplicate.status_code == 200
+    assert second_duplicate.json()["name"] == "Copie de prod-source (2)"
+
+    # Cleanup to limit cross-test pollution in the shared test DB.
+    for pid in (first_copy["id"], second_duplicate.json()["id"], source_id):
+        client.delete(f"/api/marketplace/productions/{pid}")
 

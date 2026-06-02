@@ -638,6 +638,25 @@ function CommandPage() {
 
     const overridesCount = Object.keys(quantityOverrides).length;
 
+    if (!activeProduction?.id) {
+        return (
+            <Stack spacing={4}>
+                <PageHeader
+                    eyebrow="Préparation achat"
+                    title="Préparation commande composants"
+                    description="La préparation de commande est liée à une production active."
+                />
+                <EmptyState
+                    eyebrow="Aucune production active"
+                    title="Sélectionnez une production"
+                    description="Activez ou créez une production depuis l'onglet Productions pour préparer une commande de composants."
+                    navigateTo="/dashboard"
+                    navigateLabel="Aller aux productions"
+                />
+            </Stack>
+        );
+    }
+
     return (
         <Stack spacing={4}>
             <PageHeader

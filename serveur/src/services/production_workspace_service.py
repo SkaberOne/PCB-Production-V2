@@ -524,3 +524,24 @@ class ProductionWorkspaceService:
         db.commit()
         db.refresh(new_production)
         return ProductionWorkspaceService.get_production_detail(db, new_production.id)
+
+    @staticmethod
+    def delete_production(db: Session, production_id: int) -> None:
+        """Delete a production workspace.
+
+        Linked BOM revision rows are removed via the ``bom_links`` cascade.
+        Commands keep a nullable FK to the production, so we detach them first
+        to avoid an integrity error instead of deleting the command history.
+        """
+        production = ProductionWorkspaceService.get_production_or_raise(db, production_id)
+
+        # Detach commands (nullable FK) so the production can be removed without
+        # cascading away the command history.
+        db.query(Command).filter(Command.production_id == production_id).update(
+            {Command.production_id: None},
+            synchronize_session=False,
+        )
+
+        db.delete(production)
+        db.commit()
+
