@@ -1,13 +1,31 @@
 import React from 'react';
 import { Alert, Box, Button, Card, CardContent, Grid, Typography } from '@mui/material';
+import { colors } from '../../theme';
 
-function StatTile({ value, label, backgroundColor, color }) {
+// Tuiles en thème dark : fond teinté subtil + valeur en couleur sémantique vive.
+const TILE_TONES = {
+    info: { value: colors.blue, tint: 'rgba(59, 130, 246, 0.10)', edge: 'rgba(59, 130, 246, 0.25)' },
+    success: { value: colors.green, tint: 'rgba(16, 185, 129, 0.10)', edge: 'rgba(16, 185, 129, 0.25)' },
+    warning: { value: colors.amber, tint: 'rgba(245, 158, 11, 0.10)', edge: 'rgba(245, 158, 11, 0.25)' },
+    neutral: { value: colors.textPrimary, tint: 'rgba(255, 255, 255, 0.04)', edge: colors.border },
+};
+
+function StatTile({ value, label, tone = 'neutral' }) {
+    const t = TILE_TONES[tone] || TILE_TONES.neutral;
     return (
-        <Box sx={{ p: 2, backgroundColor, borderRadius: 1, textAlign: 'center' }}>
-            <Typography variant="h5" sx={{ color }}>
+        <Box
+            sx={{
+                p: 2,
+                backgroundColor: t.tint,
+                border: `1px solid ${t.edge}`,
+                borderRadius: 2,
+                textAlign: 'center',
+            }}
+        >
+            <Typography variant="h5" sx={{ color: t.value }}>
                 {value}
             </Typography>
-            <Typography variant="caption" sx={{ color: '#666' }}>
+            <Typography variant="caption" sx={{ color: colors.textSecondary }}>
                 {label}
             </Typography>
         </Box>
@@ -78,32 +96,28 @@ function BomImportOverviewPanel({
                             <StatTile
                                 value={result.item_count}
                                 label="Lignes importées"
-                                backgroundColor="#f5f5f5"
-                                color="#1976d2"
+                                tone="info"
                             />
                         </Grid>
                         <Grid item xs={6} sm={3}>
                             <StatTile
                                 value={stats.auto_harmonized || 0}
                                 label="Valeurs harmonisées"
-                                backgroundColor="#e8f5e9"
-                                color="#4caf50"
+                                tone="success"
                             />
                         </Grid>
                         <Grid item xs={6} sm={3}>
                             <StatTile
                                 value={stats.manual_review || 0}
                                 label="Valeurs conservées"
-                                backgroundColor="#fff3e0"
-                                color="#ff9800"
+                                tone="warning"
                             />
                         </Grid>
                         <Grid item xs={6} sm={3}>
                             <StatTile
                                 value={warnings.length || 0}
                                 label="Avertissements"
-                                backgroundColor="#fce4ec"
-                                color="#111827"
+                                tone={warnings.length > 0 ? 'warning' : 'neutral'}
                             />
                         </Grid>
                     </Grid>

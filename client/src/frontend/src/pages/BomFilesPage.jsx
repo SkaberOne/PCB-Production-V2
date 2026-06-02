@@ -283,7 +283,7 @@ function BomFilesPage() {
                         <Typography variant="h6" sx={{ color: '#a1a1aa', mb: 0.5 }}>
                             Aucune BOM en bibliothèque
                         </Typography>
-                        <Typography variant="body2" sx={{ color: '#71717a', mb: 3 }}>
+                        <Typography variant="body2" sx={{ color: '#a1a1aa', mb: 3 }}>
                             Importe ta première BOM depuis l'onglet Import BOM pour la voir apparaître ici.
                         </Typography>
                         <Button variant="outlined" href="#/import-bom">

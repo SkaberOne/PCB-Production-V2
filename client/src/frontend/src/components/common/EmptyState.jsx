@@ -34,7 +34,7 @@ function EmptyState({
                         <Typography
                             variant="overline"
                             sx={{
-                                color: '#71717a',
+                                color: 'text.secondary',
                                 letterSpacing: '0.08em',
                                 fontSize: '0.65rem',
                                 fontWeight: 500
@@ -48,7 +48,7 @@ function EmptyState({
                             variant="h6"
                             sx={{
                                 mb: 1,
-                                color: '#a1a1aa',
+                                color: 'text.primary',
                                 fontWeight: 600
                             }}
                         >
@@ -57,7 +57,7 @@ function EmptyState({
                         <Typography
                             variant="body2"
                             sx={{
-                                color: '#71717a',
+                                color: 'text.secondary',
                                 maxWidth: 560,
                                 lineHeight: 1.5
                             }}

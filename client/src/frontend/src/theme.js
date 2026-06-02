@@ -231,7 +231,12 @@ export const colors = {
     borderHover: '#3f3f46',
     textPrimary: '#f4f4f5',
     textSecondary: '#a1a1aa',
-    textDisabled: '#52525b',
+    // Alias sûrs pour le contraste (WCAG AA) : ne jamais descendre sous #a1a1aa
+    // pour du texte porteur de sens. Corrige les bugs `undefined` (textMuted/textTertiary).
+    textTertiary: '#a1a1aa',
+    textMuted: '#a1a1aa',
+    textDisabled: '#52525b',   // décoratif / non-textuel uniquement
+    textDecorative: '#52525b',
 };
 
 export { theme };

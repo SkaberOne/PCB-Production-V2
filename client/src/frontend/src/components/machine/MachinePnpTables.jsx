@@ -451,15 +451,15 @@ export const MachineAssignmentTable = React.memo(function MachineAssignmentTable
         <Table size="small" stickyHeader>
             <TableHead>
                 <TableRow>
-                    <TableCell sx={compactHeaderSx}>Slot</TableCell>
-                    <TableCell sx={compactHeaderSx}>Composant</TableCell>
-                    <TableCell sx={compactHeaderSx}>Référence</TableCell>
-                    <TableCell sx={compactHeaderSx}>Footprint</TableCell>
-                    <TableCell sx={compactHeaderSx}>Feeder</TableCell>
-                    <TableCell sx={compactHeaderSx}>Type</TableCell>
-                    <TableCell sx={compactHeaderSx}>BOM</TableCell>
-                    <TableCell sx={compactHeaderSx}>Qté totale</TableCell>
-                    <TableCell sx={compactHeaderSx}>Qté/carte</TableCell>
+                    <TableCell>Slot</TableCell>
+                    <TableCell>Composant</TableCell>
+                    <TableCell>Référence</TableCell>
+                    <TableCell>Footprint</TableCell>
+                    <TableCell>Feeder</TableCell>
+                    <TableCell>Type</TableCell>
+                    <TableCell>BOM</TableCell>
+                    <TableCell>Qté totale</TableCell>
+                    <TableCell>Qté/carte</TableCell>
                 </TableRow>
             </TableHead>
             <TableBody>

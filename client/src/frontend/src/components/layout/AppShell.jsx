@@ -267,7 +267,7 @@ function AppShell({ pages, children }) {
                     </Typography>
                     <Typography
                         sx={{
-                            color: '#3f3f46',
+                            color: '#a1a1aa',
                             fontSize: '0.6rem',
                             letterSpacing: '0.1em',
                             fontWeight: 600,

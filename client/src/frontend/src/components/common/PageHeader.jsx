@@ -14,8 +14,8 @@ function PageHeader({ eyebrow, title, description, actions = null }) {
                 {eyebrow ? (
                     <Typography 
                         variant="overline" 
-                        sx={{ 
-                            color: '#71717a',
+                        sx={{
+                            color: 'text.secondary',
                             letterSpacing: '0.08em',
                             fontSize: '0.65rem',
                             fontWeight: 500

@@ -282,7 +282,7 @@ function BomImportPreviewCard({
                         />
                     </Grid>
                 </Grid>
-                <Typography variant="body2" sx={{ color: '#666', mb: 2 }}>
+                <Typography variant="body2" sx={{ color: 'text.secondary', mb: 2 }}>
                     {previewMode === 'compact'
                         ? `${previewRows.length} groupe(s) affiche(s)`
                         : `${previewRows.length} ligne(s) affichée(s)`}
@@ -291,7 +291,7 @@ function BomImportPreviewCard({
                     <Table sx={compactTableSx}>
                         {previewMode === 'compact' ? (
                             <>
-                                <TableHead sx={{ backgroundColor: '#f5f5f5' }}>
+                                <TableHead sx={{ backgroundColor: 'background.default' }}>
                                     <TableRow>
                                         {effectivePreviewScope === 'batch' && <TableCell sx={{ width: '16%' }}><strong>BOM</strong></TableCell>}
                                         <TableCell sx={{ width: '10%' }}><strong>Occ.</strong></TableCell>
@@ -322,7 +322,7 @@ function BomImportPreviewCard({
                             </>
                         ) : (
                             <>
-                                <TableHead sx={{ backgroundColor: '#f5f5f5' }}>
+                                <TableHead sx={{ backgroundColor: 'background.default' }}>
                                     <TableRow>
                                         {effectivePreviewScope === 'batch' && <TableCell sx={{ width: '14%' }}><strong>BOM</strong></TableCell>}
                                         <TableCell sx={{ width: '10%' }}><strong>Référence</strong></TableCell>

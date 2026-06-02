@@ -59,6 +59,9 @@ function BomImportResolutionDialogs(props) {
         handleResolveBatchMissingFootprints,
     } = props;
 
+    // Confirmation en deux temps de l'action destructive (sans window.confirm).
+    const [confirmComponentDelete, setConfirmComponentDelete] = React.useState(false);
+
     return (
         <>
             <Dialog
@@ -80,16 +83,16 @@ function BomImportResolutionDialogs(props) {
                             </Typography>
                             <Grid container spacing={2} sx={{ mb: 2 }}>
                                 <Grid item xs={12} sm={6}>
-                                    <Typography variant="body2" sx={{ color: '#666' }}>Valeur : <strong>{currentMissingComponentGroup.componentValue}</strong></Typography>
+                                    <Typography variant="body2" sx={{ color: 'text.secondary' }}>Valeur : <strong>{currentMissingComponentGroup.componentValue}</strong></Typography>
                                 </Grid>
                                 <Grid item xs={12} sm={6}>
-                                    <Typography variant="body2" sx={{ color: '#666' }}>Type : <strong>{currentMissingComponentGroup.componentType}</strong></Typography>
+                                    <Typography variant="body2" sx={{ color: 'text.secondary' }}>Type : <strong>{currentMissingComponentGroup.componentType}</strong></Typography>
                                 </Grid>
                                 <Grid item xs={12} sm={6}>
-                                    <Typography variant="body2" sx={{ color: '#666' }}>Footprint Eagle : <strong>{currentMissingComponentGroup.footprintEagle || '-'}</strong></Typography>
+                                    <Typography variant="body2" sx={{ color: 'text.secondary' }}>Footprint Eagle : <strong>{currentMissingComponentGroup.footprintEagle || '-'}</strong></Typography>
                                 </Grid>
                                 <Grid item xs={12} sm={6}>
-                                    <Typography variant="body2" sx={{ color: '#666' }}>Footprint PnP : <strong>{currentMissingComponentGroup.footprintPnp || '-'}</strong></Typography>
+                                    <Typography variant="body2" sx={{ color: 'text.secondary' }}>Footprint PnP : <strong>{currentMissingComponentGroup.footprintPnp || '-'}</strong></Typography>
                                 </Grid>
                             </Grid>
                             <TextField
@@ -115,9 +118,39 @@ function BomImportResolutionDialogs(props) {
                             {componentResolutionError && <Alert severity="error" sx={{ mt: 2 }}>{componentResolutionError}</Alert>}
                         </DialogContent>
                         <DialogActions>
-                            <Button onClick={() => updateWorkspace((current) => ({ ...current, componentResolutionPaused: true }))} disabled={componentResolutionLoading}>Plus tard</Button>
-                            <Button color="error" onClick={() => handleResolveMissingComponents('delete')} disabled={componentResolutionLoading}>Supprimer de la BOM</Button>
-                            <Button variant="contained" onClick={() => handleResolveMissingComponents('register')} disabled={componentResolutionLoading}>
+                            <Button
+                                color="inherit"
+                                onClick={() => {
+                                    setConfirmComponentDelete(false);
+                                    updateWorkspace((current) => ({ ...current, componentResolutionPaused: true }));
+                                }}
+                                disabled={componentResolutionLoading}
+                            >
+                                Plus tard
+                            </Button>
+                            <Button
+                                color="error"
+                                variant={confirmComponentDelete ? 'contained' : 'text'}
+                                onClick={() => {
+                                    if (confirmComponentDelete) {
+                                        handleResolveMissingComponents('delete');
+                                        setConfirmComponentDelete(false);
+                                    } else {
+                                        setConfirmComponentDelete(true);
+                                    }
+                                }}
+                                disabled={componentResolutionLoading}
+                            >
+                                {confirmComponentDelete ? 'Confirmer la suppression' : 'Supprimer de la BOM'}
+                            </Button>
+                            <Button
+                                variant="contained"
+                                onClick={() => {
+                                    setConfirmComponentDelete(false);
+                                    handleResolveMissingComponents('register');
+                                }}
+                                disabled={componentResolutionLoading}
+                            >
                                 {componentResolutionLoading ? 'Enregistrement...' : 'Enregistrer dans la base'}
                             </Button>
                         </DialogActions>
@@ -148,10 +181,10 @@ function BomImportResolutionDialogs(props) {
                             </Typography>
                             <Grid container spacing={2} sx={{ mb: 2 }}>
                                 <Grid item xs={12} sm={6}>
-                                    <Typography variant="body2" sx={{ color: '#666' }}>Footprint Eagle : <strong>{currentMissingFootprintGroup.footprintEagle}</strong></Typography>
+                                    <Typography variant="body2" sx={{ color: 'text.secondary' }}>Footprint Eagle : <strong>{currentMissingFootprintGroup.footprintEagle}</strong></Typography>
                                 </Grid>
                                 <Grid item xs={12} sm={6}>
-                                    <Typography variant="body2" sx={{ color: '#666' }}>Lignes concernées : <strong>{currentMissingFootprintGroup.itemIds.length}</strong></Typography>
+                                    <Typography variant="body2" sx={{ color: 'text.secondary' }}>Lignes concernées : <strong>{currentMissingFootprintGroup.itemIds.length}</strong></Typography>
                                 </Grid>
                             </Grid>
                             <TextField
@@ -214,7 +247,7 @@ function BomImportResolutionDialogs(props) {
                             </Typography>
                             <TableContainer component={Paper} variant="outlined" sx={{ maxHeight: 420 }}>
                                 <Table sx={compactTableSx}>
-                                    <TableHead sx={{ backgroundColor: '#f5f5f5' }}>
+                                    <TableHead sx={{ backgroundColor: 'background.default' }}>
                                         <TableRow>
                                             <TableCell sx={{ width: '24%' }}><strong>Valeur détectée</strong></TableCell>
                                             <TableCell sx={{ width: '16%' }}><strong>Type</strong></TableCell>
@@ -300,7 +333,7 @@ function BomImportResolutionDialogs(props) {
                             </Typography>
                             <TableContainer component={Paper} variant="outlined" sx={{ maxHeight: 420 }}>
                                 <Table sx={compactTableSx}>
-                                    <TableHead sx={{ backgroundColor: '#f5f5f5' }}>
+                                    <TableHead sx={{ backgroundColor: 'background.default' }}>
                                         <TableRow>
                                             <TableCell sx={{ width: '28%' }}><strong>Footprint Eagle</strong></TableCell>
                                             <TableCell sx={{ width: '14%' }}><strong>BOM</strong></TableCell>
