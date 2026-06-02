@@ -69,20 +69,37 @@ def reference_from_filename(pdf_path: str) -> str:
     return re.sub(r"\s+", "_", ref)
 
 
-def select_component(db, reference: Optional[str], mpn: Optional[str]) -> Optional[Component]:
-    """Trouve un Component par reference puis par mpn (insensible à la casse)."""
+def _norm_mpn(value: Optional[str]) -> str:
+    """Normalise un identifiant (MPN/value) : majuscules, alphanumérique seul."""
+    return re.sub(r"[^A-Z0-9]", "", (value or "").upper())
+
+
+def select_component(db, reference: Optional[str], mpn: Optional[str],
+                     value_token: Optional[str] = None) -> Optional[Component]:
+    """Trouve un Component par reference, puis mpn, puis champ `value`.
+
+    Dans cette base, `reference` est un ID interne (LIB-...) et `mpn` est presque
+    toujours vide ; l'identifiant réel du composant vit dans `value`. Le matching
+    sur `value` se fait par comparaison normalisée (préfixe, min. 5 caractères)
+    pour absorber les suffixes type ",118" ou "_NOPB".
+    """
     if reference:
-        comp = (
-            db.query(Component)
-            .filter(Component.reference.ilike(reference))
-            .first()
-        )
+        comp = db.query(Component).filter(Component.reference.ilike(reference)).first()
         if comp:
             return comp
     if mpn:
         comp = db.query(Component).filter(Component.mpn.ilike(mpn)).first()
         if comp:
             return comp
+
+    token = _norm_mpn(value_token if value_token is not None else reference)
+    if len(token) >= 5:
+        for comp in db.query(Component).filter(Component.value.isnot(None)).all():
+            nv = _norm_mpn(comp.value)
+            if len(nv) < 5:
+                continue
+            if nv == token or nv.startswith(token) or token.startswith(nv):
+                return comp
     return None
 
 
@@ -117,14 +134,21 @@ def process_pdf(db, pdf_path: str, *, reference: Optional[str] = None,
     except Exception:
         text = ""
     parsed = ed.parse_datasheet_text(text)
-    detected_pkg = package or ed.detect_package_from_text(text)
-    data = ed.merge_with_eia(parsed, detected_pkg)
 
-    component = select_component(db, ref, mpn)
+    component = select_component(db, ref, mpn, value_token=ref)
+
+    # Priorité du boîtier : --package explicite > package déjà en base > détecté du PDF
+    resolved_pkg = (
+        package
+        or (component.package if component and component.package else None)
+        or ed.detect_package_from_text(text)
+    )
+    data = ed.merge_with_eia(parsed, resolved_pkg)
+
     if component is None:
         return {"reference": ref, "matched": False, "updates": {}, "confidence": data["confidence"]}
 
-    updates = compute_updates(component, data, package=detected_pkg, force=force)
+    updates = compute_updates(component, data, package=resolved_pkg, force=force)
     for attr, value in updates.items():
         setattr(component, attr, value)
     return {

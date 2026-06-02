@@ -68,7 +68,7 @@ _PACKAGE_GROUPS: list[tuple[float, float, set[str]]] = [
         8.0,
         {
             "0603", "0805", "1206", "1210", "1812", "2010", "2512",
-            "SOT23", "SOT233", "SOT235", "SOT236",
+            "SOT23", "SOT25", "SOT26", "SOT233", "SOT235", "SOT236",
             "SOT323", "SOT343", "SOT353", "SOT363", "SOT523", "SOT563",
             "SOD123", "SOD323", "SOD523", "SOD882", "SOD123F", "SOD323F",
             "MELF", "MINIMELF", "SC70",

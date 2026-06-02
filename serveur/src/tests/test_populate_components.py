@@ -42,6 +42,20 @@ class TestSelectComponent:
     def test_no_match(self, db):
         assert pop.select_component(db, "RIEN", "RIEN") is None
 
+    def test_match_by_value_with_suffix(self, db):
+        # reference = ID interne, identifiant réel dans `value` (avec suffixe ,118)
+        db.add(Component(reference="LIB-ABC", value="PSMN3R8-100BS,118"))
+        db.commit()
+        comp = pop.select_component(db, "PSMN3R8-100BS", None, value_token="PSMN3R8-100BS")
+        assert comp is not None
+        assert comp.reference == "LIB-ABC"
+
+    def test_value_match_does_not_confuse_similar(self, db):
+        db.add(Component(reference="LIB-DEF", value="DN1509K1-G"))
+        db.commit()
+        # DN2530 ne doit pas matcher DN1509
+        assert pop.select_component(db, "DN2530", None, value_token="DN2530") is None
+
 
 class TestComputeUpdates:
     def test_fills_empty_fields_only(self):
