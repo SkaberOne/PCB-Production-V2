@@ -33,3 +33,32 @@
 - **Couleurs en dur restantes (slate, indigo, surfaces multiples)** → **Vague 2** (design system).
 
 **Verdict Vague 1 :** ✅ Tous les points 🔴 critiques de l'audit initial sont corrigés et validés. Aucune régression. Palette conservée.
+
+---
+
+## ✅ Vague 2 — Consolidation design system (validée le 2026-06-03)
+
+### Corrections livrées
+
+| # | Correction | Portée | Sévérité traitée |
+|---|---|---|---|
+| 1 | **Surfaces unifiées** sur `#18181b` : `#111827`, `#111111`, `#0f0f12`, `#1c1c1f`, `#161b22` éliminés | ConfirmDialog, SettingsPage, BomReviewTab, BomStockTab/Dialog, BomSelectionPanel, BomLibraryCard, BomLibraryDetail, DashboardPage | 🟡 |
+| 2 | **Slate → zinc** : `#f8fafc`→`#f4f4f5`, `#94a3b8`→`#a1a1aa`, `#cbd5e1`→`#d4d4d8` (+ teintes rgba) | composants `machine/*`, SettingsPage | 🟡 |
+| 3 | **Indigo → émeraude** : `#6366f1`→`#10b981`, `#4f46e5`→`#059669`, `#a5b4fc`→`#34d399`, fonds indigo→émeraude (+ rgba) | BomLibraryCard | 🟡 |
+| 4 | **Rouges/bleus → tokens** : `#dc2626`→`#ef4444`, `#2563eb`→`#3b82f6` (+ hovers, + rgba) ; `#818cf8`→`#a855f7`, `#38bdf8`/`#67e8f9`→bleu palette | MachinePnpPage, DashboardPage, BomStockTable | 🟡 |
+| 5 | **Indicateur d'onglet** BOM Viewer : gris `secondary` → **vert** `primary` (cohérent avec Machine PnP) | BomViewerPage | 🟡 |
+| 6 | **Confirmations destructives via `ConfirmDialog`** : « Supprimer révision » (bibliothèque) et migration des **2 `window.confirm()` natifs** de Settings (suppression + reset de règles) | BomLibraryDetail, SettingsPage | 🟡 |
+
+### Preuves de validation
+
+- **Tests Jest :** 18 suites / **66 tests — 100 % OK** (aucune régression).
+- **Inventaire code :** scan exhaustif → **0 couleur hors-palette restante** (surfaces, slate, indigo, rouges/bleus, y compris teintes rgba).
+- **Rendu live :** scan des couleurs calculées du DOM (Settings) → **aucune couleur hors-palette dans le rendu** ; navigation Settings/BOM/Machine PnP → **0 erreur console**.
+- **Palette conservée :** seuls les écarts ont été ramenés vers l'émeraude/zinc d'origine ; aucune nouvelle teinte introduite (hors alias internes).
+
+### Reporté
+
+- **`aria-labelledby` sur tous les dialogs** + structure de coquille commune → **Vague 3** (a11y).
+- **Unification fine des 3 systèmes de table** → partiellement faite (en-têtes confiées au thème) ; reste à harmoniser `thSx/tdSx` de MachinePnP → **Vague 3**.
+
+**Verdict Vague 2 :** ✅ Palette et surfaces entièrement unifiées sur les tokens. Confirmations destructives thématisées. Aucune régression.

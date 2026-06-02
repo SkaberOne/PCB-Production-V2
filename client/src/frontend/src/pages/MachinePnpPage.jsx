@@ -103,9 +103,9 @@ function KindChip({ kind }) {
                 height: 18,
                 fontSize: '0.6rem',
                 fontWeight: 700,
-                backgroundColor: isCommon ? 'rgba(99,102,241,0.12)' : 'rgba(245,158,11,0.1)',
-                color: isCommon ? '#818cf8' : '#f59e0b',
-                border: `1px solid ${isCommon ? 'rgba(99,102,241,0.25)' : 'rgba(245,158,11,0.25)'}`,
+                backgroundColor: isCommon ? 'rgba(16,185,129,0.12)' : 'rgba(245,158,11,0.1)',
+                color: isCommon ? '#a855f7' : '#f59e0b',
+                border: `1px solid ${isCommon ? 'rgba(16,185,129,0.25)' : 'rgba(245,158,11,0.25)'}`,
             }}
         />
     );
@@ -224,7 +224,7 @@ function DeleteMachineDialog({ machine, open, onClose, onDeleted }) {
             <DialogActions sx={{ px: 3, pb: 2 }}>
                 <Button onClick={onClose} sx={{ color: '#71717a' }}>Annuler</Button>
                 <Button onClick={handleDelete} variant="contained" disabled={loading}
-                    sx={{ backgroundColor: '#dc2626', '&:hover': { backgroundColor: '#b91c1c' } }}>
+                    sx={{ backgroundColor: '#ef4444', '&:hover': { backgroundColor: '#dc2626' } }}>
                     {loading ? <CircularProgress size={16} sx={{ color: '#fff' }} /> : 'Supprimer'}
                 </Button>
             </DialogActions>
@@ -340,7 +340,7 @@ function DeleteCartDialog({ cart, open, onClose, onDeleted }) {
             <DialogActions sx={{ px: 3, pb: 2 }}>
                 <Button onClick={onClose} sx={{ color: '#71717a' }}>Annuler</Button>
                 <Button onClick={handleDelete} variant="contained" disabled={loading}
-                    sx={{ backgroundColor: '#dc2626', '&:hover': { backgroundColor: '#b91c1c' } }}>
+                    sx={{ backgroundColor: '#ef4444', '&:hover': { backgroundColor: '#dc2626' } }}>
                     {loading ? <CircularProgress size={16} sx={{ color: '#fff' }} /> : 'Supprimer'}
                 </Button>
             </DialogActions>
@@ -426,7 +426,7 @@ function EditCartDialog({ cart, open, onClose, onSaved }) {
             <DialogActions sx={{ px: 3, pb: 2 }}>
                 <Button onClick={onClose} sx={{ color: '#71717a' }}>Annuler</Button>
                 <Button onClick={handleSubmit} variant="contained" disabled={loading}
-                    sx={{ backgroundColor: '#2563eb', '&:hover': { backgroundColor: '#1d4ed8' } }}>
+                    sx={{ backgroundColor: '#3b82f6', '&:hover': { backgroundColor: '#2563eb' } }}>
                     {loading ? <CircularProgress size={16} sx={{ color: '#fff' }} /> : 'Enregistrer'}
                 </Button>
             </DialogActions>
@@ -469,7 +469,7 @@ function MachineCard({ machine, selected, onSelect, onDelete }) {
                         <IconButton
                             size="small"
                             onClick={(e) => { e.stopPropagation(); onDelete(machine); }}
-                            sx={{ color: '#52525b', '&:hover': { color: '#dc2626', backgroundColor: 'rgba(220,38,38,0.08)' } }}
+                            sx={{ color: '#52525b', '&:hover': { color: '#ef4444', backgroundColor: 'rgba(239,68,68,0.08)' } }}
                         >
                             <DeleteRoundedIcon sx={{ fontSize: 16 }} />
                         </IconButton>
@@ -800,9 +800,9 @@ function FeederTab() {
                                                     size="small"
                                                     sx={{
                                                         height: 18, fontSize: '0.65rem',
-                                                        backgroundColor: f.fixed_cart_kind === 'COMMON' ? 'rgba(99,102,241,0.12)' : 'rgba(245,158,11,0.1)',
-                                                        color: f.fixed_cart_kind === 'COMMON' ? '#818cf8' : '#f59e0b',
-                                                        border: `1px solid ${f.fixed_cart_kind === 'COMMON' ? 'rgba(99,102,241,0.25)' : 'rgba(245,158,11,0.25)'}`,
+                                                        backgroundColor: f.fixed_cart_kind === 'COMMON' ? 'rgba(16,185,129,0.12)' : 'rgba(245,158,11,0.1)',
+                                                        color: f.fixed_cart_kind === 'COMMON' ? '#a855f7' : '#f59e0b',
+                                                        border: `1px solid ${f.fixed_cart_kind === 'COMMON' ? 'rgba(16,185,129,0.25)' : 'rgba(245,158,11,0.25)'}`,
                                                     }}
                                                 />
                                             ) : '—'}
@@ -965,7 +965,7 @@ function ChariotTab() {
                                                     </Tooltip>
                                                     <Tooltip title="Supprimer">
                                                         <IconButton size="small" onClick={() => setDeleteTarget(cart)}
-                                                            sx={{ color: '#52525b', '&:hover': { color: '#dc2626', backgroundColor: 'rgba(220,38,38,0.08)' } }}>
+                                                            sx={{ color: '#52525b', '&:hover': { color: '#ef4444', backgroundColor: 'rgba(239,68,68,0.08)' } }}>
                                                             <DeleteRoundedIcon sx={{ fontSize: 16 }} />
                                                         </IconButton>
                                                     </Tooltip>

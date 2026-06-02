@@ -82,7 +82,7 @@ function MachinePnpSlotStrip({
                                 opacity: hasFocusedAssignmentSubset && !isVisibleInCurrentList ? 0.35 : 1,
                             }}
                         >
-                            <Typography sx={{ fontSize: layout.fontSize, lineHeight: 1, fontWeight: 700, color: '#f8fafc' }}>
+                            <Typography sx={{ fontSize: layout.fontSize, lineHeight: 1, fontWeight: 700, color: '#f4f4f5' }}>
                                 {slot}
                             </Typography>
                             {isAssigned && layout.height >= 20 ? (

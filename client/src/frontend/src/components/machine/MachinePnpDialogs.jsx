@@ -290,10 +290,10 @@ export function MachinePnpAuxOverlays({
 
                                     return (
                                         <>
-                                            <Typography variant="body1" sx={{ color: '#f8fafc', fontWeight: 700 }}>
+                                            <Typography variant="body1" sx={{ color: '#f4f4f5', fontWeight: 700 }}>
                                                 {selectedMachineSlot.assignment.component_label}
                                             </Typography>
-                                            <Typography variant="body2" sx={{ color: '#94a3b8' }}>
+                                            <Typography variant="body2" sx={{ color: '#a1a1aa' }}>
                                                 {selectedMachineSlot.assignment.component_reference || '--'}
                                                 {selectedMachineSlot.assignment.feeder_type
                                                     ? ` · feeder ${selectedMachineSlot.assignment.feeder_type}`
@@ -319,7 +319,7 @@ export function MachinePnpAuxOverlays({
                                                 <Chip
                                                     size="small"
                                                     label={`${selectedMachineSlot.assignment.bom_presence_count || 0} BOM`}
-                                                    sx={{ backgroundColor: 'rgba(148,163,184,0.12)', color: '#cbd5e1' }}
+                                                    sx={{ backgroundColor: 'rgba(161,161,170,0.12)', color: '#d4d4d8' }}
                                                 />
                                                 <Chip
                                                     size="small"
@@ -329,10 +329,10 @@ export function MachinePnpAuxOverlays({
                                                 <Chip
                                                     size="small"
                                                     label={`${quantityDisplay.perBoardChipLabel} ${formatDecimal(quantityDisplay.perBoardQuantity || 0)}`}
-                                                    sx={{ backgroundColor: 'rgba(56,189,248,0.12)', color: '#bae6fd' }}
+                                                    sx={{ backgroundColor: 'rgba(59,130,246,0.12)', color: '#bae6fd' }}
                                                 />
                                             </Stack>
-                                            <Typography variant="caption" sx={{ color: '#94a3b8' }}>
+                                            <Typography variant="caption" sx={{ color: '#a1a1aa' }}>
                                                 {selectedMachineBomRevision
                                                     ? `La popup affiche ici la quantite du composant pour la BOM selectionnee (${selectedMachineBomPlannedBoardQuantity || 0} carte(s)).`
                                                     : 'Prod. = quantite totale requise pour toute la production. / carte = quantite moyenne posee pour une carte.'}
@@ -344,7 +344,7 @@ export function MachinePnpAuxOverlays({
                                                             key={label}
                                                             size="small"
                                                             label={label}
-                                                            sx={{ backgroundColor: 'rgba(148,163,184,0.12)', color: '#cbd5e1' }}
+                                                            sx={{ backgroundColor: 'rgba(161,161,170,0.12)', color: '#d4d4d8' }}
                                                         />
                                                     ))}
                                                 </Stack>
@@ -353,7 +353,7 @@ export function MachinePnpAuxOverlays({
                                     );
                                 })()
                             ) : (
-                                <Typography variant="body2" sx={{ color: '#94a3b8' }}>
+                                <Typography variant="body2" sx={{ color: '#a1a1aa' }}>
                                     Emplacement {selectedMachineSlot.position} libre.
                                 </Typography>
                             )}

@@ -10,7 +10,7 @@ import {
 import BomStockTable from './BomStockTable';
 
 const INNER_CARD_SX = {
-    backgroundColor: '#111827',
+    backgroundColor: '#18181b',
     border: '1px solid #27272a',
 };
 

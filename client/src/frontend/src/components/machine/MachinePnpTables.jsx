@@ -52,11 +52,11 @@ const MachineTableRow = React.memo(function MachineTableRow({
         >
             <TableCell sx={compactWrapCellSx}>
                 <Stack spacing={0.35}>
-                    <Typography variant="body2" sx={{ color: '#f8fafc', fontWeight: 600 }}>
+                    <Typography variant="body2" sx={{ color: '#f4f4f5', fontWeight: 600 }}>
                         {machine.name}
                     </Typography>
                     {machine.notes ? (
-                        <Typography variant="caption" sx={{ color: '#94a3b8' }}>
+                        <Typography variant="caption" sx={{ color: '#a1a1aa' }}>
                             {machine.notes}
                         </Typography>
                     ) : null}
@@ -153,11 +153,11 @@ const FixedFeederTableRow = React.memo(function FixedFeederTableRow({
         <TableRow hover>
             <TableCell sx={compactWrapCellSx}>
                 <Stack spacing={0.35}>
-                    <Typography variant="body2" sx={{ color: '#f8fafc', fontWeight: 600 }}>
+                    <Typography variant="body2" sx={{ color: '#f4f4f5', fontWeight: 600 }}>
                         {primaryLabel}
                     </Typography>
                     {secondaryLabel ? (
-                        <Typography variant="caption" sx={{ color: '#94a3b8' }}>
+                        <Typography variant="caption" sx={{ color: '#a1a1aa' }}>
                             {secondaryLabel}
                         </Typography>
                     ) : null}
@@ -169,7 +169,7 @@ const FixedFeederTableRow = React.memo(function FixedFeederTableRow({
             <TableCell>{formatDecimal(row.average_board_quantity || 0)}</TableCell>
             <TableCell sx={{ ...compactCellSx, minWidth: 190 }}>
                 <Stack spacing={0.35}>
-                    <Typography variant="body2" noWrap title={row.fixed_cart_name || ''} sx={{ color: '#f8fafc' }}>
+                    <Typography variant="body2" noWrap title={row.fixed_cart_name || ''} sx={{ color: '#f4f4f5' }}>
                         {row.fixed_cart_name || '--'}
                     </Typography>
                     {row.fixed_cart_kind ? (
@@ -260,10 +260,10 @@ const CartTableRow = React.memo(function CartTableRow({
         <TableRow hover>
             <TableCell>
                 <Stack spacing={0.35}>
-                    <Typography variant="body2" sx={{ color: '#f8fafc', fontWeight: 600 }}>
+                    <Typography variant="body2" sx={{ color: '#f4f4f5', fontWeight: 600 }}>
                         {cart.name}
                     </Typography>
-                    <Typography variant="caption" sx={{ color: '#94a3b8' }}>
+                    <Typography variant="caption" sx={{ color: '#a1a1aa' }}>
                         {cart.fixed_component_count || 0} composant(s) fixe(s)
                     </Typography>
                 </Stack>
@@ -282,7 +282,7 @@ const CartTableRow = React.memo(function CartTableRow({
             <TableCell>
                 {/* #12 — barre de progression capacité */}
                 <Stack spacing={0.5}>
-                    <Typography variant="body2" sx={{ color: '#f8fafc' }}>
+                    <Typography variant="body2" sx={{ color: '#f4f4f5' }}>
                         {cart.used_positions || 0} / {cart.capacity_positions}
                     </Typography>
                     <Box sx={{ width: 80 }}>
@@ -477,3 +477,4 @@ export const MachineAssignmentTable = React.memo(function MachineAssignmentTable
         </Table>
     );
 });
+                                                                                                                                                                                             

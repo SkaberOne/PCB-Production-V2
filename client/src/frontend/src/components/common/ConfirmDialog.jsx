@@ -9,7 +9,7 @@ import {
 } from '@mui/material';
 
 const DIALOG_PAPER_SX = {
-    backgroundColor: '#111827',
+    backgroundColor: '#18181b',
     color: '#f4f4f5',
     border: '1px solid #27272a',
     borderRadius: 3,

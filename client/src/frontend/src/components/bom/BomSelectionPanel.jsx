@@ -27,13 +27,13 @@ const ENTRY_ACTIVE_SX = {
 
 const ENTRY_INACTIVE_SX = {
     border: '1px solid #27272a',
-    backgroundColor: '#111827',
+    backgroundColor: '#18181b',
     borderRadius: 2,
     px: 1.5,
     py: 1.25,
     cursor: 'pointer',
     transition: 'background-color 0.16s ease, border-color 0.16s ease',
-    '&:hover': { backgroundColor: '#161b22' },
+    '&:hover': { backgroundColor: '#18181b' },
 };
 
 /**

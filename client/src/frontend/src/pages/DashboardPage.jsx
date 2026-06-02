@@ -135,8 +135,8 @@ function getProductionStatusUi(status) {
     case 'COMPLETED':
         return {
             label: 'Terminée',
-            color: '#38bdf8',
-            backgroundColor: 'rgba(56, 189, 248, 0.12)',
+            color: '#3b82f6',
+            backgroundColor: 'rgba(59,130,246, 0.12)',
         };
     case 'ARCHIVED':
         return {
@@ -322,7 +322,7 @@ const DashboardProductionRow = React.memo(function DashboardProductionRow({
                         anchorEl={menuAnchor}
                         open={Boolean(menuAnchor)}
                         onClose={() => setMenuAnchor(null)}
-                        PaperProps={{ sx: { backgroundColor: '#1c1c1f', border: '1px solid #27272a', minWidth: 180 } }}
+                        PaperProps={{ sx: { backgroundColor: '#18181b', border: '1px solid #27272a', minWidth: 180 } }}
                     >
                         <MenuItem onClick={handleRename}>
                             <ListItemIcon><DriveFileRenameOutlineRoundedIcon fontSize="small" sx={{ color: '#a1a1aa' }} /></ListItemIcon>
