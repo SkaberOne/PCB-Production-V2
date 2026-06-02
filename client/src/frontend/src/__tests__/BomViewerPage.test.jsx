@@ -121,7 +121,10 @@ describe('BomViewerPage', () => {
     });
 
     it('shows empty-quantity message when no BOM is selected', () => {
-        renderPage();
+        // La page n'affiche le plan de travail (dont le panneau quantité) que
+        // lorsqu'une production est active ; sans BOM sélectionnée le panneau
+        // montre le message vide.
+        renderPage({ activeProduction: { id: 1, name: 'Prod test' } });
         expect(
             screen.getByText(/aucune bom sélectionnée pour le moment/i),
         ).toBeInTheDocument();
@@ -191,7 +194,8 @@ describe('BomViewerPage', () => {
     });
 
     it('renders action buttons in the page header', () => {
-        renderPage();
+        // Les boutons d'action ne sont rendus que pour une production active.
+        renderPage({ activeProduction: { id: 1, name: 'Prod test' } });
         expect(screen.getByRole('button', { name: /exporter/i })).toBeInTheDocument();
         expect(screen.getByRole('button', { name: /valider/i })).toBeInTheDocument();
         expect(screen.getByRole('button', { name: /supprimer bom active/i })).toBeInTheDocument();

@@ -46,6 +46,7 @@ function BomSelectionPanel({
     loadingRevisionId = null,
     bomWorkspace = {},
     onActivateEntry,
+    onLoadBom,
 }) {
     return (
         <Card sx={PANEL_CARD_SX}>
@@ -72,8 +73,9 @@ function BomSelectionPanel({
                         <EmptyState
                             eyebrow="Session vide"
                             title="Aucune BOM à revoir"
-                            description="Ouvre une sélection depuis Fichier BOM ou poursuis depuis Import BOM pour alimenter cette page."
-                            actionLabel="Charger une BOM"
+                            description="Choisis des BOM enregistrées via « Choisir des BOM », ou poursuis depuis Import BOM pour alimenter cette page."
+                            actionLabel="Choisir des BOM"
+                            onAction={onLoadBom}
                         />
                     ) : (
                         <Box sx={{ maxHeight: 300, overflowY: 'auto', pr: 0.5 }}>

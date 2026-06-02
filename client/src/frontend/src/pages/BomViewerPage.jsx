@@ -1,4 +1,5 @@
 import React from 'react';
+import AddRoundedIcon from '@mui/icons-material/AddRounded';
 import DeleteOutlineRoundedIcon from '@mui/icons-material/DeleteOutlineRounded';
 import DownloadRoundedIcon from '@mui/icons-material/DownloadRounded';
 import SaveRoundedIcon from '@mui/icons-material/SaveRounded';
@@ -14,16 +15,18 @@ import {
     Tabs,
 } from '@mui/material';
 import apiClient from '../api/client';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 
 // ── Sub-components ────────────────────────────────────────────────────────────
 import BomQuantityPanel from '../components/bom/BomQuantityPanel';
+import BomPickerDialog from '../components/bom/BomPickerDialog';
 import BomSelectionPanel from '../components/bom/BomSelectionPanel';
 import BomReviewTab from '../components/bom/BomReviewTab';
 import BomStockDialog from '../components/bom/BomStockDialog';
 import BomStockTab from '../components/bom/BomStockTab';
 import ConfirmDialog from '../components/common/ConfirmDialog';
 import PageHeader from '../components/common/PageHeader';
+import EmptyState from '../components/common/EmptyState';
 
 // ── Context + utils ───────────────────────────────────────────────────────────
 import { useBomSession } from '../context/BomSessionContext';
@@ -62,6 +65,7 @@ const TAB_SX = {
 // ─── BomViewerPage ─────────────────────────────────────────────────────────────
 function BomViewerPage() {
     const navigate = useNavigate();
+    const [searchParams, setSearchParams] = useSearchParams();
     const {
         currentBom,
         bomWorkspace,
@@ -89,6 +93,7 @@ function BomViewerPage() {
     const [selectionFeedback, setSelectionFeedback] = React.useState({ type: 'info', message: '' });
     const [stockDialogKey, setStockDialogKey] = React.useState(null);
     const [confirmDeleteOpen, setConfirmDeleteOpen] = React.useState(false);
+    const [pickerOpen, setPickerOpen] = React.useState(false);
     const [undoStack, setUndoStack] = React.useState([]); // (#22)
     const reviewCardRef = React.useRef(null); // (#14)
 
@@ -172,6 +177,62 @@ function BomViewerPage() {
         prefetch();
         return () => { cancelled = true; };
     }, [selectedEntries, bomWorkspace.revisionsById, loadRevisionSession]);
+
+    // ── Ouverture d'une révision via le paramètre d'URL ?revision= ────────────
+    // (déclenché par le bouton « Ouvrir » de la bibliothèque BOM enregistrées)
+    const processedRevisionRef = React.useRef(null);
+    React.useEffect(() => {
+        const revId = Number(searchParams.get('revision'));
+        if (!revId || processedRevisionRef.current === revId) return;
+        processedRevisionRef.current = revId;
+
+        const alreadySelected = selectedBomEntries.some(
+            (entry) => entry.bom_revision_id === revId,
+        );
+        if (alreadySelected) {
+            setActiveBomRevision(revId);
+        } else {
+            loadRevisionSession({ bom_revision_id: revId }, true).catch((requestError) => {
+                setSelectionFeedback({
+                    type: 'error',
+                    message: requestError.response?.status === 404
+                        ? `La révision ${revId} n'existe plus dans les fichiers.`
+                        : `Impossible de charger la révision ${revId}.`,
+                });
+            });
+        }
+
+        // Nettoie le paramètre pour éviter un rechargement sur refresh/navigation.
+        const nextParams = new URLSearchParams(searchParams);
+        nextParams.delete('revision');
+        setSearchParams(nextParams, { replace: true });
+    }, [searchParams, selectedBomEntries, loadRevisionSession, setActiveBomRevision, setSearchParams]);
+
+    // ── Ajout de BOM via le dialog de sélection multiple ──────────────────────
+    const handlePickBomRevisions = React.useCallback(async (revisionIds) => {
+        setPickerOpen(false);
+        const ids = Array.from(new Set((revisionIds || []).map(Number).filter(Boolean)));
+        if (!ids.length) return;
+
+        setSelectionFeedback({ type: 'info', message: `Chargement de ${ids.length} BOM…` });
+        const results = await Promise.allSettled(
+            ids.map((id, index) => loadRevisionSession(
+                { bom_revision_id: id },
+                index === 0 && !activeRevisionId,
+            )),
+        );
+        const failed = results.filter((result) => result.status === 'rejected').length;
+        const added = ids.length - failed;
+        setSelectionFeedback(failed
+            ? {
+                type: 'warning',
+                message: `${added}/${ids.length} BOM ajoutée(s) à la session (${failed} échec). Clique « Valider » pour les relier à la production.`,
+            }
+            : {
+                type: 'success',
+                message: `${added} BOM ajoutée(s) à la session. Clique « Valider » pour les relier à la production active.`,
+            });
+    }, [activeRevisionId, loadRevisionSession]);
 
     // ── Active BOM + computed values ──────────────────────────────────────────
     const activeBom = bomWorkspace.revisionsById[activeRevisionId]
@@ -566,6 +627,25 @@ function BomViewerPage() {
     }, [selectedEntries, activeRevisionId]);
 
     // ── Render ────────────────────────────────────────────────────────────────
+    if (!activeProduction?.id) {
+        return (
+            <Stack spacing={4}>
+                <PageHeader
+                    eyebrow="Revue multi-BOM"
+                    title="BOM"
+                    description="La revue BOM est liée à une production active."
+                />
+                <EmptyState
+                    eyebrow="Aucune production active"
+                    title="Sélectionnez une production"
+                    description="Activez ou créez une production depuis l'onglet Productions pour charger ses BOM et lancer la revue."
+                    navigateTo="/dashboard"
+                    navigateLabel="Aller aux productions"
+                />
+            </Stack>
+        );
+    }
+
     return (
         <Stack spacing={4}>
             <PageHeader
@@ -574,6 +654,13 @@ function BomViewerPage() {
                 description="Sélectionne une BOM active à la fois, renseigne les quantités à produire par référence, puis finalise la revue avant de basculer vers la préparation composants."
                 actions={(
                     <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+                        <Button
+                            variant="contained"
+                            startIcon={<AddRoundedIcon />}
+                            onClick={() => setPickerOpen(true)}
+                        >
+                            Choisir des BOM
+                        </Button>
                         <Button
                             variant="outlined"
                             startIcon={<DownloadRoundedIcon />}
@@ -632,6 +719,7 @@ function BomViewerPage() {
                         loadingRevisionId={loadingRevisionId}
                         bomWorkspace={bomWorkspace}
                         onActivateEntry={handleActivateEntry}
+                        onLoadBom={() => setPickerOpen(true)}
                     />
                 </Grid>
             </Grid>
@@ -698,6 +786,13 @@ function BomViewerPage() {
                 onConfirm={handleConfirmDeleteBom}
                 onClose={() => setConfirmDeleteOpen(false)}
                 severity="error"
+            />
+
+            <BomPickerDialog
+                open={pickerOpen}
+                onClose={() => setPickerOpen(false)}
+                onConfirm={handlePickBomRevisions}
+                alreadySelectedIds={selectedEntries.map((entry) => entry.bom_revision_id)}
             />
         </Stack>
     );
