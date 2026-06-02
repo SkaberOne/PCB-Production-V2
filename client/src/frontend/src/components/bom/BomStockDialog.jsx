@@ -177,6 +177,23 @@ function BomStockDialog({
                                                         sx={compactInputSx}
                                                     />
                                                 </Grid>
+                                                <Grid item xs={12} sm={6}>
+                                                    <TextField
+                                                        fullWidth
+                                                        size="small"
+                                                        type="number"
+                                                        label="Épaisseur de bande (mm)"
+                                                        value={line.draft.tape_thickness_mm ?? ''}
+                                                        placeholder={line.resolvedTapeThicknessMm != null ? `défaut ${line.resolvedTapeThicknessMm}` : ''}
+                                                        helperText={
+                                                            line.draft.tape_thickness_mm
+                                                                ? null
+                                                                : `Défaut appliqué : ${line.resolvedTapeThicknessMm ?? '-'} mm`
+                                                        }
+                                                        onChange={onStockDraftChange(line.key, 'tape_thickness_mm', true)}
+                                                        sx={compactInputSx}
+                                                    />
+                                                </Grid>
                                             </Grid>
 
                                             <Alert severity="success">

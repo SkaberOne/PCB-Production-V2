@@ -26,6 +26,9 @@ class ComponentSchema(OrmBaseModel):
     package: Optional[str] = None
     tape_width_mm: Optional[float] = None
     pitch_mm: Optional[float] = None
+    qty_per_reel: Optional[int] = None
+    reel_outer_diameter_mm: Optional[float] = None
+    reel_hub_diameter_mm: Optional[float] = None
     supplier_code: Optional[str] = None
     footprint_eagle: Optional[str] = None
     footprint_pnp: Optional[str] = None

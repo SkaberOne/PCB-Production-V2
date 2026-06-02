@@ -1,12 +1,29 @@
 import { getBomItemType } from './bomSession';
 import { buildReferenceRevisionKey } from './bomWorkspace';
 
-const DEFAULT_TAPE_THICKNESS_MM = 0.8;
+const DEFAULT_TAPE_THICKNESS_MM = 1.0;
 const DEFAULT_SAFETY_PCT = 25;
 
 function toNumber(value, fallback = 0) {
     const parsed = Number(value);
     return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+// Épaisseur de bande par défaut selon la largeur de bande (mm).
+// Approximation EIA-481 : bande papier fine pour 8 mm, plastique gaufré plus épais
+// au-delà. Ces valeurs sont des défauts modifiables à la main dans l'UI.
+export function defaultTapeThicknessMm(tapeWidthMm) {
+    const width = toNumber(tapeWidthMm, 0);
+    if (width <= 0) {
+        return DEFAULT_TAPE_THICKNESS_MM;
+    }
+    if (width <= 8) {
+        return 1.0;
+    }
+    if (width <= 12) {
+        return 1.2;
+    }
+    return 1.5;
 }
 
 export function buildBoardQuantityRows(entries = [], quantitiesByReference = {}) {
@@ -77,11 +94,15 @@ export function estimateReelQuantity({
 }
 
 export function buildStockSummary(line, stockDraft = {}) {
+    const resolvedTapeThicknessMm = toNumber(stockDraft.tape_thickness_mm, 0) > 0
+        ? toNumber(stockDraft.tape_thickness_mm)
+        : defaultTapeThicknessMm(line.componentTapeWidthMm);
     const reelEstimatedQty = estimateReelQuantity({
         outerDiameterMm: stockDraft.reel_outer_diameter_mm,
         hubDiameterMm: stockDraft.reel_hub_diameter_mm,
         pitchMm: stockDraft.pitch_mm || line.componentPitchMm,
         safetyPct: stockDraft.reel_safety_pct || DEFAULT_SAFETY_PCT,
+        tapeThicknessMm: resolvedTapeThicknessMm,
     });
     const reelManualOverrideQty = toNumber(stockDraft.reel_manual_override_qty, 0);
     const reelAvailableQty = reelManualOverrideQty > 0 ? reelManualOverrideQty : (reelEstimatedQty || 0);
@@ -102,6 +123,7 @@ export function buildStockSummary(line, stockDraft = {}) {
 
     return {
         reelEstimatedQty,
+        resolvedTapeThicknessMm,
         reelAvailableQty,
         bagQty,
         tubeQty,
@@ -149,6 +171,7 @@ export function buildAggregatedComponents(
                     sources: new Set(),
                     componentLibraryIds: new Set(),
                     componentPitchCandidates: new Set(),
+                    componentTapeWidthCandidates: new Set(),
                     componentLibraryName: null,
                     manualPlacementBase: false,
                 });
@@ -164,6 +187,9 @@ export function buildAggregatedComponents(
             if (item.component_library_pitch_mm) {
                 group.componentPitchCandidates.add(item.component_library_pitch_mm);
             }
+            if (item.component_library_tape_width_mm) {
+                group.componentTapeWidthCandidates.add(item.component_library_tape_width_mm);
+            }
             if (!group.componentLibraryName && item.component_library_name) {
                 group.componentLibraryName = item.component_library_name;
             }
@@ -174,12 +200,15 @@ export function buildAggregatedComponents(
         .map((group) => {
             const componentLibraryIds = Array.from(group.componentLibraryIds);
             const componentPitchCandidates = Array.from(group.componentPitchCandidates);
+            const componentTapeWidthCandidates = Array.from(group.componentTapeWidthCandidates);
             const draft = stockDraftByComponentKey[group.key] || {};
             const componentPitchMm = componentPitchCandidates.length === 1 ? componentPitchCandidates[0] : null;
+            const componentTapeWidthMm = componentTapeWidthCandidates.length === 1 ? componentTapeWidthCandidates[0] : null;
             const stock = buildStockSummary(
                 {
                     requiredQuantity: group.requiredQuantity,
                     componentPitchMm,
+                    componentTapeWidthMm,
                     manualPlacementBase: group.manualPlacementBase,
                 },
                 draft,
@@ -196,6 +225,7 @@ export function buildAggregatedComponents(
                 componentLibraryId: componentLibraryIds.length === 1 ? componentLibraryIds[0] : null,
                 componentLibraryName: group.componentLibraryName,
                 componentPitchMm,
+                componentTapeWidthMm,
                 manualPlacementBase: group.manualPlacementBase,
                 draft,
                 ...stock,

@@ -5,6 +5,51 @@
 
 ---
 
+## 2026-06-02 — Session 2 : Calcul bobine + extraction datasheets (EIA-481, sans LLM)
+
+### Contexte
+Deux objectifs : (1) fiabiliser le calcul du nombre de composants en bobine dans
+l'onglet « Composant et stock » ; (2) extraire (sans LLM) les infos production des
+datasheets PDF Mouser pour aider à remplir la base et le calcul.
+
+### Objectif 1 — Calcul bobine (`client/src/frontend/src/utils/bomPlanning.js`)
+- **Bug corrigé** : `buildStockSummary()` ne transmettait jamais `tapeThicknessMm`
+  à `estimateReelQuantity()` → l'épaisseur de bande était toujours figée à la
+  valeur par défaut, quel que soit le composant.
+- Ajout du helper `defaultTapeThicknessMm(tapeWidthMm)` (1,0 / 1,2 / 1,5 mm selon
+  largeur 8 / 12 / 16+ mm) ; défaut générique relevé de 0,8 → 1,0 mm.
+- Agrégation de `componentTapeWidthMm` (parallèle au pitch) pour dériver le défaut.
+- UI : champ « Épaisseur de bande (mm) » ajouté dans `BomStockDialog.jsx` (carte
+  Bobine), avec affichage du défaut appliqué quand le champ est vide.
+- Tests jest : `bomPlanning.test.js` (8/8 verts).
+
+### Objectif 2 — Extraction datasheets (ADR 0003)
+- **ADR 0003** + `STRUCTURE.md` + `.gitignore` : nouveau domaine `data/datasheets/`
+  (`pdf/` source gitignored, `md/` généré versionné).
+- **Table EIA-481** : `serveur/src/services/eia481_rules.py` (boîtier → pitch /
+  largeur / feeder `CL8/CL12/CL16/CL24` / épaisseur défaut). Tests pytest.
+- **Migration DB** `f2a8c1d4e6b0` : `qty_per_reel`, `reel_outer_diameter_mm`,
+  `reel_hub_diameter_mm` ajoutés à `COMPONENTS` (+ modèle + schéma). Tête unique
+  vérifiée, upgrade/downgrade OK.
+- **Script** `serveur/extract_datasheet.py` (sans LLM) : pdfplumber/pypdf + regex
+  (sections Tape & Reel / Packaging), table EIA-481 d'abord + PDF en complément,
+  détection auto best-effort du boîtier, rendu Markdown en sections. Tests pytest.
+- `pdfplumber>=0.11.0` ajouté à `requirements_flexible.txt`.
+- 32 datasheets copiées depuis `pcb-debug-assistant` → fiches `.md` générées dans
+  `data/datasheets/md/`.
+
+### Tests
+- pytest (nouveaux fichiers) : 18/18 verts · jest `bomPlanning` : 8/8 verts.
+- Note : `test_migrations.py` reste obsolète (REVISION_CHAIN codée en dur, déjà
+  signalé audit 2026-05-29) — non lié à cette session.
+
+### Limitation connue
+- L'auto-détection du boîtier ne couvre pas toutes les notations (ex. « SO-8 » vs
+  « SOIC8 ») → confiance « basse » sur ces composants ; passer `--package` ou
+  étendre la table EIA-481.
+
+---
+
 ## 2026-05-29 — Session 1 : Audit complet + restructure profonde + setup vault Obsidian
 
 ### Contexte

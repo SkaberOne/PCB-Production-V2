@@ -67,6 +67,10 @@ serveur/uploads/
 serveur/exports/
 serveur/backups/
 
+# --- Datasheets PDF source (lourd, propriété fournisseur) — ADR 0003 ---
+data/datasheets/pdf/*
+!data/datasheets/pdf/.gitkeep
+
 # --- Database ---
 *.mdb
 *.db

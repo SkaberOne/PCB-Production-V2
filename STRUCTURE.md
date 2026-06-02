@@ -22,6 +22,11 @@ PCB-Production-V2/
 ├── restart_serveur.bat             ← Kill + redémarre backend
 ├── test_api.bat                    ← Smoke test endpoints
 │
+├── data/                           ← Données métier (hors code/doc) — voir ADR 0003
+│   └── datasheets/
+│       ├── pdf/                    ← Datasheets PDF source (input, gitignored)
+│       └── md/                     ← Fiches .md générées par composant (output)
+│
 ├── docs/                           ← Documentation + vault Obsidian
 │   ├── INDEX.md                    ← Entry point du vault
 │   ├── Projet.md                   ← Description technique (vision + archi + data model)
@@ -100,6 +105,8 @@ PCB-Production-V2/
 | ADR | `docs/adr/` (format `NNNN-titre.md`) |
 | Guide utilisateur | `docs/guides/` |
 | Doc historique | `docs/archive/` |
+| Datasheets PDF source | `data/datasheets/pdf/` (gitignored) |
+| Fiches `.md` composant générées | `data/datasheets/md/` |
 | Scripts dev | Racine si universel (auto_push.bat) sinon `serveur/` ou `client/` |
 
 ---
