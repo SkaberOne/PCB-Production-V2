@@ -77,7 +77,19 @@ function SortableHeaderCell({ label, column, sortConfig, onSort, width, sx }) {
     const isActive = sortConfig.column === column;
     const isAsc = sortConfig.direction === 'asc';
     return (
-        <TableCell sx={{ width, ...HEADER_HOVER_SX, ...sx }} onClick={() => onSort(column)}>
+        <TableCell
+            sx={{ width, ...HEADER_HOVER_SX, ...sx }}
+            role="button"
+            tabIndex={0}
+            aria-sort={isActive ? (isAsc ? 'ascending' : 'descending') : 'none'}
+            onClick={() => onSort(column)}
+            onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    onSort(column);
+                }
+            }}
+        >
             <Stack direction="row" alignItems="center" spacing={0.25}>
                 <span>{label}</span>
                 {isActive ? (
@@ -117,6 +129,7 @@ const BomReviewTableRow = React.memo(function BomReviewTableRow({
                 <TableCell sx={{ ...compactCellSx, width: '4%' }}>
                     <Checkbox
                         size="small"
+                        aria-label={`Sélectionner ${item.reference || item.reference_item || 'la ligne'}`}
                         checked={isSelected}
                         onChange={(e) => onSelect(item.id, e.target.checked)}
                         sx={{ p: 0.5 }}
@@ -128,6 +141,7 @@ const BomReviewTableRow = React.memo(function BomReviewTableRow({
             <TableCell>
                 <TextField
                     fullWidth size="small"
+                    aria-label={`Valeur revue ${item.reference || item.reference_item || ''}`.trim()}
                     value={item.value_harmonized || ''}
                     onChange={(e) => onValueChange(item.id, e.target.value)}
                     placeholder={item.value_raw || ''}
@@ -138,6 +152,7 @@ const BomReviewTableRow = React.memo(function BomReviewTableRow({
             <TableCell>
                 <TextField
                     fullWidth size="small"
+                    aria-label={`Empreinte PnP ${item.reference || item.reference_item || ''}`.trim()}
                     value={item.footprint_pnp || ''}
                     onChange={(e) => onFootprintChange(item, e.target.value)}
                     placeholder={item.footprint_eagle || ''}
@@ -149,6 +164,7 @@ const BomReviewTableRow = React.memo(function BomReviewTableRow({
                 <Stack spacing={0.75}>
                     <TextField
                         fullWidth select size="small"
+                        aria-label={`Type ${item.reference || item.reference_item || ''}`.trim()}
                         value={item._type || ''}
                         onChange={(e) => onComponentTypeChange(item.id, e.target.value)}
                         sx={compactInputSx}
@@ -170,6 +186,7 @@ const BomReviewTableRow = React.memo(function BomReviewTableRow({
             <TableCell sx={compactCellSx}>
                 <Checkbox
                     size="small"
+                    aria-label={`Marquer DNP ${item.reference || item.reference_item || ''}`.trim()}
                     checked={Boolean(item.dnp)}
                     onChange={(e) => onDnpChange(item.id, e.target.checked)}
                     sx={{ p: 0.5 }}
@@ -178,6 +195,7 @@ const BomReviewTableRow = React.memo(function BomReviewTableRow({
             <TableCell>
                 <TextField
                     fullWidth size="small"
+                    aria-label={`Note ${item.reference || item.reference_item || ''}`.trim()}
                     value={item.notes || ''}
                     onChange={(e) => onNotesChange(item.id, e.target.value)}
                     placeholder="Note…"
@@ -574,6 +592,7 @@ function BomReviewTab({
                                 <TableCell sx={{ width: '4%' }}>
                                     <Checkbox
                                         size="small"
+                                        aria-label="Tout sélectionner"
                                         checked={allPageSelected}
                                         indeterminate={somePageSelected}
                                         onChange={(e) => handleSelectAll(e.target.checked)}

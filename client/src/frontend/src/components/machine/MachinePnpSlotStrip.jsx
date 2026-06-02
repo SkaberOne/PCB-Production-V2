@@ -55,6 +55,11 @@ function MachinePnpSlotStrip({
                     <Tooltip key={`${laneColor}-${slot}`} title={slotTitle}>
                         <Box
                             onClick={() => onSelectSlot(slot)}
+                            role="button"
+                            tabIndex={0}
+                            aria-label={slotTitle}
+                            aria-pressed={isSelected}
+                            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelectSlot(slot); } }}
                             sx={{
                                 ...machineSlotCellSx,
                                 minWidth: 0,

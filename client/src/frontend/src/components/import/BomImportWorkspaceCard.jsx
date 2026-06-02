@@ -60,6 +60,10 @@ const WorkspaceSessionRow = React.memo(function WorkspaceSessionRow({
                     selectBatchResult(row);
                 }
             }}
+            role={row.isImported ? 'button' : undefined}
+            tabIndex={row.isImported ? 0 : undefined}
+            aria-pressed={row.isImported ? selected : undefined}
+            onKeyDown={(e) => { if (row.isImported && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); selectBatchResult(row); } }}
             sx={{ cursor: row.isImported ? 'pointer' : 'default' }}
         >
             <TableCell sx={compactCellSx}>{row.file_name}</TableCell>
@@ -70,6 +74,7 @@ const WorkspaceSessionRow = React.memo(function WorkspaceSessionRow({
                     sx={compactInputSx}
                     value={row.category || ''}
                     placeholder="Ex: AMPLI"
+                    aria-label={`Catégorie ${row.file_name}`}
                     onChange={(event) => (
                         row.isImported
                             ? handleBatchResultFieldChange(rowKey, 'category', event.target.value)
@@ -83,6 +88,7 @@ const WorkspaceSessionRow = React.memo(function WorkspaceSessionRow({
                     size="small"
                     sx={compactInputSx}
                     value={row.reference}
+                    aria-label={`Référence ${row.file_name}`}
                     onChange={(event) => (
                         row.isImported
                             ? handleBatchResultFieldChange(rowKey, 'reference', event.target.value)
@@ -96,6 +102,7 @@ const WorkspaceSessionRow = React.memo(function WorkspaceSessionRow({
                     size="small"
                     sx={compactInputSx}
                     value={row.revision}
+                    aria-label={`Révision ${row.file_name}`}
                     onChange={(event) => (
                         row.isImported
                             ? handleBatchResultFieldChange(rowKey, 'revision', event.target.value)
@@ -115,6 +122,7 @@ const WorkspaceSessionRow = React.memo(function WorkspaceSessionRow({
                         size="small"
                         sx={compactInputSx}
                         value={row.side}
+                        aria-label={`Face ${row.file_name}`}
                         onChange={(event) => (
                             handleDraftFieldChange(row.row_key, 'side', event.target.value)
                         )}

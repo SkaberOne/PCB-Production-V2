@@ -23,6 +23,7 @@ const CommandLineRow = React.memo(function CommandLineRow({ line, override, onOv
                 <TextField
                     size="small"
                     type="number"
+                    aria-label={`Quantité à commander ${line.componentName || line.value || ''}`.trim()}
                     value={effectiveQty}
                     onChange={(e) => {
                         const val = parseInt(e.target.value, 10);

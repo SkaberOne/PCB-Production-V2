@@ -24,9 +24,10 @@ function PageHeader({ eyebrow, title, description, actions = null }) {
                         {eyebrow}
                     </Typography>
                 ) : null}
-                <Typography 
-                    variant="h4" 
-                    sx={{ 
+                <Typography
+                    variant="h4"
+                    component="h2"
+                    sx={{
                         mb: 1,
                         color: '#f4f4f5',
                         fontWeight: 700

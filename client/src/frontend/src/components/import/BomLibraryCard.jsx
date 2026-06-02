@@ -128,7 +128,13 @@ const LibraryReferenceGroup = React.memo(function LibraryReferenceGroup({
                 spacing={0.5}
                 sx={{ ...treeRowSx, pl: 2 }}
             >
-                <IconButton size="small" onClick={() => setOpen((v) => !v)} sx={{ color: '#71717a', p: 0.25 }}>
+                <IconButton
+                    size="small"
+                    onClick={() => setOpen((v) => !v)}
+                    aria-label={open ? `Réduire ${referenceEntry.reference}` : `Développer ${referenceEntry.reference}`}
+                    aria-expanded={open}
+                    sx={{ color: '#71717a', p: 0.25 }}
+                >
                     {open ? <ExpandMoreRoundedIcon fontSize="small" /> : <ChevronRightRoundedIcon fontSize="small" />}
                 </IconButton>
                 <Checkbox
@@ -136,6 +142,7 @@ const LibraryReferenceGroup = React.memo(function LibraryReferenceGroup({
                     checked={allChecked}
                     indeterminate={indeterminate}
                     onChange={handleGroupToggle}
+                    aria-label={`Sélectionner la référence ${referenceEntry.reference}`}
                     sx={{ p: 0.25, color: '#52525b', '&.Mui-checked': { color: '#10b981' }, '&.MuiCheckbox-indeterminate': { color: '#10b981' } }}
                     icon={<CheckBoxOutlineBlankRoundedIcon fontSize="small" />}
                     checkedIcon={<CheckBoxRoundedIcon fontSize="small" />}
@@ -188,8 +195,13 @@ const LibraryCategoryGroup = React.memo(function LibraryCategoryGroup({
                 spacing={0.5}
                 sx={{ ...treeRowSx, cursor: 'pointer' }}
                 onClick={() => setOpen((v) => !v)}
+                role="button"
+                tabIndex={0}
+                aria-expanded={open}
+                aria-label={`${open ? 'Réduire' : 'Développer'} la catégorie ${categoryEntry.category}`}
+                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setOpen((v) => !v); } }}
             >
-                <IconButton size="small" sx={{ color: '#71717a', p: 0.25, pointerEvents: 'none' }}>
+                <IconButton size="small" aria-hidden="true" tabIndex={-1} sx={{ color: '#71717a', p: 0.25, pointerEvents: 'none' }}>
                     {open ? <ExpandMoreRoundedIcon fontSize="small" /> : <ChevronRightRoundedIcon fontSize="small" />}
                 </IconButton>
                 <Typography variant="caption" sx={{ color: '#71717a', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', flex: 1 }}>

@@ -62,3 +62,49 @@
 - **Unification fine des 3 systèmes de table** → partiellement faite (en-têtes confiées au thème) ; reste à harmoniser `thSx/tdSx` de MachinePnP → **Vague 3**.
 
 **Verdict Vague 2 :** ✅ Palette et surfaces entièrement unifiées sur les tokens. Confirmations destructives thématisées. Aucune régression.
+
+---
+
+## ✅ Vague 3 — Accessibilité & polish (validée le 2026-06-03)
+
+### Corrections livrées
+
+| # | Correction | Portée | Critère WCAG |
+|---|---|---|---|
+| 1 | **Cartes/lignes/slots cliquables accessibles au clavier** (`role="button"`, `tabIndex=0`, `onKeyDown` Enter/Espace, `aria-pressed`, `:focus-visible`) : StatCard, MachineCard, lignes de table machine/stock, entrées BOM, slots PnP, arbre catégories, lignes session import | StatCard, MachinePnpPage, MachinePnpTables, MachinePnpSlotStrip, BomSelectionPanel, BomStockTable, BomFilesPage, BomImportWorkspaceCard, BomLibraryCard | 2.1.1 / 2.4.7 |
+| 2 | **En-têtes de tri opérables au clavier** + `aria-sort` | DashboardPage, BomReviewTab | 2.1.1 / 4.1.2 |
+| 3 | **Noms accessibles** ajoutés à TOUS les champs de recherche et boutons-icônes sans nom (Dashboard, BomFiles, Command, MachinePnP, Import, GuideBanner, boutons monter/descendre Settings) | 11 fichiers | 3.3.2 / 4.1.2 |
+| 4 | **2 boutons « Supprimer » identiques** de Machine PnP → `aria-label` distincts (machine vs chariot) | MachinePnpPage, MachinePnpTables | 4.1.2 |
+| 5 | **Cases à cocher nommées** (sélection ligne, tout sélectionner, DNP) | BomReviewTab, BomLibraryCard | 4.1.2 |
+| 6 | **Hiérarchie sémantique** : exactement **un `h1` par page** (titre topbar AppShell) + PageHeader en `h2` ; flèche « → » des StatCards en `aria-hidden` | AppShell, PageHeader, StatCard | 1.3.1 |
+| 7 | **`aria-labelledby`** reliant le titre du `ConfirmDialog` | ConfirmDialog | 4.1.2 |
+| 8 | **Icône recherche** : emoji `🔍` → `SearchRoundedIcon` (cohérence + lecteur d'écran) | CommandPage | 1.1.1 |
+| 9 | **Accents FR** corrigés (« Creer »→« Créer », « Categorie »→« Catégorie », etc.) | MachinePnpDialogs | — (rédactionnel) |
+
+### Preuves de validation (rendu live Chrome)
+
+- **Boutons sans nom accessible :** scan DOM de toutes les pages (en excluant les décoratifs `aria-hidden`) → **0 bouton interactif sans nom** (Dashboard, Import, Machine PnP, Paramètres, Commande, BOM, Fichier BOM). Avant : 9 sur Import, 66 sur Paramètres, 1 sur Dashboard.
+- **Décoratifs correctement masqués :** les `IconButton` d'expansion non-cliquables sont `aria-hidden="true"` + `tabIndex="-1"`, leur parent portant `role="button"` + `aria-expanded` + nom.
+- **Clavier :** StatCards = `role="button"`, `tabIndex="0"`, `aria-label` contextuel, focus visible — opérables au clavier.
+- **Hiérarchie :** exactement **1 `h1` par page** vérifié (Dashboard « Productions », Commande topbar h1 + PageHeader h2).
+- **Tests Jest :** 18 suites / **66 tests — 100 % OK**. **0 erreur console** sur l'ensemble des pages.
+
+### Reste (polish mineur, non bloquant)
+
+- `aria-label` des champs `TextField` posés en racine : pour un ciblage strict de l'`<input>`, MUI recommande `inputProps={{ 'aria-label' }}` (le `placeholder` fournit déjà un nom de repli — pas de régression).
+- Refactor des états vides restants (Dashboard, MachinePnP) vers le composant `EmptyState` partagé.
+- `aria-labelledby` à généraliser aux dialogs restants (BomPicker, BomStock, MachinePnp, BomReview) sur le modèle de `ConfirmDialog`.
+
+**Verdict Vague 3 :** ✅ Accessibilité clavier et noms accessibles couvrant l'ensemble des pages. Hiérarchie de titres conforme. Aucune régression. Palette conservée du début à la fin.
+
+---
+
+## Bilan global de la refonte
+
+| Vague | Fichiers touchés | Tests | Régression |
+|---|---|---|---|
+| V1 — Quick wins | 11 | 66/66 ✅ | aucune |
+| V2 — Design system | 16 | 66/66 ✅ | aucune |
+| V3 — A11y & polish | ~20 | 66/66 ✅ | aucune |
+
+**Résultat :** tous les points 🔴 critiques et la grande majorité des 🟡 majeurs de l'audit initial sont corrigés et validés en live. La **palette émeraude sur fond zinc est conservée à l'identique** — elle a été *unifiée*, pas modifiée. La version stable d'origine reste intacte sur la branche `audit-restructure-2026-05` ; toute la refonte vit sur `refonte-design-2026-06`.

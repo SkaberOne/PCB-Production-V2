@@ -453,6 +453,7 @@ const SettingsTypeRuleTableRow = React.memo(function SettingsTypeRuleTableRow({
                             size="small"
                             onClick={handleMoveUp}
                             disabled={!canMoveUp}
+                            aria-label="Monter la règle dans la liste"
                             sx={{ border: '1px solid var(--border)', borderRadius: 1 }}
                         >
                             <KeyboardArrowUpRoundedIcon fontSize="small" />
@@ -461,6 +462,7 @@ const SettingsTypeRuleTableRow = React.memo(function SettingsTypeRuleTableRow({
                             size="small"
                             onClick={handleMoveDown}
                             disabled={!canMoveDown}
+                            aria-label="Descendre la règle dans la liste"
                             sx={{ border: '1px solid var(--border)', borderRadius: 1 }}
                         >
                             <KeyboardArrowDownRoundedIcon fontSize="small" />

@@ -43,9 +43,10 @@ function ConfirmDialog({
             onClose={onClose}
             maxWidth="xs"
             fullWidth
+            aria-labelledby="confirm-dialog-title"
             PaperProps={{ sx: DIALOG_PAPER_SX }}
         >
-            <DialogTitle sx={{ borderBottom: '1px solid #27272a', fontWeight: 700 }}>
+            <DialogTitle id="confirm-dialog-title" sx={{ borderBottom: '1px solid #27272a', fontWeight: 700 }}>
                 {title}
             </DialogTitle>
             <DialogContent sx={{ pt: 2.5 }}>

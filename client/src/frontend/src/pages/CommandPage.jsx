@@ -1,5 +1,6 @@
 import React from 'react';
 import AddShoppingCartRoundedIcon from '@mui/icons-material/AddShoppingCartRounded';
+import SearchRoundedIcon from '@mui/icons-material/SearchRounded';
 import DownloadRoundedIcon from '@mui/icons-material/DownloadRounded';
 import RestartAltRoundedIcon from '@mui/icons-material/RestartAltRounded';
 import {
@@ -806,13 +807,14 @@ function CommandPage() {
                                 <TextField
                                     size="small"
                                     placeholder="Filtrer composant, valeur, empreinte..."
+                                    aria-label="Filtrer les composants de la commande"
                                     value={filterText}
                                     onChange={(e) => { setFilterText(e.target.value); setPage(0); }}
                                     sx={{ width: 260 }}
                                     InputProps={{
                                         startAdornment: (
                                             <InputAdornment position="start">
-                                                <Typography variant="caption" sx={{ color: colors.textMuted }}>🔍</Typography>
+                                                <SearchRoundedIcon sx={{ color: colors.textSecondary, fontSize: 18 }} />
                                             </InputAdornment>
                                         ),
                                     }}

@@ -358,12 +358,14 @@ function AppShell({ pages, children }) {
                     }}
                 >
                     <Typography
+                        component="h1"
                         sx={{
                             fontWeight: 700,
                             fontSize: '0.9375rem',
                             color: '#f4f4f5',
                             flex: 1,
-                            minWidth: 0
+                            minWidth: 0,
+                            m: 0
                         }}
                         noWrap
                     >

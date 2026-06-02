@@ -440,6 +440,10 @@ function MachineCard({ machine, selected, onSelect, onDelete }) {
     return (
         <Card
             onClick={() => onSelect(machine)}
+            role="button"
+            tabIndex={0}
+            aria-pressed={selected}
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelect(machine); } }}
             sx={{
                 cursor: 'pointer',
                 backgroundColor: selected ? 'rgba(5,150,105,0.08)' : '#18181b',
@@ -468,6 +472,7 @@ function MachineCard({ machine, selected, onSelect, onDelete }) {
                     <Tooltip title="Supprimer">
                         <IconButton
                             size="small"
+                            aria-label={`Supprimer la machine ${machine.name}`}
                             onClick={(e) => { e.stopPropagation(); onDelete(machine); }}
                             sx={{ color: '#52525b', '&:hover': { color: '#ef4444', backgroundColor: 'rgba(239,68,68,0.08)' } }}
                         >
@@ -536,12 +541,12 @@ function SequenceTab({ summary, summaryLoading, activeProduction, onAssignProduc
                     </Typography>
                     <Box sx={{ display: 'flex', gap: 0.5 }}>
                         <Tooltip title="Actualiser">
-                            <IconButton size="small" onClick={loadMachines} sx={{ color: '#52525b' }}>
+                            <IconButton size="small" aria-label="Actualiser la liste des machines" onClick={loadMachines} sx={{ color: '#52525b' }}>
                                 <RefreshRoundedIcon sx={{ fontSize: 16 }} />
                             </IconButton>
                         </Tooltip>
                         <Tooltip title="Nouvelle machine">
-                            <IconButton size="small" onClick={() => setCreateOpen(true)}
+                            <IconButton size="small" aria-label="Nouvelle machine" onClick={() => setCreateOpen(true)}
                                 sx={{ color: '#059669', backgroundColor: 'rgba(5,150,105,0.08)', '&:hover': { backgroundColor: 'rgba(5,150,105,0.15)' } }}>
                                 <AddRoundedIcon sx={{ fontSize: 16 }} />
                             </IconButton>
@@ -745,13 +750,14 @@ function FeederTab() {
                     <TextField
                         size="small"
                         placeholder="Recherche…"
+                        aria-label="Rechercher un feeder"
                         value={search}
                         onChange={(e) => { setSearch(e.target.value); setPage(0); }}
                         sx={{ width: 220, '& .MuiOutlinedInput-root': { fontSize: '0.8rem', '& fieldset': { borderColor: '#3f3f46' } }, '& input': { color: '#f4f4f5', py: 0.75 } }}
                         InputLabelProps={{ sx: { color: '#71717a' } }}
                     />
                     <Tooltip title="Actualiser">
-                        <IconButton size="small" onClick={load} sx={{ color: '#52525b' }}>
+                        <IconButton size="small" aria-label="Actualiser la liste des feeders" onClick={load} sx={{ color: '#52525b' }}>
                             <RefreshRoundedIcon sx={{ fontSize: 16 }} />
                         </IconButton>
                     </Tooltip>
@@ -882,7 +888,7 @@ function ChariotTab() {
                 </Typography>
                 <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
                     <Tooltip title="Actualiser">
-                        <IconButton size="small" onClick={load} sx={{ color: '#52525b' }}>
+                        <IconButton size="small" aria-label="Actualiser la liste des chariots" onClick={load} sx={{ color: '#52525b' }}>
                             <RefreshRoundedIcon sx={{ fontSize: 16 }} />
                         </IconButton>
                     </Tooltip>
@@ -958,13 +964,13 @@ function ChariotTab() {
                                             <TableCell sx={{ ...tdSx, textAlign: 'right', pr: 1 }}>
                                                 <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 0.5 }}>
                                                     <Tooltip title="Modifier">
-                                                        <IconButton size="small" onClick={() => setEditTarget(cart)}
+                                                        <IconButton size="small" aria-label={`Modifier le chariot ${cart.name}`} onClick={() => setEditTarget(cart)}
                                                             sx={{ color: '#52525b', '&:hover': { color: '#3b82f6', backgroundColor: 'rgba(59,130,246,0.08)' } }}>
                                                             <EditRoundedIcon sx={{ fontSize: 16 }} />
                                                         </IconButton>
                                                     </Tooltip>
                                                     <Tooltip title="Supprimer">
-                                                        <IconButton size="small" onClick={() => setDeleteTarget(cart)}
+                                                        <IconButton size="small" aria-label={`Supprimer le chariot ${cart.name}`} onClick={() => setDeleteTarget(cart)}
                                                             sx={{ color: '#52525b', '&:hover': { color: '#ef4444', backgroundColor: 'rgba(239,68,68,0.08)' } }}>
                                                             <DeleteRoundedIcon sx={{ fontSize: 16 }} />
                                                         </IconButton>

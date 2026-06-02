@@ -96,7 +96,8 @@ function GuideBanner({
                 <IconButton
                     size="small"
                     onClick={handleDismiss}
-                    sx={{ color: '#52525b', flexShrink: 0, p: 0.25 }}
+                    aria-label="Masquer ce conseil"
+                    sx={{ color: '#a1a1aa', flexShrink: 0, p: 0.25 }}
                 >
                     <CloseRoundedIcon sx={{ fontSize: 16 }} />
                 </IconButton>

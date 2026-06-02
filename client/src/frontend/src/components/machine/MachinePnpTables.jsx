@@ -48,6 +48,10 @@ const MachineTableRow = React.memo(function MachineTableRow({
             selected={isSelected}
             onClick={() => onOpenConfig(machine)}
             onContextMenu={(event) => onOpenContextMenu(event, machine)}
+            role="button"
+            tabIndex={0}
+            aria-pressed={isSelected}
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpenConfig(machine); } }}
             sx={{ cursor: 'pointer' }}
         >
             <TableCell sx={compactWrapCellSx}>
@@ -73,6 +77,7 @@ const MachineTableRow = React.memo(function MachineTableRow({
                         <IconButton
                             size="small"
                             color="primary"
+                            aria-label={`Configurer les feeders de la machine ${machine.name}`}
                             onClick={(event) => {
                                 event.stopPropagation();
                                 onOpenConfig(machine);
@@ -85,6 +90,7 @@ const MachineTableRow = React.memo(function MachineTableRow({
                         <IconButton
                             size="small"
                             color="error"
+                            aria-label={`Supprimer la machine ${machine.name}`}
                             onClick={(event) => {
                                 event.stopPropagation();
                                 onDeleteMachine(machine);
@@ -188,6 +194,7 @@ const FixedFeederTableRow = React.memo(function FixedFeederTableRow({
                         <IconButton
                             size="small"
                             color="primary"
+                            aria-label={`Modifier le feeder fixe ${primaryLabel}`}
                             onClick={() => onEditFixedFeeder(row)}
                         >
                             <EditRoundedIcon fontSize="small" />
@@ -197,6 +204,7 @@ const FixedFeederTableRow = React.memo(function FixedFeederTableRow({
                         <IconButton
                             size="small"
                             color="error"
+                            aria-label={`Retirer le feeder fixe ${primaryLabel}`}
                             onClick={() => onRemoveFixedFeeder(row.component_id)}
                             disabled={actionLoading === `remove-fixed-feeder-${row.component_id}`}
                         >
@@ -308,6 +316,7 @@ const CartTableRow = React.memo(function CartTableRow({
                         <IconButton
                             size="small"
                             color="primary"
+                            aria-label={`Modifier le chariot ${cart.name}`}
                             onClick={() => onEditCart(cart)}
                             disabled={actionLoading === `update-cart-${cart.id}`}
                         >
@@ -318,6 +327,7 @@ const CartTableRow = React.memo(function CartTableRow({
                         <IconButton
                             size="small"
                             color="error"
+                            aria-label={`Supprimer le chariot ${cart.name}`}
                             onClick={() => onDeleteCart(cart)}
                             disabled={actionLoading === `delete-cart-${cart.id}`}
                         >
@@ -383,6 +393,10 @@ const MachineAssignmentTableRow = React.memo(function MachineAssignmentTableRow(
             hover
             selected={isSelected}
             onClick={() => onSelectSlot(assignment.slot_start)}
+            role="button"
+            tabIndex={0}
+            aria-pressed={isSelected}
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelectSlot(assignment.slot_start); } }}
             sx={{
                 cursor: 'pointer',
                 backgroundColor: assignmentPalette.rowBackground,

@@ -306,6 +306,7 @@ const DashboardProductionRow = React.memo(function DashboardProductionRow({
                         <span>
                             <IconButton
                                 size="small"
+                                aria-label={`Plus d'actions pour ${production.name}`}
                                 onClick={(e) => setMenuAnchor(e.currentTarget)}
                                 disabled={isBusy}
                                 sx={{
@@ -797,6 +798,7 @@ function DashboardPage() {
                                     <TextField
                                         size="small"
                                         placeholder="Rechercher une production..."
+                                        aria-label="Rechercher une production"
                                         value={searchQuery}
                                         onChange={(e) => setSearchQuery(e.target.value)}
                                         InputProps={{
@@ -831,7 +833,10 @@ function DashboardPage() {
                                 <Table sx={compactTableSx}>
                                     <TableHead sx={{ backgroundColor: 'background.default' }}>
                                         <TableRow>
-                                            <TableCell sx={{ width: '42%' }}>
+                                            <TableCell
+                                                sx={{ width: '42%' }}
+                                                aria-sort={sortField === 'name' ? (sortDir === 'asc' ? 'ascending' : 'descending') : 'none'}
+                                            >
                                                 <TableSortLabel
                                                     active={sortField === 'name'}
                                                     direction={sortField === 'name' ? sortDir : 'asc'}
@@ -841,7 +846,10 @@ function DashboardPage() {
                                                     PRODUCTION
                                                 </TableSortLabel>
                                             </TableCell>
-                                            <TableCell sx={{ width: '16%' }}>
+                                            <TableCell
+                                                sx={{ width: '16%' }}
+                                                aria-sort={sortField === 'bom_count' ? (sortDir === 'asc' ? 'ascending' : 'descending') : 'none'}
+                                            >
                                                 <TableSortLabel
                                                     active={sortField === 'bom_count'}
                                                     direction={sortField === 'bom_count' ? sortDir : 'asc'}
@@ -851,7 +859,10 @@ function DashboardPage() {
                                                     BOM LIÉES
                                                 </TableSortLabel>
                                             </TableCell>
-                                            <TableCell sx={{ width: '22%' }}>
+                                            <TableCell
+                                                sx={{ width: '22%' }}
+                                                aria-sort={sortField === 'updated_at' ? (sortDir === 'asc' ? 'ascending' : 'descending') : 'none'}
+                                            >
                                                 <TableSortLabel
                                                     active={sortField === 'updated_at'}
                                                     direction={sortField === 'updated_at' ? sortDir : 'desc'}

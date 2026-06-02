@@ -88,7 +88,18 @@ function BomSelectionPanel({
                                     return (
                                         <Box
                                             key={entry.bom_revision_id}
+                                            role="button"
+                                            tabIndex={0}
+                                            aria-pressed={isActive}
+                                            aria-current={isActive ? 'true' : undefined}
+                                            aria-label={`Activer ${entry.reference || 'BOM'} ${entry.revision || ''} ${entry.side || ''}`.trim()}
                                             onClick={() => onActivateEntry(entry)}
+                                            onKeyDown={(e) => {
+                                                if (e.key === 'Enter' || e.key === ' ') {
+                                                    e.preventDefault();
+                                                    onActivateEntry(entry);
+                                                }
+                                            }}
                                             sx={isActive ? ENTRY_ACTIVE_SX : ENTRY_INACTIVE_SX}
                                         >
                                             <Stack
