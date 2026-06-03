@@ -5,6 +5,54 @@
 
 ---
 
+## 2026-06-03 — Session 3 : Intégration API fournisseurs (Mouser + DigiKey) + export ERP 12 colonnes
+
+### Contexte
+Intégrer les API fournisseurs dans la section Commande : prix/disponibilité,
+tri multi-fournisseurs (moins cher / priorisé), enrichissement MPN, et refonte de
+l'export ERP. Audit + décisions : `docs/audits/Audit_2026-06-03_integration_api_fournisseurs.md`,
+ADR `docs/adr/0004-supplier-api-connectors.md`.
+
+### Backend
+- **Modèle** : table `SUPPLIER_OFFERS` (cache prix/dispo/lien par composant×fournisseur)
+  + table `ERP_DEFAULTS` (valeurs par défaut éditables). Migrations Alembic
+  `g1b2c3d4e5f6` et `h2c3d4e5f6a7`.
+- **Connecteurs** : `services/suppliers/` — interface commune `SupplierConnector` +
+  `OfferDTO` (`base.py`), `MouserConnector` (clé query string), `DigiKeyConnector`
+  (OAuth2 2-legged via `oauth.py`, inactif sans Client ID/Secret). Farnell/RS = un
+  fichier à ajouter plus tard.
+- **Service** `supplier_offer_service.py` : cache (TTL 24h), refresh temps réel,
+  tri `cheapest`/`priority`, proposition + application MPN en revue manuelle.
+- **Routes** : `/marketplace/supplier-offers` (cache), `/refresh`, `/best`,
+  `/mpn-proposals`, `/mpn-apply` ; `/marketplace/erp-defaults` (GET/PUT).
+- **Export ERP** : `ERP_HEADERS` passe de 10 → **12 colonnes** alignées sur le
+  formulaire « Nouvelle Demande d'Achat ». Référence KT = `COMPONENTS.reference` ;
+  fournisseur/réf/lien/description depuis l'offre retenue ; défauts ERP préremplis
+  (Projet `PJ2601-00241…`, Demandeur `Eric Bouquet`, Validateur `Kevin Surrier`,
+  Délai `URGENT`, Remarques `mise en bobine`, Unité `pièce`).
+- **Config** : nouveaux champs `.env` (Mouser, DigiKey OAuth, TTL cache, défauts ERP) ;
+  `.env.example` mis à jour ; `httpx` ajouté à `requirements_flexible.txt`.
+- **Tests pytest** : `test_suppliers.py`, `test_supplier_offers.py`,
+  `test_erp_export_v2.py` (17 verts) ; `test_export_command_erp_workbook` mis à jour
+  pour le format 12 colonnes.
+
+### Frontend
+- `components/command/SupplierOffersPanel.jsx` : panneau prix/dispo avec menu de tri
+  (moins cher / prioriser un fournisseur), bouton « Actualiser » (temps réel), chip
+  de fraîcheur du cache. Intégré dans `CommandPage` sous le contexte ERP.
+- `pages/ErpDefaultsPage.jsx` : écran admin des valeurs par défaut ERP
+  (route `/parametre-erp`).
+- `utils/supplierOffers.js` (tri/pricing purs) + tests jest
+  `utils/__tests__/supplierOffers.test.js` (logique validée).
+
+### À faire (Eric)
+- Créer le compte DigiKey (developer.digikey.com) → renseigner `DIGIKEY_CLIENT_ID`
+  / `DIGIKEY_CLIENT_SECRET` dans `serveur/.env`.
+- Renseigner `MOUSER_API_KEY` (et **régénérer** la clé partagée en clair).
+- Confirmer le libellé fournisseur attendu par l'import ERP (Mouser / Digi-Key).
+
+---
+
 ## 2026-06-02 — Session 2 : Calcul bobine + extraction datasheets (EIA-481, sans LLM)
 
 ### Contexte

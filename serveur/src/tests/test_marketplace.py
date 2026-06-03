@@ -977,11 +977,12 @@ R1 10R 0805 10.0 20.0 0 R
         export_response = client.post(
             f"/api/marketplace/commands/{command_id}/erp-export",
             json={
-                "project": "PJ2601-00241,Achat Projet client 2026",
-                "erp_status": "Demande d'achat, Attente de validation",
-                "delay": "URGENT - 24h à 48h",
-                "remark": "Mousreel",
+                "project": "PJ2601-00241 - Achat projet client 2026",
+                "delay": "URGENT",
+                "remark": "mise en bobine",
                 "validator": "Kevin Surrier",
+                "requester": "Eric Bouquet",
+                "unit": "pièce",
                 "default_supplier": "MOUSER",
             },
         )
@@ -993,20 +994,31 @@ R1 10R 0805 10.0 20.0 0 R
 
         workbook = load_workbook(BytesIO(export_response.content))
         worksheet = workbook["Purchase List ERP"]
-        assert worksheet.cell(1, 1).value == "Fournisseur"
-        assert worksheet.cell(1, 2).value == "nom du composant"
-        assert worksheet.cell(1, 3).value == "ref fournisseur"
-        assert worksheet.cell(1, 5).value == "Quantite a commander"
-        assert worksheet.cell(1, 7).value == "Statut"
-        assert worksheet.cell(2, 1).value == "MOUSER"
-        assert worksheet.cell(2, 2).value == "RES-10R"
-        assert worksheet.cell(2, 3).value == "SUP-10R"
-        assert worksheet.cell(2, 5).value == 3
-        assert worksheet.cell(2, 6).value == "PJ2601-00241,Achat Projet client 2026"
-        assert worksheet.cell(2, 7).value == "Demande d'achat, Attente de validation"
-        assert worksheet.cell(2, 8).value == "URGENT - 24h à 48h"
-        assert worksheet.cell(2, 9).value == "Mousreel"
-        assert worksheet.cell(2, 10).value == "Kevin Surrier"
+        # New 12-column ERP layout (audit 2026-06-03 §6.2).
+        assert worksheet.cell(1, 1).value == "Référence fournisseur"
+        assert worksheet.cell(1, 2).value == "Fournisseur"
+        assert worksheet.cell(1, 3).value == "Description"
+        assert worksheet.cell(1, 4).value == "Lien web"
+        assert worksheet.cell(1, 5).value == "Référence KT"
+        assert worksheet.cell(1, 6).value == "Quantité"
+        assert worksheet.cell(1, 7).value == "Unité"
+        assert worksheet.cell(1, 8).value == "Projet"
+        assert worksheet.cell(1, 9).value == "Demandeur"
+        assert worksheet.cell(1, 10).value == "Validateur"
+        assert worksheet.cell(1, 11).value == "Délai"
+        assert worksheet.cell(1, 12).value == "Remarques"
+        # No supplier offer cached -> falls back to component library + default supplier.
+        assert worksheet.cell(2, 1).value == "SUP-10R"           # supplier_code
+        assert worksheet.cell(2, 2).value == "MOUSER"            # default supplier
+        assert "RES-10R" in worksheet.cell(2, 3).value           # description from MPN
+        assert worksheet.cell(2, 5).value == "LIB-ERP-1"         # Référence KT = COMPONENTS.reference
+        assert worksheet.cell(2, 6).value == 3                   # quantity
+        assert worksheet.cell(2, 7).value == "pièce"             # unit
+        assert worksheet.cell(2, 8).value == "PJ2601-00241 - Achat projet client 2026"
+        assert worksheet.cell(2, 9).value == "Eric Bouquet"      # requester
+        assert worksheet.cell(2, 10).value == "Kevin Surrier"    # validator
+        assert worksheet.cell(2, 11).value == "URGENT"           # delay
+        assert worksheet.cell(2, 12).value == "mise en bobine"   # remark
     finally:
         os.unlink(temp_path)
 

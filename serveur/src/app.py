@@ -110,3 +110,4 @@ if __name__ == "__main__":
         port=settings.api_port,
         reload=settings.api_env == "development",
     )
+# reload trigger 2026-06-03T18:12:26.5746720+02:00

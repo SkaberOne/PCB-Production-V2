@@ -30,6 +30,19 @@ class GenerateCommandRequest(BaseModel):
     items: List[AddCommandItemRequest]
 
 
+class SyncProductionCommandRequest(BaseModel):
+    """Upsert the implicit per-production command from the current BOM selection."""
+
+    items: List[AddCommandItemRequest] = Field(default_factory=list)
+
+
+class SetReceiptRequest(BaseModel):
+    """Set the received quantity for one command line (aggregate key)."""
+
+    line_key: str = Field(..., min_length=1, max_length=300)
+    qty_received: int = Field(..., ge=0)
+
+
 class CreateProductionRequest(BaseModel):
     name: str = Field(..., min_length=1, max_length=200)
     machine_id: Optional[int] = Field(default=None, gt=0)
@@ -65,13 +78,34 @@ class UpdateCommandItemQuantityRequest(BaseModel):
 
 
 class ExportCommandErpRequest(BaseModel):
-    project: str = Field(..., min_length=1, max_length=250)
-    erp_status: str = Field(..., min_length=1, max_length=250)
-    delay: str = Field(..., min_length=1, max_length=250)
-    remark: str = Field(default="", max_length=500)
-    validator: str = Field(..., min_length=1, max_length=250)
-    default_supplier: Optional[str] = Field(default=None, max_length=250)
+    """ERP purchase-list export. All context fields fall back to ERP defaults."""
+
+    project: Optional[str] = Field(default=None, max_length=250)
+    unit: Optional[str] = Field(default=None, max_length=50)
+    requester: Optional[str] = Field(default=None, max_length=150)
+    validator: Optional[str] = Field(default=None, max_length=150)
+    delay: Optional[str] = Field(default=None, max_length=100)
+    remark: Optional[str] = Field(default=None, max_length=500)
+    default_supplier: Optional[str] = Field(default=None, max_length=50)
+    sort_strategy: str = Field(default="cheapest", pattern="^(cheapest|priority)$")
+    priority_supplier: Optional[str] = Field(default=None, max_length=20)
     line_overrides: Optional[List[dict]] = Field(default=None)
+
+
+class UpdateErpDefaultsRequest(BaseModel):
+    project: Optional[str] = Field(default=None, max_length=250)
+    unit: Optional[str] = Field(default=None, max_length=50)
+    requester: Optional[str] = Field(default=None, max_length=150)
+    validator: Optional[str] = Field(default=None, max_length=150)
+    delay: Optional[str] = Field(default=None, max_length=100)
+    remark: Optional[str] = Field(default=None, max_length=500)
+    default_supplier: Optional[str] = Field(default=None, max_length=50)
+
+
+class SupplierOfferRefreshRequest(BaseModel):
+    """Force a real-time refresh of supplier offers for the given components."""
+
+    component_ids: List[int] = Field(..., min_items=1)
 
 
 class CreateProductionPlanRequest(BaseModel):

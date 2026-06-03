@@ -1,7 +1,15 @@
 """SQLAlchemy models package."""
 
 from .bom import BomCategory, BomItem, BomReference, BomRevision, Component, FootprintMapping
-from .commands import Command, CommandItem, PlanAssignment, ProductionPlan
+from .commands import (
+    Command,
+    CommandItem,
+    CommandReceipt,
+    ErpDefaults,
+    PlanAssignment,
+    ProductionPlan,
+    SupplierOffer,
+)
 from .machines import PnpCart, PnpFeeder, PnpMachine
 from .production import Production, ProductionBomRevision
 
@@ -12,7 +20,9 @@ __all__ = [
     "BomRevision",
     "Command",
     "CommandItem",
+    "CommandReceipt",
     "Component",
+    "ErpDefaults",
     "FootprintMapping",
     "PlanAssignment",
     "PnpCart",
@@ -21,4 +31,5 @@ __all__ = [
     "Production",
     "ProductionBomRevision",
     "ProductionPlan",
+    "SupplierOffer",
 ]

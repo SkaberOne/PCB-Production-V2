@@ -13,6 +13,7 @@ import BomFilesPage from './pages/BomFilesPage';
 import BomViewerPage from './pages/BomViewerPage';
 import CommandPage from './pages/CommandPage';
 import DashboardPage from './pages/DashboardPage';
+import ErpDefaultsPage from './pages/ErpDefaultsPage';
 import ImportBomPage from './pages/ImportBomPage';
 import MachinePnpPage from './pages/MachinePnpPage';
 import SettingsPage from './pages/SettingsPage';
@@ -99,6 +100,7 @@ function App() {
                 <Route path="/commande-composant" element={<ErrorBoundary context="Commande"><CommandPage /></ErrorBoundary>} />
                 <Route path="/machine-pnp" element={<ErrorBoundary context="Machine PnP"><MachinePnpPage /></ErrorBoundary>} />
                 <Route path="/parametre" element={<ErrorBoundary context="Parametres"><SettingsPage /></ErrorBoundary>} />
+                <Route path="/parametre-erp" element={<ErrorBoundary context="Defauts ERP"><ErpDefaultsPage /></ErrorBoundary>} />
             </Routes>
         </AppShell>
     );

@@ -118,18 +118,36 @@ class Settings(BaseSettings):
         "http://127.0.0.1:5173",
     ]
 
-    # Supplier APIs (Phase 2)
+    # Supplier APIs
     farnell_api_url: Optional[str] = None
     farnell_api_key: Optional[str] = None
 
+    # DigiKey — OAuth2 2-legged (client credentials). Inactive until id+secret set.
     digikey_api_url: Optional[str] = None
-    digikey_api_key: Optional[str] = None
+    digikey_api_key: Optional[str] = None  # legacy/unused, kept for compatibility
+    digikey_client_id: Optional[str] = None
+    digikey_client_secret: Optional[str] = None
+    digikey_oauth_url: Optional[str] = None
+    digikey_locale_site: str = "FR"
+    digikey_locale_currency: str = "EUR"
+    digikey_locale_language: str = "fr"
 
     rs_api_url: Optional[str] = None
     rs_api_key: Optional[str] = None
 
     mouser_api_url: Optional[str] = None
     mouser_api_key: Optional[str] = None
+
+    # Supplier offers cache (ADR 0004)
+    supplier_offer_ttl_hours: int = 24
+
+    # ERP purchase-request defaults (editable in admin screen; ADR 0004 / audit 2026-06-03)
+    erp_default_project: str = "PJ2601-00241 - Achat projet client 2026"
+    erp_default_unit: str = "pièce"
+    erp_default_requester: str = "Eric Bouquet"
+    erp_default_validator: str = "Kevin Surrier"
+    erp_default_delay: str = "URGENT"
+    erp_default_remark: str = "mise en bobine"
 
     if _PYDANTIC_V2:
         model_config = SettingsConfigDict(
