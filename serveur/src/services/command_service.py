@@ -14,7 +14,7 @@ from sqlalchemy.orm import Session, joinedload
 
 from ..database import utcnow
 from ..models.bom import BomItem, BomReference, BomRevision, Component
-from ..models.commands import Command, CommandItem
+from ..models.commands import Command, CommandItem, CommandReceipt
 from ..models.machines import PnpMachine
 from ..models.production import Production
 from .component_library_service import ComponentLibraryService
@@ -26,18 +26,30 @@ logger = logging.getLogger(__name__)
 class CommandService:
     """Service for managing production commands"""
 
+    # ERP "Nouvelle Demande d'Achat" columns (12) — mapped to the ERP form.
+    # See docs/audits/Audit_2026-06-03_integration_api_fournisseurs.md §6.2.
     ERP_HEADERS = [
+        "Référence fournisseur",
         "Fournisseur",
-        "nom du composant",
-        "ref fournisseur",
-        "Lien",
-        "Quantite a commander",
-        "projet",
-        "Statut",
-        "Delai",
-        "remarque",
+        "Description",
+        "Lien web",
+        "Référence KT",
+        "Quantité",
+        "Unité",
+        "Projet",
+        "Demandeur",
         "Validateur",
+        "Délai",
+        "Remarques",
     ]
+
+    # Canonical supplier code -> label expected by the ERP import.
+    SUPPLIER_LABELS = {
+        "MOUSER": "Mouser",
+        "DIGIKEY": "Digi-Key",
+        "FARNELL": "Farnell",
+        "RS": "RS",
+    }
 
     @staticmethod
     def _clean_export_text(value: Optional[str]) -> str:
@@ -46,40 +58,64 @@ class CommandService:
         return str(value).strip()
 
     @classmethod
+    def _supplier_label(cls, supplier_code: Optional[str], default: Optional[str] = None) -> str:
+        if not supplier_code:
+            return cls._clean_export_text(default)
+        return cls.SUPPLIER_LABELS.get(supplier_code.upper(), supplier_code)
+
+    @classmethod
+    def _build_description(cls, line: Dict, offer: Optional[Dict]) -> str:
+        manufacturer = (offer or {}).get("manufacturer")
+        mpn = (offer or {}).get("mpn") or line.get("component_mpn")
+        value = line.get("value")
+        footprint = line.get("footprint")
+        parts = [p for p in (manufacturer, mpn) if p]
+        head = " ".join(parts) if parts else cls._clean_export_text(value)
+        tail = " / ".join(p for p in (value, footprint) if p and p != head)
+        return cls._clean_export_text(f"{head} — {tail}" if tail else head)
+
+    @classmethod
     def _build_erp_export_rows(
         cls,
         command_summary: Dict,
-        project: str,
-        erp_status: str,
-        delay: str,
-        remark: str,
-        validator: str,
-        default_supplier: Optional[str] = None,
+        defaults: Dict[str, str],
+        offers_by_component: Optional[Dict[int, Dict]] = None,
         line_overrides: Optional[Dict[str, int]] = None,
     ) -> List[Dict[str, object]]:
         rows: List[Dict[str, object]] = []
         overrides = line_overrides or {}
+        offers_by_component = offers_by_component or {}
 
         for line in command_summary.get("aggregated_components", []):
-            component_name = cls._clean_export_text(line.get("component_mpn") or line.get("component_name") or line.get("value"))
-            supplier_reference = cls._clean_export_text(
-                line.get("supplier_code") or line.get("component_mpn")
-            )
+            offer = offers_by_component.get(line.get("component_library_id")) or {}
 
+            supplier_reference = cls._clean_export_text(
+                offer.get("supplier_part")
+                or line.get("supplier_code")
+                or offer.get("mpn")
+                or line.get("component_mpn")
+            )
+            supplier_label = cls._supplier_label(
+                offer.get("supplier"), defaults.get("default_supplier")
+            )
+            product_url = cls._clean_export_text(offer.get("product_url") or line.get("supplier_link"))
+            kt_reference = cls._clean_export_text(line.get("component_reference"))
             export_quantity = int(overrides.get(line.get("key"), line.get("quantity") or 0) or 0)
 
             rows.append(
                 {
-                    "Fournisseur": cls._clean_export_text(line.get("supplier_name") or default_supplier),
-                    "nom du composant": component_name,
-                    "ref fournisseur": supplier_reference,
-                    "Lien": cls._clean_export_text(line.get("supplier_link")),
-                    "Quantite a commander": export_quantity,
-                    "projet": cls._clean_export_text(project),
-                    "Statut": cls._clean_export_text(erp_status),
-                    "Delai": cls._clean_export_text(delay),
-                    "remarque": cls._clean_export_text(remark),
-                    "Validateur": cls._clean_export_text(validator),
+                    "Référence fournisseur": supplier_reference,
+                    "Fournisseur": supplier_label,
+                    "Description": cls._build_description(line, offer),
+                    "Lien web": product_url,
+                    "Référence KT": kt_reference,
+                    "Quantité": export_quantity,
+                    "Unité": cls._clean_export_text(defaults.get("unit")),
+                    "Projet": cls._clean_export_text(defaults.get("project")),
+                    "Demandeur": cls._clean_export_text(defaults.get("requester")),
+                    "Validateur": cls._clean_export_text(defaults.get("validator")),
+                    "Délai": cls._clean_export_text(defaults.get("delay")),
+                    "Remarques": cls._clean_export_text(defaults.get("remark")),
                 }
             )
 
@@ -90,16 +126,33 @@ class CommandService:
         cls,
         db: Session,
         command_id: int,
-        project: str,
-        erp_status: str,
-        delay: str,
-        remark: str,
-        validator: str,
-        default_supplier: Optional[str] = None,
+        defaults: Dict[str, str],
+        sort_strategy: str = "cheapest",
+        priority_supplier: Optional[str] = None,
         line_overrides: Optional[Dict[str, int]] = None,
     ) -> Tuple[BytesIO, str]:
-        """Build the ERP purchase-list workbook for a command."""
+        """Build the ERP purchase-list workbook for a command.
+
+        ``defaults`` carries the ERP context (project, unit, requester, validator,
+        delay, remark, default_supplier). Supplier columns are filled from the
+        retained offer per component (cached), per the chosen sort strategy.
+        """
+        from .supplier_offer_service import SupplierOfferService  # avoid import cycle
+
         summary = cls.get_command_summary(db=db, command_id=command_id)
+
+        component_quantities = {
+            line["component_library_id"]: line.get("quantity") or 1
+            for line in summary.get("aggregated_components", [])
+            if line.get("component_library_id")
+        }
+        offers_by_component = SupplierOfferService.best_offers_for_components(
+            db,
+            component_quantities,
+            strategy=sort_strategy,
+            priority_supplier=priority_supplier,
+        )
+
         workbook = Workbook()
         worksheet = workbook.active
         worksheet.title = "Purchase List ERP"
@@ -107,12 +160,8 @@ class CommandService:
 
         for row in cls._build_erp_export_rows(
             command_summary=summary,
-            project=project,
-            erp_status=erp_status,
-            delay=delay,
-            remark=remark,
-            validator=validator,
-            default_supplier=default_supplier,
+            defaults=defaults,
+            offers_by_component=offers_by_component,
             line_overrides=line_overrides,
         ):
             worksheet.append([row[header] for header in cls.ERP_HEADERS])
@@ -695,6 +744,7 @@ class CommandService:
                             else component_value
                         ),
                         "component_mpn": library_match.mpn if library_match else None,
+                        "component_reference": library_match.reference if library_match else None,
                         "supplier_code": library_match.supplier_code if library_match else None,
                         "supplier_name": None,
                         "supplier_link": None,
@@ -715,6 +765,7 @@ class CommandService:
                         library_match.mpn or library_match.value or component_value
                     )
                     aggregated_components[aggregate_key]["component_mpn"] = library_match.mpn
+                    aggregated_components[aggregate_key]["component_reference"] = library_match.reference
                     aggregated_components[aggregate_key]["supplier_code"] = library_match.supplier_code
                     aggregated_components[aggregate_key]["feeder_type"] = normalize_component_feeder_type(library_match.feeder_type)
                     aggregated_components[aggregate_key]["component_library_id"] = library_match.id
@@ -765,6 +816,7 @@ class CommandService:
                     "footprint": line["footprint"],
                     "component_name": line["component_name"],
                     "component_mpn": line["component_mpn"],
+                    "component_reference": line.get("component_reference"),
                     "supplier_code": line["supplier_code"],
                     "supplier_name": line["supplier_name"],
                     "supplier_link": line["supplier_link"],
@@ -785,6 +837,14 @@ class CommandService:
             f"{line['component_type']} | {line['value']} | {line['footprint']}": line["quantity"]
             for line in aggregated_lines
         }
+
+        # Attache la quantité reçue (suivi réception) à chaque ligne agrégée.
+        receipts = {
+            receipt.line_key: receipt.qty_received
+            for receipt in db.query(CommandReceipt).filter(CommandReceipt.command_id == command_id).all()
+        }
+        for line in aggregated_lines:
+            line["qty_received"] = receipts.get(line["key"], 0)
 
         return {
             "id": command.id,

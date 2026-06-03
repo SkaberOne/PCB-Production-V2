@@ -17,6 +17,7 @@ from ..schemas.marketplace import (
     UpdateCommandRequest,
 )
 from ..services.command_service import CommandService
+from ..services.erp_defaults_service import ErpDefaultsService
 
 router = APIRouter()
 
@@ -139,17 +140,21 @@ def export_command_erp(
     request: ExportCommandErpRequest,
     db: Session = Depends(get_db),
 ):
-    """Export a command as an ERP purchase-list workbook."""
+    """Export a command as an ERP purchase-list workbook (12 colonnes)."""
     try:
+        # Merge ERP defaults (admin screen) with per-export overrides from the request.
+        defaults = ErpDefaultsService.as_dict(db)
+        for field in ("project", "unit", "requester", "validator", "delay", "remark", "default_supplier"):
+            value = getattr(request, field, None)
+            if value is not None:
+                defaults[field] = value
+
         workbook_stream, filename = CommandService.export_command_erp_workbook(
             db=db,
             command_id=command_id,
-            project=request.project,
-            erp_status=request.erp_status,
-            delay=request.delay,
-            remark=request.remark,
-            validator=request.validator,
-            default_supplier=request.default_supplier,
+            defaults=defaults,
+            sort_strategy=request.sort_strategy,
+            priority_supplier=request.priority_supplier,
             line_overrides={
                 str(item.get("key")): int(item.get("quantity_to_order") or 0)
                 for item in (request.line_overrides or [])

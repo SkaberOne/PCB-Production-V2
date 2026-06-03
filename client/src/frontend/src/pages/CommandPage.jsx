@@ -1,10 +1,11 @@
 import React from 'react';
-import AddShoppingCartRoundedIcon from '@mui/icons-material/AddShoppingCartRounded';
 import SearchRoundedIcon from '@mui/icons-material/SearchRounded';
 import DownloadRoundedIcon from '@mui/icons-material/DownloadRounded';
+import RefreshRoundedIcon from '@mui/icons-material/RefreshRounded';
 import RestartAltRoundedIcon from '@mui/icons-material/RestartAltRounded';
 import {
     Alert,
+    Box,
     Button,
     Card,
     CardContent,
@@ -29,8 +30,8 @@ import { useNavigate } from 'react-router-dom';
 import EmptyState from '../components/common/EmptyState';
 import GuideBanner from '../components/common/GuideBanner';
 import PageHeader from '../components/common/PageHeader';
-import CommandLineRow from '../components/command/CommandLineRow';
 import ErpContextForm, { EMPTY_ERP } from '../components/command/ErpContextForm';
+import ProcurementTable from '../components/command/ProcurementTable';
 import StockStatusChip from '../components/command/StockStatusChip';
 import { useBomSession } from '../context/BomSessionContext';
 import { colors } from '../theme';
@@ -93,6 +94,8 @@ function CommandPage() {
     const [feedback, setFeedback] = React.useState({ type: 'info', message: '' });
     const [isGenerating, setIsGenerating] = React.useState(false);
     const [isExporting, setIsExporting] = React.useState(false);
+    const [refreshNonce, setRefreshNonce] = React.useState(0);
+    const [refreshState, setRefreshState] = React.useState({ loading: false, error: null });
     const [isLoadingCommand, setIsLoadingCommand] = React.useState(false);
     const [planningSyncState, setPlanningSyncState] = React.useState({ loading: false, type: 'info', message: '' });
     const [page, setPage] = React.useState(0);
@@ -406,32 +409,13 @@ function CommandPage() {
 
         commandLoadDebounceRef.current = setTimeout(async () => {
             try {
-                const listResponse = await apiClient.get(`/marketplace/commands`, {
-                    params: { production_id: activeProduction.id, limit: 20, offset: 0 },
-                });
-                const recentCommands = listResponse.data?.data || [];
-
-                // Sequential fetch with early exit — stops as soon as matching command found
-                for (const candidate of recentCommands) {
-                    if (cancelled || !candidate?.id) continue;
-
-                    try {
-                        const summaryResponse = await apiClient.get(`/marketplace/commands/${candidate.id}/summary`);
-                        const summary = summaryResponse?.data;
-
-                        if (buildCommandSummarySignature(summary) === commandContextSignature) {
-                            if (!cancelled) {
-                                setCommandSummary(summary);
-                                setCommandName(summary?.name || buildDefaultCommandName(selectedEntries));
-                            }
-                            return;
-                        }
-                    } catch {
-                        // Skip failed summary — continue to next candidate
-                    }
+                // Charge la commande implicite canonique de la production (même ancre que le backend).
+                const response = await apiClient.get(`/marketplace/productions/${activeProduction.id}/command`);
+                const summary = response?.data;
+                if (!cancelled) {
+                    setCommandSummary(summary || null);
+                    if (summary?.name) setCommandName(summary.name);
                 }
-
-                if (!cancelled) setCommandSummary(null);
             } catch {
                 if (!cancelled) setCommandSummary(null);
             } finally {
@@ -495,48 +479,79 @@ function CommandPage() {
         return errorData?.detail || errorData?.message || requestError.message || 'Erreur inconnue';
     };
 
-    const generateCommand = async () => {
-        if (!selectedEntries.length) {
-            setFeedback({ type: 'error', message: "Aucune BOM sélectionnée n'est disponible pour générer une commande." });
-            return;
-        }
-        if (!stockValidation.isValidated) {
-            setFeedback({ type: 'error', message: "Valide d'abord la vérification du stock dans l'onglet BOM avant de générer la commande." });
-            return;
-        }
-        if (!isPlanningReady || planningSyncState.loading) {
-            setFeedback({ type: 'error', message: 'Les révisions BOM sont encore en cours de rechargement pour recalculer le stock. Réessaie dans un instant.' });
-            return;
-        }
-        const normalizedName = commandName.trim();
-        if (!normalizedName) {
-            setFeedback({ type: 'error', message: 'Le nom de commande est obligatoire.' });
-            return;
-        }
-
+    // Synchronise la commande implicite de la production (remplace « Générer »).
+    const syncCommand = React.useCallback(async () => {
+        if (!activeProduction?.id || !selectedEntries.length) return;
+        if (!stockValidation.isValidated || !isPlanningReady || planningSyncState.loading) return;
         setIsGenerating(true);
-        setFeedback({ type: 'info', message: '' });
-
         try {
-            const summaryResponse = await apiClient.post(`/marketplace/commands/generate`, {
-                name: normalizedName,
-                notes: `Généré depuis ${selectedEntries.length} BOM sélectionnée(s)`,
-                production_id: activeProduction?.id || null,
-                items: buildCommandGenerationItems(selectedEntries, bomWorkspace.quantitiesByReference),
-            });
-            setCommandSummary(summaryResponse.data);
-            setQuantityOverrides({});
-            setFeedback({ type: 'success', message: `Commande ${summaryResponse.data.name} générée avec succès.` });
+            const response = await apiClient.post(
+                `/marketplace/productions/${activeProduction.id}/command/sync`,
+                { items: buildCommandGenerationItems(selectedEntries, bomWorkspace.quantitiesByReference) },
+            );
+            setCommandSummary(response.data);
         } catch (requestError) {
-            // Do NOT wipe existing commandSummary on error — preserve last valid state
             setFeedback({
                 type: 'error',
-                message: requestError.response?.data?.detail || requestError.message || 'Erreur lors de la génération de commande',
+                message: requestError.response?.data?.detail || requestError.message || 'Erreur lors de la synchronisation de la commande',
             });
         } finally {
             setIsGenerating(false);
         }
-    };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [activeProduction?.id, selectedEntries, stockValidation.isValidated, isPlanningReady, planningSyncState.loading, bomWorkspace.quantitiesByReference]);
+
+    // Auto-synchronise la commande implicite dès que le stock est validé.
+    const lastSyncedSignature = React.useRef(null);
+    React.useEffect(() => {
+        if (!stockValidation.isValidated || !selectedEntries.length || !isPlanningReady || planningSyncState.loading) {
+            return;
+        }
+        if (isCommandCurrent || isGenerating) return;
+        if (lastSyncedSignature.current === commandContextSignature) return;
+        lastSyncedSignature.current = commandContextSignature;
+        syncCommand();
+    }, [
+        stockValidation.isValidated, selectedEntries.length, isPlanningReady, planningSyncState.loading,
+        isCommandCurrent, isGenerating, commandContextSignature, syncCommand,
+    ]);
+
+    // Préremplit le formulaire ERP avec les valeurs par défaut (champs vides seulement).
+    React.useEffect(() => {
+        let cancelled = false;
+        apiClient.get('/marketplace/erp-defaults').then((res) => {
+            if (cancelled) return;
+            const d = res.data || {};
+            setExportContext((cur) => ({
+                ...cur,
+                projet: cur.projet || d.project || '',
+                delai: cur.delai || d.delay || '',
+                remarque: cur.remarque || d.remark || '',
+                validateur: cur.validateur || d.validator || '',
+                fournisseurParDefaut: cur.fournisseurParDefaut || d.default_supplier || '',
+            }));
+        }).catch(() => {});
+        return () => { cancelled = true; };
+    }, []);
+
+    const procurementRows = React.useMemo(() => {
+        const byKey = new Map(commandLines.map((line) => [line.key, line]));
+        return effectiveSummaryLines.map((line) => {
+            const merged = byKey.get(line.key);
+            return {
+                key: line.key,
+                componentName: merged?.componentName || line.component_name || line.value,
+                value: line.value,
+                footprint: line.footprint,
+                requiredQuantity: merged?.requiredQuantity ?? line.quantity ?? 0,
+                stockAvailableQty: merged?.stockAvailableQty ?? 0,
+                quantityToOrder: quantityOverrides[line.key] ?? merged?.quantityToOrder ?? line.quantity ?? 0,
+                componentLibraryId: line.component_library_id,
+                mpn: line.component_mpn,
+                qtyReceived: line.qty_received ?? 0,
+            };
+        });
+    }, [effectiveSummaryLines, commandLines, quantityOverrides]);
 
     const exportCommandToErp = async () => {
         if (!stockValidation.isValidated) {
@@ -555,10 +570,7 @@ function CommandPage() {
             setFeedback({ type: 'error', message: 'La commande backend ne correspond plus à la sélection ou aux quantités courantes. Régénère-la avant export.' });
             return;
         }
-        if (!exportContext.projet.trim() || !exportContext.statut.trim() || !exportContext.delai.trim() || !exportContext.validateur.trim()) {
-            setFeedback({ type: 'error', message: "Renseigne au minimum Projet, Statut, Délai et Validateur avant l'export ERP." });
-            return;
-        }
+        // Les champs ERP non renseignés sont complétés par les valeurs par défaut côté backend.
 
         setIsExporting(true);
         setFeedback({ type: 'info', message: '' });
@@ -668,19 +680,20 @@ function CommandPage() {
                     <Stack direction="row" spacing={1}>
                         <Button
                             variant="contained"
-                            startIcon={<AddShoppingCartRoundedIcon />}
-                            disabled={!canGenerateCommand || isGenerating}
-                            onClick={generateCommand}
-                        >
-                            {isGenerating ? 'Génération...' : 'Générer la commande'}
-                        </Button>
-                        <Button
-                            variant="contained"
                             startIcon={<DownloadRoundedIcon />}
                             disabled={!canExportCommand}
                             onClick={exportCommandToErp}
                         >
-                            {isExporting ? 'Export...' : 'Export ERP'}
+                            {isExporting ? 'Export...' : 'Exporter ERP'}
+                        </Button>
+                        <Button
+                            variant="contained"
+                            color="secondary"
+                            startIcon={<RefreshRoundedIcon />}
+                            disabled={!isCommandCurrent || refreshState.loading}
+                            onClick={() => setRefreshNonce((n) => n + 1)}
+                        >
+                            {refreshState.loading ? 'Actualisation...' : 'Actualiser'}
                         </Button>
                         <Button
                             variant="outlined"
@@ -776,198 +789,25 @@ function CommandPage() {
                 </CardContent>
             </Card>
 
-            {/* ── Contexte export ERP ── */}
+            {/* ── Tableau unique : BOM prod + fournisseur + tri + qté reçue ── */}
+            {refreshState.error ? <Alert severity="warning">{refreshState.error}</Alert> : null}
+            <Card sx={CARD_SX}>
+                <CardContent>
+                    <ProcurementTable
+                        rows={procurementRows}
+                        commandId={commandSummary?.command_id || commandSummary?.id}
+                        refreshNonce={refreshNonce}
+                        onRefreshState={setRefreshState}
+                    />
+                </CardContent>
+            </Card>
+
+            {/* ── Champs pour le fichier ERP (pleine largeur, sous le tableau) ── */}
             <ErpContextForm
                 exportContext={exportContext}
                 onFieldChange={handleExportContextChange}
                 isExporting={isExporting}
             />
-
-            {/* ── Liste commande + Aperçu session ── */}
-            <Grid container spacing={3}>
-                <Grid item xs={12} xl={8}>
-                    <Card sx={CARD_SX}>
-                        <CardContent>
-                            <Stack direction="row" justifyContent="space-between" alignItems="flex-start" sx={{ mb: 2 }}>
-                                <div>
-                                    <Typography variant="h6" sx={{ color: colors.textPrimary, fontWeight: 600 }}>
-                                        Liste de commande
-                                    </Typography>
-                                    <Typography component="div" variant="body2" sx={{ color: colors.textSecondary }}>
-                                        Composants agrégés depuis les BOM sélectionnées — colonne Commande éditable (ex : arrondi bobine).
-                                        {overridesCount > 0 && (
-                                            <Chip
-                                                label={`${overridesCount} qté modifiée${overridesCount > 1 ? 's' : ''}`}
-                                                size="small"
-                                                sx={{ ml: 1, backgroundColor: 'rgba(5,150,105,0.18)', color: '#34d399', fontSize: '0.72rem' }}
-                                            />
-                                        )}
-                                    </Typography>
-                                </div>
-                                <TextField
-                                    size="small"
-                                    placeholder="Filtrer composant, valeur, empreinte..."
-                                    aria-label="Filtrer les composants de la commande"
-                                    value={filterText}
-                                    onChange={(e) => { setFilterText(e.target.value); setPage(0); }}
-                                    sx={{ width: 260 }}
-                                    InputProps={{
-                                        startAdornment: (
-                                            <InputAdornment position="start">
-                                                <SearchRoundedIcon sx={{ color: colors.textSecondary, fontSize: 18 }} />
-                                            </InputAdornment>
-                                        ),
-                                    }}
-                                />
-                            </Stack>
-
-                            <TableContainer sx={compactTableContainerSx}>
-                                <Table sx={compactTableSx}>
-                                    <colgroup>
-                                        <col style={{ width: '14%' }} />
-                                        <col style={{ width: '10%' }} />
-                                        <col style={{ width: '10%' }} />
-                                        <col style={{ width: '8%' }} />
-                                        <col style={{ width: '8%' }} />
-                                        <col style={{ width: '10%' }} />
-                                        <col style={{ width: '8%' }} />
-                                        <col style={{ width: '32%' }} />
-                                    </colgroup>
-                                    <TableHead>
-                                        <TableRow>
-                                            {SORTABLE_COLUMNS.map(({ key, label }) => (
-                                                <TableCell
-                                                    key={key}
-                                                    sortDirection={sortConfig.column === key ? sortConfig.direction : false}
-                                                >
-                                                    <TableSortLabel
-                                                        active={sortConfig.column === key}
-                                                        direction={sortConfig.column === key ? sortConfig.direction : 'asc'}
-                                                        onClick={() => handleSortChange(key)}
-                                                    >
-                                                        {label}
-                                                    </TableSortLabel>
-                                                </TableCell>
-                                            ))}
-                                        </TableRow>
-                                    </TableHead>
-                                    <TableBody>
-                                        {!commandLines.length ? (
-                                            <TableRow>
-                                                <TableCell colSpan={8} sx={{ py: 3 }}>
-                                                    <EmptyState
-                                                        eyebrow="État vide"
-                                                        title="Aucune commande générée"
-                                                        description="Charge une sélection BOM, valide le stock dans l'onglet BOM, puis reviens ici pour préparer la commande."
-                                                        actionLabel="Sélectionner une BOM"
-                                                        onAction={() => navigate('/bom')}
-                                                    />
-                                                </TableCell>
-                                            </TableRow>
-                                        ) : filteredSortedLines.length === 0 ? (
-                                            <TableRow>
-                                                <TableCell colSpan={8} sx={{ py: 2, textAlign: 'center', color: colors.textSecondary }}>
-                                                    Aucun résultat pour « {filterText} »
-                                                </TableCell>
-                                            </TableRow>
-                                        ) : (
-                                            paginatedCommandLines.map((line) => (
-                                                <CommandLineRow
-                                                    key={line.key}
-                                                    line={line}
-                                                    override={quantityOverrides[line.key]}
-                                                    onOverrideChange={handleQuantityOverride}
-                                                />
-                                            ))
-                                        )}
-                                    </TableBody>
-                                </Table>
-                            </TableContainer>
-
-                            {filteredSortedLines.length > 0 && (
-                                <TablePagination
-                                    component="div"
-                                    count={filteredSortedLines.length}
-                                    page={page}
-                                    onPageChange={(_event, nextPage) => setPage(nextPage)}
-                                    rowsPerPage={rowsPerPage}
-                                    onRowsPerPageChange={(event) => {
-                                        setRowsPerPage(parseInt(event.target.value, 10));
-                                        setPage(0);
-                                    }}
-                                    rowsPerPageOptions={[25, 50, 100]}
-                                    sx={compactPaginationSx}
-                                    labelRowsPerPage="Lignes"
-                                />
-                            )}
-                        </CardContent>
-                    </Card>
-                </Grid>
-
-                {/* ── Aperçu session ── */}
-                <Grid item xs={12} xl={4}>
-                    <Stack spacing={3}>
-                        <Card sx={CARD_SX}>
-                            <CardContent>
-                                <Typography variant="h6" sx={{ mb: 1, color: colors.textPrimary, fontWeight: 600 }}>
-                                    Règles appliquées
-                                </Typography>
-                                <Typography variant="body2" sx={{ color: colors.textSecondary }}>
-                                    La liste garde toutes les lignes, puis déduit le stock disponible vérifié dans BOM pour calculer la quantité à commander.
-                                    Les poses manuelles restent visibles. Les quantités modifiées manuellement (colonne Commande) sont envoyées telles quelles à l'ERP.
-                                </Typography>
-                            </CardContent>
-                        </Card>
-
-                        <Card>
-                            <CardContent>
-                                <Typography variant="h6" sx={{ mb: 2 }}>
-                                    Aperçu session
-                                </Typography>
-                                <Stack spacing={1}>
-                                    <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                                        Sélection : {selectionLabel || 'Aucune'}
-                                    </Typography>
-                                    <Stack direction="row" alignItems="center" spacing={1}>
-                                        <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                                            Stock validé :
-                                        </Typography>
-                                        <StockStatusChip
-                                            isValidated={stockValidation.isValidated}
-                                            isLoading={planningSyncState.loading}
-                                        />
-                                    </Stack>
-                                    <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                                        BOM chargées : {loadedEntryCount}/{selectedEntries.length || 0}
-                                    </Typography>
-                                    <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                                        Lignes agrégées : {commandLines.length}
-                                        {filterText ? ` (${filteredSortedLines.length} affichées)` : ''}
-                                    </Typography>
-                                    <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                                        Besoin total : {totalRequiredQuantity}
-                                    </Typography>
-                                    <Typography component="div" variant="body2" sx={{ color: 'text.secondary' }}>
-                                        À commander : {totalOrderQuantity}
-                                        {overridesCount > 0 && (
-                                            <Tooltip title="Inclut les quantités modifiées manuellement">
-                                                <Chip
-                                                    label="modifié"
-                                                    size="small"
-                                                    sx={{ ml: 1, height: 18, fontSize: '0.68rem', backgroundColor: 'rgba(5,150,105,0.18)', color: '#34d399' }}
-                                                />
-                                            </Tooltip>
-                                        )}
-                                    </Typography>
-                                    <Typography variant="caption" sx={{ color: 'text.disabled' }}>
-                                        Calculé sur {selectedEntries.length} BOM
-                                    </Typography>
-                                </Stack>
-                            </CardContent>
-                        </Card>
-                    </Stack>
-                </Grid>
-            </Grid>
         </Stack>
     );
 }
