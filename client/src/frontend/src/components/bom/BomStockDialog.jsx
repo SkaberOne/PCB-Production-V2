@@ -19,7 +19,7 @@ import { compactInputSx } from '../../utils/compactTable';
 import { getStockStatusChipColor, normalizeStockStatus } from '../../utils/bomStockUi';
 
 const panelCardSx = {
-    backgroundColor: '#111111',
+    backgroundColor: '#18181b',
     border: '1px solid #27272a',
 };
 

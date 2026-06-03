@@ -103,9 +103,9 @@ function KindChip({ kind }) {
                 height: 18,
                 fontSize: '0.6rem',
                 fontWeight: 700,
-                backgroundColor: isCommon ? 'rgba(99,102,241,0.12)' : 'rgba(245,158,11,0.1)',
-                color: isCommon ? '#818cf8' : '#f59e0b',
-                border: `1px solid ${isCommon ? 'rgba(99,102,241,0.25)' : 'rgba(245,158,11,0.25)'}`,
+                backgroundColor: isCommon ? 'rgba(16,185,129,0.12)' : 'rgba(245,158,11,0.1)',
+                color: isCommon ? '#a855f7' : '#f59e0b',
+                border: `1px solid ${isCommon ? 'rgba(16,185,129,0.25)' : 'rgba(245,158,11,0.25)'}`,
             }}
         />
     );
@@ -224,7 +224,7 @@ function DeleteMachineDialog({ machine, open, onClose, onDeleted }) {
             <DialogActions sx={{ px: 3, pb: 2 }}>
                 <Button onClick={onClose} sx={{ color: '#71717a' }}>Annuler</Button>
                 <Button onClick={handleDelete} variant="contained" disabled={loading}
-                    sx={{ backgroundColor: '#dc2626', '&:hover': { backgroundColor: '#b91c1c' } }}>
+                    sx={{ backgroundColor: '#ef4444', '&:hover': { backgroundColor: '#dc2626' } }}>
                     {loading ? <CircularProgress size={16} sx={{ color: '#fff' }} /> : 'Supprimer'}
                 </Button>
             </DialogActions>
@@ -340,7 +340,7 @@ function DeleteCartDialog({ cart, open, onClose, onDeleted }) {
             <DialogActions sx={{ px: 3, pb: 2 }}>
                 <Button onClick={onClose} sx={{ color: '#71717a' }}>Annuler</Button>
                 <Button onClick={handleDelete} variant="contained" disabled={loading}
-                    sx={{ backgroundColor: '#dc2626', '&:hover': { backgroundColor: '#b91c1c' } }}>
+                    sx={{ backgroundColor: '#ef4444', '&:hover': { backgroundColor: '#dc2626' } }}>
                     {loading ? <CircularProgress size={16} sx={{ color: '#fff' }} /> : 'Supprimer'}
                 </Button>
             </DialogActions>
@@ -426,7 +426,7 @@ function EditCartDialog({ cart, open, onClose, onSaved }) {
             <DialogActions sx={{ px: 3, pb: 2 }}>
                 <Button onClick={onClose} sx={{ color: '#71717a' }}>Annuler</Button>
                 <Button onClick={handleSubmit} variant="contained" disabled={loading}
-                    sx={{ backgroundColor: '#2563eb', '&:hover': { backgroundColor: '#1d4ed8' } }}>
+                    sx={{ backgroundColor: '#3b82f6', '&:hover': { backgroundColor: '#2563eb' } }}>
                     {loading ? <CircularProgress size={16} sx={{ color: '#fff' }} /> : 'Enregistrer'}
                 </Button>
             </DialogActions>
@@ -440,6 +440,10 @@ function MachineCard({ machine, selected, onSelect, onDelete }) {
     return (
         <Card
             onClick={() => onSelect(machine)}
+            role="button"
+            tabIndex={0}
+            aria-pressed={selected}
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelect(machine); } }}
             sx={{
                 cursor: 'pointer',
                 backgroundColor: selected ? 'rgba(5,150,105,0.08)' : '#18181b',
@@ -468,8 +472,9 @@ function MachineCard({ machine, selected, onSelect, onDelete }) {
                     <Tooltip title="Supprimer">
                         <IconButton
                             size="small"
+                            aria-label={`Supprimer la machine ${machine.name}`}
                             onClick={(e) => { e.stopPropagation(); onDelete(machine); }}
-                            sx={{ color: '#52525b', '&:hover': { color: '#dc2626', backgroundColor: 'rgba(220,38,38,0.08)' } }}
+                            sx={{ color: '#52525b', '&:hover': { color: '#ef4444', backgroundColor: 'rgba(239,68,68,0.08)' } }}
                         >
                             <DeleteRoundedIcon sx={{ fontSize: 16 }} />
                         </IconButton>
@@ -536,12 +541,12 @@ function SequenceTab({ summary, summaryLoading, activeProduction, onAssignProduc
                     </Typography>
                     <Box sx={{ display: 'flex', gap: 0.5 }}>
                         <Tooltip title="Actualiser">
-                            <IconButton size="small" onClick={loadMachines} sx={{ color: '#52525b' }}>
+                            <IconButton size="small" aria-label="Actualiser la liste des machines" onClick={loadMachines} sx={{ color: '#52525b' }}>
                                 <RefreshRoundedIcon sx={{ fontSize: 16 }} />
                             </IconButton>
                         </Tooltip>
                         <Tooltip title="Nouvelle machine">
-                            <IconButton size="small" onClick={() => setCreateOpen(true)}
+                            <IconButton size="small" aria-label="Nouvelle machine" onClick={() => setCreateOpen(true)}
                                 sx={{ color: '#059669', backgroundColor: 'rgba(5,150,105,0.08)', '&:hover': { backgroundColor: 'rgba(5,150,105,0.15)' } }}>
                                 <AddRoundedIcon sx={{ fontSize: 16 }} />
                             </IconButton>
@@ -745,13 +750,14 @@ function FeederTab() {
                     <TextField
                         size="small"
                         placeholder="Recherche…"
+                        aria-label="Rechercher un feeder"
                         value={search}
                         onChange={(e) => { setSearch(e.target.value); setPage(0); }}
                         sx={{ width: 220, '& .MuiOutlinedInput-root': { fontSize: '0.8rem', '& fieldset': { borderColor: '#3f3f46' } }, '& input': { color: '#f4f4f5', py: 0.75 } }}
                         InputLabelProps={{ sx: { color: '#71717a' } }}
                     />
                     <Tooltip title="Actualiser">
-                        <IconButton size="small" onClick={load} sx={{ color: '#52525b' }}>
+                        <IconButton size="small" aria-label="Actualiser la liste des feeders" onClick={load} sx={{ color: '#52525b' }}>
                             <RefreshRoundedIcon sx={{ fontSize: 16 }} />
                         </IconButton>
                     </Tooltip>
@@ -800,9 +806,9 @@ function FeederTab() {
                                                     size="small"
                                                     sx={{
                                                         height: 18, fontSize: '0.65rem',
-                                                        backgroundColor: f.fixed_cart_kind === 'COMMON' ? 'rgba(99,102,241,0.12)' : 'rgba(245,158,11,0.1)',
-                                                        color: f.fixed_cart_kind === 'COMMON' ? '#818cf8' : '#f59e0b',
-                                                        border: `1px solid ${f.fixed_cart_kind === 'COMMON' ? 'rgba(99,102,241,0.25)' : 'rgba(245,158,11,0.25)'}`,
+                                                        backgroundColor: f.fixed_cart_kind === 'COMMON' ? 'rgba(16,185,129,0.12)' : 'rgba(245,158,11,0.1)',
+                                                        color: f.fixed_cart_kind === 'COMMON' ? '#a855f7' : '#f59e0b',
+                                                        border: `1px solid ${f.fixed_cart_kind === 'COMMON' ? 'rgba(16,185,129,0.25)' : 'rgba(245,158,11,0.25)'}`,
                                                     }}
                                                 />
                                             ) : '—'}
@@ -882,7 +888,7 @@ function ChariotTab() {
                 </Typography>
                 <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
                     <Tooltip title="Actualiser">
-                        <IconButton size="small" onClick={load} sx={{ color: '#52525b' }}>
+                        <IconButton size="small" aria-label="Actualiser la liste des chariots" onClick={load} sx={{ color: '#52525b' }}>
                             <RefreshRoundedIcon sx={{ fontSize: 16 }} />
                         </IconButton>
                     </Tooltip>
@@ -958,14 +964,14 @@ function ChariotTab() {
                                             <TableCell sx={{ ...tdSx, textAlign: 'right', pr: 1 }}>
                                                 <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 0.5 }}>
                                                     <Tooltip title="Modifier">
-                                                        <IconButton size="small" onClick={() => setEditTarget(cart)}
+                                                        <IconButton size="small" aria-label={`Modifier le chariot ${cart.name}`} onClick={() => setEditTarget(cart)}
                                                             sx={{ color: '#52525b', '&:hover': { color: '#3b82f6', backgroundColor: 'rgba(59,130,246,0.08)' } }}>
                                                             <EditRoundedIcon sx={{ fontSize: 16 }} />
                                                         </IconButton>
                                                     </Tooltip>
                                                     <Tooltip title="Supprimer">
-                                                        <IconButton size="small" onClick={() => setDeleteTarget(cart)}
-                                                            sx={{ color: '#52525b', '&:hover': { color: '#dc2626', backgroundColor: 'rgba(220,38,38,0.08)' } }}>
+                                                        <IconButton size="small" aria-label={`Supprimer le chariot ${cart.name}`} onClick={() => setDeleteTarget(cart)}
+                                                            sx={{ color: '#52525b', '&:hover': { color: '#ef4444', backgroundColor: 'rgba(239,68,68,0.08)' } }}>
                                                             <DeleteRoundedIcon sx={{ fontSize: 16 }} />
                                                         </IconButton>
                                                     </Tooltip>

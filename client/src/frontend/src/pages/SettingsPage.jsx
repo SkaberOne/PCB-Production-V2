@@ -1,5 +1,6 @@
 import React from 'react';
 import apiClient from '../api/client';
+import ConfirmDialog from '../components/common/ConfirmDialog';
 import ContentCopyRoundedIcon from '@mui/icons-material/ContentCopyRounded';
 import DownloadRoundedIcon from '@mui/icons-material/DownloadRounded';
 import DeleteOutlineRoundedIcon from '@mui/icons-material/DeleteOutlineRounded';
@@ -452,6 +453,7 @@ const SettingsTypeRuleTableRow = React.memo(function SettingsTypeRuleTableRow({
                             size="small"
                             onClick={handleMoveUp}
                             disabled={!canMoveUp}
+                            aria-label="Monter la règle dans la liste"
                             sx={{ border: '1px solid var(--border)', borderRadius: 1 }}
                         >
                             <KeyboardArrowUpRoundedIcon fontSize="small" />
@@ -460,6 +462,7 @@ const SettingsTypeRuleTableRow = React.memo(function SettingsTypeRuleTableRow({
                             size="small"
                             onClick={handleMoveDown}
                             disabled={!canMoveDown}
+                            aria-label="Descendre la règle dans la liste"
                             sx={{ border: '1px solid var(--border)', borderRadius: 1 }}
                         >
                             <KeyboardArrowDownRoundedIcon fontSize="small" />
@@ -570,6 +573,7 @@ function SettingsPage() {
     const [componentTypeRefreshing, setComponentTypeRefreshing] = React.useState(false);
     const [componentTypeRuleCreating, setComponentTypeRuleCreating] = React.useState(false);
     const [componentTypeRuleDeletingId, setComponentTypeRuleDeletingId] = React.useState(null);
+    const [confirmState, setConfirmState] = React.useState(null);
     const [componentTypeRuleDuplicatingId, setComponentTypeRuleDuplicatingId] = React.useState(null);
     const [componentTypeRuleExporting, setComponentTypeRuleExporting] = React.useState(false);
     const [componentTypeRuleImporting, setComponentTypeRuleImporting] = React.useState(false);
@@ -1000,15 +1004,11 @@ function SettingsPage() {
         }
     };
 
-    const deleteTypeRule = React.useCallback(async (rule) => {
+    const performDeleteTypeRule = React.useCallback(async (rule) => {
         if (!rule?.id) {
             return;
         }
         const ruleLabel = String(rule.reference_prefix || '').trim() || `#${rule.id}`;
-        if (!window.confirm(`Supprimer la règle ${ruleLabel} ?`)) {
-            return;
-        }
-
         setComponentTypeRuleDeletingId(rule.id);
         setComponentTypeRuleFeedback(emptyFeedback);
         try {
@@ -1032,11 +1032,21 @@ function SettingsPage() {
         }
     }, [fetchFullComponentTypeRuleSnapshot, pushTypeRuleHistory]);
 
-    const resetTypeRules = async () => {
-        if (!window.confirm('Réinitialiser toutes les règles de type aux valeurs par défaut ?')) {
+    const deleteTypeRule = React.useCallback((rule) => {
+        if (!rule?.id) {
             return;
         }
+        const ruleLabel = String(rule.reference_prefix || '').trim() || `#${rule.id}`;
+        setConfirmState({
+            title: 'Supprimer la règle',
+            message: `La règle ${ruleLabel} sera supprimée. Cette action est irréversible.`,
+            confirmLabel: 'Supprimer',
+            severity: 'error',
+            onConfirm: () => performDeleteTypeRule(rule),
+        });
+    }, [performDeleteTypeRule]);
 
+    const performResetTypeRules = async () => {
         setComponentTypeRuleResetting(true);
         setComponentTypeRuleFeedback(emptyFeedback);
         try {
@@ -1059,6 +1069,16 @@ function SettingsPage() {
         } finally {
             setComponentTypeRuleResetting(false);
         }
+    };
+
+    const resetTypeRules = () => {
+        setConfirmState({
+            title: 'Réinitialiser les règles',
+            message: 'Toutes les règles de type seront réinitialisées aux valeurs par défaut. Cette action est irréversible.',
+            confirmLabel: 'Réinitialiser',
+            severity: 'warning',
+            onConfirm: () => performResetTypeRules(),
+        });
     };
 
     const duplicateTypeRule = React.useCallback(async (rule) => {
@@ -1724,7 +1744,7 @@ function SettingsPage() {
                 </Alert>
             ) : null}
 
-            <Card sx={{ backgroundColor: '#111827', border: '1px solid #1f2937' }}>
+            <Card sx={{ backgroundColor: '#18181b', border: '1px solid #1f2937' }}>
                 <CardContent>
                         <Stack spacing={3}>
                             <Stack direction="row" spacing={1.5} alignItems="center">
@@ -1859,7 +1879,7 @@ function SettingsPage() {
                                                                                 sx={{
                                                                                     color: 'inherit',
                                                                                     '&.Mui-active': { color: 'inherit' },
-                                                                                    '& .MuiTableSortLabel-icon': { color: '#94a3b8 !important' },
+                                                                                    '& .MuiTableSortLabel-icon': { color: '#a1a1aa !important' },
                                                                                 }}
                                                                             >
                                                                                 {column.label}
@@ -2090,7 +2110,7 @@ function SettingsPage() {
                 </CardContent>
             </Card>
 
-            <Card sx={{ backgroundColor: '#111827', border: '1px solid #1f2937' }}>
+            <Card sx={{ backgroundColor: '#18181b', border: '1px solid #1f2937' }}>
                 <CardContent>
                     <Stack spacing={3}>
                         <Stack direction={{ xs: 'column', md: 'row' }} spacing={1.5} alignItems={{ xs: 'flex-start', md: 'center' }}>
@@ -2611,6 +2631,18 @@ function SettingsPage() {
                     );
                 })}
             </Grid>
+            <ConfirmDialog
+                open={Boolean(confirmState)}
+                title={confirmState?.title || ''}
+                message={confirmState?.message || ''}
+                confirmLabel={confirmState?.confirmLabel || 'Confirmer'}
+                severity={confirmState?.severity || 'error'}
+                onConfirm={() => {
+                    confirmState?.onConfirm?.();
+                    setConfirmState(null);
+                }}
+                onClose={() => setConfirmState(null)}
+            />
         </Stack>
     );
 }

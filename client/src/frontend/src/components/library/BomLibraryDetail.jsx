@@ -24,6 +24,7 @@ import {
     Typography,
 } from '@mui/material';
 import { formatStoredBomDate } from '../../utils/bomFileExplorer';
+import ConfirmDialog from '../common/ConfirmDialog';
 
 const cardSx = {
     backgroundColor: '#18181b',
@@ -45,7 +46,7 @@ const headCellSx = {
     fontSize: '0.75rem',
     textTransform: 'uppercase',
     letterSpacing: '0.06em',
-    backgroundColor: '#0f0f12',
+    backgroundColor: '#18181b',
 };
 
 /**
@@ -61,6 +62,7 @@ function BomLibraryDetail({
     onReload,
 }) {
     const navigate = useNavigate();
+    const [pendingDelete, setPendingDelete] = React.useState(null);
 
     if (!referenceNode) {
         return (
@@ -90,6 +92,7 @@ function BomLibraryDetail({
     };
 
     return (
+        <>
         <Card sx={cardSx}>
             <CardContent sx={{ p: 3 }}>
                 {/* Header méta de la référence */}
@@ -111,7 +114,7 @@ function BomLibraryDetail({
                                 onChange={(e) => onCategoryChange?.(referenceNode.bomReferenceId, e.target.value)}
                                 sx={{
                                     minWidth: 180,
-                                    backgroundColor: '#0f0f12',
+                                    backgroundColor: '#18181b',
                                     fontSize: '0.875rem',
                                     '& .MuiSelect-select': { py: 0.75 },
                                 }}
@@ -219,8 +222,8 @@ function BomLibraryDetail({
                                                 <Tooltip title="Supprimer cette révision">
                                                     <IconButton
                                                         size="small"
-                                                        onClick={() => onDeleteRevision?.(item)}
-                                                        sx={{ color: '#71717a', '&:hover': { color: '#ef4444' } }}
+                                                        onClick={() => setPendingDelete(item)}
+                                                        sx={{ color: '#a1a1aa', '&:hover': { color: '#ef4444' } }}
                                                     >
                                                         <DeleteOutlineRoundedIcon sx={{ fontSize: 18 }} />
                                                     </IconButton>
@@ -235,6 +238,21 @@ function BomLibraryDetail({
                 </TableContainer>
             </CardContent>
         </Card>
+        <ConfirmDialog
+            open={Boolean(pendingDelete)}
+            title="Supprimer la révision"
+            message={pendingDelete
+                ? `Cette révision (${pendingDelete.revision || ''} ${pendingDelete.side || ''}) sera définitivement supprimée de la bibliothèque. Cette action est irréversible.`
+                : ''}
+            confirmLabel="Supprimer"
+            severity="error"
+            onConfirm={() => {
+                onDeleteRevision?.(pendingDelete);
+                setPendingDelete(null);
+            }}
+            onClose={() => setPendingDelete(null)}
+        />
+        </>
     );
 }
 

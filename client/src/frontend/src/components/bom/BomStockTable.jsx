@@ -30,6 +30,14 @@ const BomStockTableRow = React.memo(function BomStockTableRow({ line, onOpenStoc
         <TableRow
             hover
             onClick={handleOpen}
+            tabIndex={0}
+            aria-label={`Détail stock ${line.componentLibraryName || line.value || ''}`.trim()}
+            onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    handleOpen();
+                }
+            }}
             sx={{
                 cursor: 'pointer',
                 '&:hover': {
@@ -46,7 +54,7 @@ const BomStockTableRow = React.memo(function BomStockTableRow({ line, onOpenStoc
                         {line.value} - {line.footprint} - {line.type}
                     </Typography>
                     {line.draft.feeder_slot ? (
-                        <Typography variant="caption" sx={{ color: '#67e8f9' }}>
+                        <Typography variant="caption" sx={{ color: '#60a5fa' }}>
                             Feeder : {line.draft.feeder_slot}
                         </Typography>
                     ) : null}

@@ -267,7 +267,7 @@ function AppShell({ pages, children }) {
                     </Typography>
                     <Typography
                         sx={{
-                            color: '#3f3f46',
+                            color: '#a1a1aa',
                             fontSize: '0.6rem',
                             letterSpacing: '0.1em',
                             fontWeight: 600,
@@ -358,12 +358,14 @@ function AppShell({ pages, children }) {
                     }}
                 >
                     <Typography
+                        component="h1"
                         sx={{
                             fontWeight: 700,
                             fontSize: '0.9375rem',
                             color: '#f4f4f5',
                             flex: 1,
-                            minWidth: 0
+                            minWidth: 0,
+                            m: 0
                         }}
                         noWrap
                     >

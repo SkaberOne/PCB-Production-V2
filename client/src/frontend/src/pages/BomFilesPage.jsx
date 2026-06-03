@@ -231,6 +231,7 @@ function BomFilesPage() {
             <TextField
                 size="small"
                 placeholder="Référence, catégorie..."
+                aria-label="Rechercher une référence ou catégorie"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 InputProps={{
@@ -243,7 +244,7 @@ function BomFilesPage() {
                 sx={{ minWidth: 260, '& .MuiOutlinedInput-root': { backgroundColor: '#18181b' } }}
             />
             <Tooltip title="Recharger">
-                <IconButton onClick={loadData} sx={{ color: '#a1a1aa' }}>
+                <IconButton onClick={loadData} aria-label="Recharger la bibliothèque" sx={{ color: '#a1a1aa' }}>
                     <RefreshRoundedIcon />
                 </IconButton>
             </Tooltip>
@@ -283,7 +284,7 @@ function BomFilesPage() {
                         <Typography variant="h6" sx={{ color: '#a1a1aa', mb: 0.5 }}>
                             Aucune BOM en bibliothèque
                         </Typography>
-                        <Typography variant="body2" sx={{ color: '#71717a', mb: 3 }}>
+                        <Typography variant="body2" sx={{ color: '#a1a1aa', mb: 3 }}>
                             Importe ta première BOM depuis l'onglet Import BOM pour la voir apparaître ici.
                         </Typography>
                         <Button variant="outlined" href="#/import-bom">
@@ -323,7 +324,17 @@ function BomFilesPage() {
                                                     alignItems="center"
                                                     spacing={0.5}
                                                     sx={treeCategorySx}
+                                                    role="button"
+                                                    tabIndex={0}
+                                                    aria-expanded={isExpanded}
+                                                    aria-label={`Catégorie ${cat.category}`}
                                                     onClick={() => toggleCategory(cat.category)}
+                                                    onKeyDown={(e) => {
+                                                        if (e.key === 'Enter' || e.key === ' ') {
+                                                            e.preventDefault();
+                                                            toggleCategory(cat.category);
+                                                        }
+                                                    }}
                                                 >
                                                     {isExpanded
                                                         ? <ExpandMoreRoundedIcon sx={{ fontSize: 18, color: '#71717a' }} />
@@ -357,7 +368,18 @@ function BomFilesPage() {
                                                             alignItems="center"
                                                             spacing={0.75}
                                                             sx={isSelected ? treeReferenceSelectedSx : treeReferenceSx}
+                                                            role="button"
+                                                            tabIndex={0}
+                                                            aria-pressed={isSelected}
+                                                            aria-current={isSelected ? 'true' : undefined}
+                                                            aria-label={`Référence ${ref.reference}`}
                                                             onClick={() => setSelectedReferenceId(ref.bomReferenceId)}
+                                                            onKeyDown={(e) => {
+                                                                if (e.key === 'Enter' || e.key === ' ') {
+                                                                    e.preventDefault();
+                                                                    setSelectedReferenceId(ref.bomReferenceId);
+                                                                }
+                                                            }}
                                                         >
                                                             <DescriptionRoundedIcon sx={{ fontSize: 14, opacity: 0.7 }} />
                                                             <Box sx={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -412,6 +434,7 @@ function BomFilesPage() {
                         fullWidth
                         size="small"
                         placeholder="Ex : Cartes principales"
+                        aria-label="Nom de la nouvelle catégorie"
                         value={newCategoryName}
                         onChange={(e) => setNewCategoryName(e.target.value)}
                         onKeyDown={(e) => { if (e.key === 'Enter') handleCreateCategory(); }}

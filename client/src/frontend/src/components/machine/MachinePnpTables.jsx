@@ -48,15 +48,19 @@ const MachineTableRow = React.memo(function MachineTableRow({
             selected={isSelected}
             onClick={() => onOpenConfig(machine)}
             onContextMenu={(event) => onOpenContextMenu(event, machine)}
+            role="button"
+            tabIndex={0}
+            aria-pressed={isSelected}
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpenConfig(machine); } }}
             sx={{ cursor: 'pointer' }}
         >
             <TableCell sx={compactWrapCellSx}>
                 <Stack spacing={0.35}>
-                    <Typography variant="body2" sx={{ color: '#f8fafc', fontWeight: 600 }}>
+                    <Typography variant="body2" sx={{ color: '#f4f4f5', fontWeight: 600 }}>
                         {machine.name}
                     </Typography>
                     {machine.notes ? (
-                        <Typography variant="caption" sx={{ color: '#94a3b8' }}>
+                        <Typography variant="caption" sx={{ color: '#a1a1aa' }}>
                             {machine.notes}
                         </Typography>
                     ) : null}
@@ -73,6 +77,7 @@ const MachineTableRow = React.memo(function MachineTableRow({
                         <IconButton
                             size="small"
                             color="primary"
+                            aria-label={`Configurer les feeders de la machine ${machine.name}`}
                             onClick={(event) => {
                                 event.stopPropagation();
                                 onOpenConfig(machine);
@@ -85,6 +90,7 @@ const MachineTableRow = React.memo(function MachineTableRow({
                         <IconButton
                             size="small"
                             color="error"
+                            aria-label={`Supprimer la machine ${machine.name}`}
                             onClick={(event) => {
                                 event.stopPropagation();
                                 onDeleteMachine(machine);
@@ -153,11 +159,11 @@ const FixedFeederTableRow = React.memo(function FixedFeederTableRow({
         <TableRow hover>
             <TableCell sx={compactWrapCellSx}>
                 <Stack spacing={0.35}>
-                    <Typography variant="body2" sx={{ color: '#f8fafc', fontWeight: 600 }}>
+                    <Typography variant="body2" sx={{ color: '#f4f4f5', fontWeight: 600 }}>
                         {primaryLabel}
                     </Typography>
                     {secondaryLabel ? (
-                        <Typography variant="caption" sx={{ color: '#94a3b8' }}>
+                        <Typography variant="caption" sx={{ color: '#a1a1aa' }}>
                             {secondaryLabel}
                         </Typography>
                     ) : null}
@@ -169,7 +175,7 @@ const FixedFeederTableRow = React.memo(function FixedFeederTableRow({
             <TableCell>{formatDecimal(row.average_board_quantity || 0)}</TableCell>
             <TableCell sx={{ ...compactCellSx, minWidth: 190 }}>
                 <Stack spacing={0.35}>
-                    <Typography variant="body2" noWrap title={row.fixed_cart_name || ''} sx={{ color: '#f8fafc' }}>
+                    <Typography variant="body2" noWrap title={row.fixed_cart_name || ''} sx={{ color: '#f4f4f5' }}>
                         {row.fixed_cart_name || '--'}
                     </Typography>
                     {row.fixed_cart_kind ? (
@@ -188,6 +194,7 @@ const FixedFeederTableRow = React.memo(function FixedFeederTableRow({
                         <IconButton
                             size="small"
                             color="primary"
+                            aria-label={`Modifier le feeder fixe ${primaryLabel}`}
                             onClick={() => onEditFixedFeeder(row)}
                         >
                             <EditRoundedIcon fontSize="small" />
@@ -197,6 +204,7 @@ const FixedFeederTableRow = React.memo(function FixedFeederTableRow({
                         <IconButton
                             size="small"
                             color="error"
+                            aria-label={`Retirer le feeder fixe ${primaryLabel}`}
                             onClick={() => onRemoveFixedFeeder(row.component_id)}
                             disabled={actionLoading === `remove-fixed-feeder-${row.component_id}`}
                         >
@@ -260,10 +268,10 @@ const CartTableRow = React.memo(function CartTableRow({
         <TableRow hover>
             <TableCell>
                 <Stack spacing={0.35}>
-                    <Typography variant="body2" sx={{ color: '#f8fafc', fontWeight: 600 }}>
+                    <Typography variant="body2" sx={{ color: '#f4f4f5', fontWeight: 600 }}>
                         {cart.name}
                     </Typography>
-                    <Typography variant="caption" sx={{ color: '#94a3b8' }}>
+                    <Typography variant="caption" sx={{ color: '#a1a1aa' }}>
                         {cart.fixed_component_count || 0} composant(s) fixe(s)
                     </Typography>
                 </Stack>
@@ -282,7 +290,7 @@ const CartTableRow = React.memo(function CartTableRow({
             <TableCell>
                 {/* #12 — barre de progression capacité */}
                 <Stack spacing={0.5}>
-                    <Typography variant="body2" sx={{ color: '#f8fafc' }}>
+                    <Typography variant="body2" sx={{ color: '#f4f4f5' }}>
                         {cart.used_positions || 0} / {cart.capacity_positions}
                     </Typography>
                     <Box sx={{ width: 80 }}>
@@ -308,6 +316,7 @@ const CartTableRow = React.memo(function CartTableRow({
                         <IconButton
                             size="small"
                             color="primary"
+                            aria-label={`Modifier le chariot ${cart.name}`}
                             onClick={() => onEditCart(cart)}
                             disabled={actionLoading === `update-cart-${cart.id}`}
                         >
@@ -318,6 +327,7 @@ const CartTableRow = React.memo(function CartTableRow({
                         <IconButton
                             size="small"
                             color="error"
+                            aria-label={`Supprimer le chariot ${cart.name}`}
                             onClick={() => onDeleteCart(cart)}
                             disabled={actionLoading === `delete-cart-${cart.id}`}
                         >
@@ -383,6 +393,10 @@ const MachineAssignmentTableRow = React.memo(function MachineAssignmentTableRow(
             hover
             selected={isSelected}
             onClick={() => onSelectSlot(assignment.slot_start)}
+            role="button"
+            tabIndex={0}
+            aria-pressed={isSelected}
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelectSlot(assignment.slot_start); } }}
             sx={{
                 cursor: 'pointer',
                 backgroundColor: assignmentPalette.rowBackground,
@@ -451,15 +465,15 @@ export const MachineAssignmentTable = React.memo(function MachineAssignmentTable
         <Table size="small" stickyHeader>
             <TableHead>
                 <TableRow>
-                    <TableCell sx={compactHeaderSx}>Slot</TableCell>
-                    <TableCell sx={compactHeaderSx}>Composant</TableCell>
-                    <TableCell sx={compactHeaderSx}>Référence</TableCell>
-                    <TableCell sx={compactHeaderSx}>Footprint</TableCell>
-                    <TableCell sx={compactHeaderSx}>Feeder</TableCell>
-                    <TableCell sx={compactHeaderSx}>Type</TableCell>
-                    <TableCell sx={compactHeaderSx}>BOM</TableCell>
-                    <TableCell sx={compactHeaderSx}>Qté totale</TableCell>
-                    <TableCell sx={compactHeaderSx}>Qté/carte</TableCell>
+                    <TableCell>Slot</TableCell>
+                    <TableCell>Composant</TableCell>
+                    <TableCell>Référence</TableCell>
+                    <TableCell>Footprint</TableCell>
+                    <TableCell>Feeder</TableCell>
+                    <TableCell>Type</TableCell>
+                    <TableCell>BOM</TableCell>
+                    <TableCell>Qté totale</TableCell>
+                    <TableCell>Qté/carte</TableCell>
                 </TableRow>
             </TableHead>
             <TableBody>
@@ -477,3 +491,4 @@ export const MachineAssignmentTable = React.memo(function MachineAssignmentTable
         </Table>
     );
 });
+                                                                                                                                                                                             

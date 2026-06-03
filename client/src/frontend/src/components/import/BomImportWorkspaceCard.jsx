@@ -60,6 +60,10 @@ const WorkspaceSessionRow = React.memo(function WorkspaceSessionRow({
                     selectBatchResult(row);
                 }
             }}
+            role={row.isImported ? 'button' : undefined}
+            tabIndex={row.isImported ? 0 : undefined}
+            aria-pressed={row.isImported ? selected : undefined}
+            onKeyDown={(e) => { if (row.isImported && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); selectBatchResult(row); } }}
             sx={{ cursor: row.isImported ? 'pointer' : 'default' }}
         >
             <TableCell sx={compactCellSx}>{row.file_name}</TableCell>
@@ -70,6 +74,7 @@ const WorkspaceSessionRow = React.memo(function WorkspaceSessionRow({
                     sx={compactInputSx}
                     value={row.category || ''}
                     placeholder="Ex: AMPLI"
+                    aria-label={`Catégorie ${row.file_name}`}
                     onChange={(event) => (
                         row.isImported
                             ? handleBatchResultFieldChange(rowKey, 'category', event.target.value)
@@ -83,6 +88,7 @@ const WorkspaceSessionRow = React.memo(function WorkspaceSessionRow({
                     size="small"
                     sx={compactInputSx}
                     value={row.reference}
+                    aria-label={`Référence ${row.file_name}`}
                     onChange={(event) => (
                         row.isImported
                             ? handleBatchResultFieldChange(rowKey, 'reference', event.target.value)
@@ -96,6 +102,7 @@ const WorkspaceSessionRow = React.memo(function WorkspaceSessionRow({
                     size="small"
                     sx={compactInputSx}
                     value={row.revision}
+                    aria-label={`Révision ${row.file_name}`}
                     onChange={(event) => (
                         row.isImported
                             ? handleBatchResultFieldChange(rowKey, 'revision', event.target.value)
@@ -115,6 +122,7 @@ const WorkspaceSessionRow = React.memo(function WorkspaceSessionRow({
                         size="small"
                         sx={compactInputSx}
                         value={row.side}
+                        aria-label={`Face ${row.file_name}`}
                         onChange={(event) => (
                             handleDraftFieldChange(row.row_key, 'side', event.target.value)
                         )}
@@ -338,128 +346,6 @@ function BomImportWorkspaceCard({
                                                     rowKey={rowKey}
                                                     selectBatchResult={selectBatchResult}
                                                 />
-                                            );
-
-                                            // eslint-disable-next-line no-unreachable
-                                            const selected = result?.bom_revision_id
-                                                ? row.bom_revision_id === result.bom_revision_id
-                                                : row.file_name === result?.file_name;
-                                            const rowBusy = rowActionState.key === rowKey;
-
-                                            return (
-                                                <TableRow
-                                                    key={rowKey}
-                                                    hover={row.isImported}
-                                                    selected={selected}
-                                                    onClick={() => {
-                                                        if (row.isImported) {
-                                                            selectBatchResult(row);
-                                                        }
-                                                    }}
-                                                    sx={{ cursor: row.isImported ? 'pointer' : 'default' }}
-                                                >
-                                                    <TableCell sx={compactCellSx}>{row.file_name}</TableCell>
-                                                    <TableCell>
-                                                        <TextField
-                                                            fullWidth
-                                                            size="small"
-                                                            sx={compactInputSx}
-                                                            value={row.category || ''}
-                                                            placeholder="Ex: AMPLI"
-                                                            onChange={(event) => (
-                                                                row.isImported
-                                                                    ? handleBatchResultFieldChange(rowKey, 'category', event.target.value)
-                                                                    : handleDraftFieldChange(row.row_key, 'category', event.target.value)
-                                                            )}
-                                                        />
-                                                    </TableCell>
-                                                    <TableCell>
-                                                        <TextField
-                                                            fullWidth
-                                                            size="small"
-                                                            sx={compactInputSx}
-                                                            value={row.reference}
-                                                            onChange={(event) => (
-                                                                row.isImported
-                                                                    ? handleBatchResultFieldChange(rowKey, 'reference', event.target.value)
-                                                                    : handleDraftFieldChange(row.row_key, 'reference', event.target.value)
-                                                            )}
-                                                        />
-                                                    </TableCell>
-                                                    <TableCell>
-                                                        <TextField
-                                                            fullWidth
-                                                            size="small"
-                                                            sx={compactInputSx}
-                                                            value={row.revision}
-                                                            onChange={(event) => (
-                                                                row.isImported
-                                                                    ? handleBatchResultFieldChange(rowKey, 'revision', event.target.value)
-                                                                    : handleDraftFieldChange(row.row_key, 'revision', event.target.value)
-                                                            )}
-                                                        />
-                                                    </TableCell>
-                                                    <TableCell>
-                                                        {row.isImported ? (
-                                                            <Typography variant="body2" sx={{ color: '#f4f4f5', fontWeight: 500 }}>
-                                                                {row.side}
-                                                            </Typography>
-                                                        ) : (
-                                                            <TextField
-                                                                select
-                                                                fullWidth
-                                                                size="small"
-                                                                sx={compactInputSx}
-                                                                value={row.side}
-                                                                onChange={(event) => (
-                                                                    handleDraftFieldChange(row.row_key, 'side', event.target.value)
-                                                                )}
-                                                            >
-                                                                <MenuItem value="TOP">TOP</MenuItem>
-                                                                <MenuItem value="BOT">BOT</MenuItem>
-                                                            </TextField>
-                                                        )}
-                                                    </TableCell>
-                                                    <TableCell sx={compactCellSx}>{row.item_count || 0}</TableCell>
-                                                    <TableCell sx={compactCellSx}>
-                                                        {row.isImported ? (row.success ? 'Importée' : 'Erreur') : 'À préparer'}
-                                                    </TableCell>
-                                                    <TableCell>
-                                                        <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
-                                                            {row.isImported ? (
-                                                                <>
-                                                                    <Button
-                                                                        size="small"
-                                                                        variant="text"
-                                                                        disabled={!row.success || rowBusy}
-                                                                        onClick={(event) => {
-                                                                            event.stopPropagation();
-                                                                            handlePersistBatchMetadata(row);
-                                                                        }}
-                                                                    >
-                                                                        {rowBusy && rowActionState.action === 'save-meta' ? 'Sauvegarde...' : 'Sauver'}
-                                                                    </Button>
-                                                                    <Button
-                                                                        size="small"
-                                                                        color="error"
-                                                                        variant="text"
-                                                                        disabled={rowBusy}
-                                                                        onClick={(event) => {
-                                                                            event.stopPropagation();
-                                                                            handleDeleteImportedBom(row);
-                                                                        }}
-                                                                    >
-                                                                        {rowBusy && rowActionState.action === 'delete' ? 'Suppression...' : 'Supprimer'}
-                                                                    </Button>
-                                                                </>
-                                                            ) : (
-                                                                <Button color="error" size="small" variant="text" onClick={() => handleDraftRowRemove(row.row_key)}>
-                                                                    Retirer
-                                                                </Button>
-                                                            )}
-                                                        </Box>
-                                                    </TableCell>
-                                                </TableRow>
                                             );
                                         })}
                                     </TableBody>

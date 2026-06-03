@@ -64,7 +64,7 @@ const LibraryRevisionItem = React.memo(function LibraryRevisionItem({ item, sele
                 checked={selected}
                 onChange={() => onToggle(item)}
                 onClick={(e) => e.stopPropagation()}
-                sx={{ p: 0.25, color: '#52525b', '&.Mui-checked': { color: '#6366f1' } }}
+                sx={{ p: 0.25, color: '#52525b', '&.Mui-checked': { color: '#10b981' } }}
                 icon={<CheckBoxOutlineBlankRoundedIcon fontSize="small" />}
                 checkedIcon={<CheckBoxRoundedIcon fontSize="small" />}
             />
@@ -76,8 +76,8 @@ const LibraryRevisionItem = React.memo(function LibraryRevisionItem({ item, sele
                         sx={{
                             height: 18,
                             fontSize: '0.65rem',
-                            backgroundColor: item.side === 'BOT' ? '#1e1b4b' : '#14532d',
-                            color: item.side === 'BOT' ? '#a5b4fc' : '#86efac',
+                            backgroundColor: item.side === 'BOT' ? '#052e16' : '#14532d',
+                            color: item.side === 'BOT' ? '#34d399' : '#86efac',
                             fontWeight: 600,
                         }}
                     />
@@ -128,7 +128,13 @@ const LibraryReferenceGroup = React.memo(function LibraryReferenceGroup({
                 spacing={0.5}
                 sx={{ ...treeRowSx, pl: 2 }}
             >
-                <IconButton size="small" onClick={() => setOpen((v) => !v)} sx={{ color: '#71717a', p: 0.25 }}>
+                <IconButton
+                    size="small"
+                    onClick={() => setOpen((v) => !v)}
+                    aria-label={open ? `Réduire ${referenceEntry.reference}` : `Développer ${referenceEntry.reference}`}
+                    aria-expanded={open}
+                    sx={{ color: '#71717a', p: 0.25 }}
+                >
                     {open ? <ExpandMoreRoundedIcon fontSize="small" /> : <ChevronRightRoundedIcon fontSize="small" />}
                 </IconButton>
                 <Checkbox
@@ -136,7 +142,8 @@ const LibraryReferenceGroup = React.memo(function LibraryReferenceGroup({
                     checked={allChecked}
                     indeterminate={indeterminate}
                     onChange={handleGroupToggle}
-                    sx={{ p: 0.25, color: '#52525b', '&.Mui-checked': { color: '#6366f1' }, '&.MuiCheckbox-indeterminate': { color: '#6366f1' } }}
+                    aria-label={`Sélectionner la référence ${referenceEntry.reference}`}
+                    sx={{ p: 0.25, color: '#52525b', '&.Mui-checked': { color: '#10b981' }, '&.MuiCheckbox-indeterminate': { color: '#10b981' } }}
                     icon={<CheckBoxOutlineBlankRoundedIcon fontSize="small" />}
                     checkedIcon={<CheckBoxRoundedIcon fontSize="small" />}
                 />
@@ -151,7 +158,7 @@ const LibraryReferenceGroup = React.memo(function LibraryReferenceGroup({
                     <Chip
                         label={`${checkedCount}/${allItems.length}`}
                         size="small"
-                        sx={{ height: 18, fontSize: '0.65rem', backgroundColor: '#312e81', color: '#a5b4fc' }}
+                        sx={{ height: 18, fontSize: '0.65rem', backgroundColor: '#064e3b', color: '#34d399' }}
                     />
                 )}
             </Stack>
@@ -188,8 +195,13 @@ const LibraryCategoryGroup = React.memo(function LibraryCategoryGroup({
                 spacing={0.5}
                 sx={{ ...treeRowSx, cursor: 'pointer' }}
                 onClick={() => setOpen((v) => !v)}
+                role="button"
+                tabIndex={0}
+                aria-expanded={open}
+                aria-label={`${open ? 'Réduire' : 'Développer'} la catégorie ${categoryEntry.category}`}
+                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setOpen((v) => !v); } }}
             >
-                <IconButton size="small" sx={{ color: '#71717a', p: 0.25, pointerEvents: 'none' }}>
+                <IconButton size="small" aria-hidden="true" tabIndex={-1} sx={{ color: '#71717a', p: 0.25, pointerEvents: 'none' }}>
                     {open ? <ExpandMoreRoundedIcon fontSize="small" /> : <ChevronRightRoundedIcon fontSize="small" />}
                 </IconButton>
                 <Typography variant="caption" sx={{ color: '#71717a', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', flex: 1 }}>
@@ -332,7 +344,7 @@ export default function BomLibraryCard() {
                     <Stack direction="row" alignItems="flex-start" justifyContent="space-between" spacing={1}>
                         <Stack spacing={0.5}>
                             <Stack direction="row" alignItems="center" spacing={1}>
-                                <LibraryBooksRoundedIcon sx={{ color: '#6366f1', fontSize: 20 }} />
+                                <LibraryBooksRoundedIcon sx={{ color: '#10b981', fontSize: 20 }} />
                                 <Typography variant="h6" sx={{ color: '#f4f4f5', fontWeight: 600 }}>
                                     BOM enregistrées
                                 </Typography>
@@ -379,10 +391,10 @@ export default function BomLibraryCard() {
                         }}
                         sx={{
                             '& .MuiOutlinedInput-root': {
-                                backgroundColor: '#111111',
+                                backgroundColor: '#18181b',
                                 '& fieldset': { borderColor: '#27272a' },
                                 '&:hover fieldset': { borderColor: '#3f3f46' },
-                                '&.Mui-focused fieldset': { borderColor: '#6366f1' },
+                                '&.Mui-focused fieldset': { borderColor: '#10b981' },
                             },
                             '& .MuiInputBase-input': { color: '#f4f4f5' },
                         }}
@@ -391,7 +403,7 @@ export default function BomLibraryCard() {
                     {/* Liste groupée */}
                     <Box
                         sx={{
-                            backgroundColor: '#111111',
+                            backgroundColor: '#18181b',
                             border: '1px solid #27272a',
                             borderRadius: 1,
                             maxHeight: 340,
@@ -432,7 +444,7 @@ export default function BomLibraryCard() {
                                 indeterminate={someSelected}
                                 onChange={handleSelectAll}
                                 disabled={items.length === 0}
-                                sx={{ p: 0.25, color: '#52525b', '&.Mui-checked': { color: '#6366f1' }, '&.MuiCheckbox-indeterminate': { color: '#6366f1' } }}
+                                sx={{ p: 0.25, color: '#52525b', '&.Mui-checked': { color: '#10b981' }, '&.MuiCheckbox-indeterminate': { color: '#10b981' } }}
                                 icon={<CheckBoxOutlineBlankRoundedIcon fontSize="small" />}
                                 checkedIcon={<CheckBoxRoundedIcon fontSize="small" />}
                             />
@@ -449,7 +461,7 @@ export default function BomLibraryCard() {
                             startIcon={addLoading ? <CircularProgress size={14} color="inherit" /> : <AddRoundedIcon />}
                             onClick={handleAddToWorkspace}
                             disabled={selectedEntries.length === 0 || addLoading}
-                            sx={{ backgroundColor: '#6366f1', '&:hover': { backgroundColor: '#4f46e5' } }}
+                            sx={{ backgroundColor: '#10b981', '&:hover': { backgroundColor: '#059669' } }}
                         >
                             {addLoading
                                 ? 'Chargement…'

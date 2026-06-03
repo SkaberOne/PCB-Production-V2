@@ -16,6 +16,15 @@ function StatCard({ label, value, hint, icon: Icon, color = colors.green, onClic
     return (
         <Card
             onClick={onClick}
+            role={isClickable ? 'button' : undefined}
+            tabIndex={isClickable ? 0 : undefined}
+            aria-label={isClickable ? `${label} : ${isEmpty ? 'en attente de session' : value}` : undefined}
+            onKeyDown={isClickable ? (event) => {
+                if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault();
+                    onClick(event);
+                }
+            } : undefined}
             sx={{
                 height: '100%',
                 backgroundColor: colors.surfaceCard,
@@ -29,6 +38,10 @@ function StatCard({ label, value, hint, icon: Icon, color = colors.green, onClic
                         ? `0 4px 16px ${color}22`
                         : `0 4px 16px ${colors.green}1a`,
                     transform: isClickable ? 'translateY(-1px)' : 'none',
+                },
+                '&:focus-visible': {
+                    outline: `2px solid ${color}`,
+                    outlineOffset: 2,
                 },
             }}
         >
@@ -51,7 +64,7 @@ function StatCard({ label, value, hint, icon: Icon, color = colors.green, onClic
                         )}
                         {isClickable && (
                             <Typography variant="caption" sx={{ color: color, opacity: 0.7, fontSize: '0.7rem', mt: 0.5 }}>
-                                Voir →
+                                Voir <span aria-hidden="true">→</span>
                             </Typography>
                         )}
                     </Box>

@@ -135,8 +135,8 @@ function getProductionStatusUi(status) {
     case 'COMPLETED':
         return {
             label: 'Terminée',
-            color: '#38bdf8',
-            backgroundColor: 'rgba(56, 189, 248, 0.12)',
+            color: '#3b82f6',
+            backgroundColor: 'rgba(59,130,246, 0.12)',
         };
     case 'ARCHIVED':
         return {
@@ -306,6 +306,7 @@ const DashboardProductionRow = React.memo(function DashboardProductionRow({
                         <span>
                             <IconButton
                                 size="small"
+                                aria-label={`Plus d'actions pour ${production.name}`}
                                 onClick={(e) => setMenuAnchor(e.currentTarget)}
                                 disabled={isBusy}
                                 sx={{
@@ -322,7 +323,7 @@ const DashboardProductionRow = React.memo(function DashboardProductionRow({
                         anchorEl={menuAnchor}
                         open={Boolean(menuAnchor)}
                         onClose={() => setMenuAnchor(null)}
-                        PaperProps={{ sx: { backgroundColor: '#1c1c1f', border: '1px solid #27272a', minWidth: 180 } }}
+                        PaperProps={{ sx: { backgroundColor: '#18181b', border: '1px solid #27272a', minWidth: 180 } }}
                     >
                         <MenuItem onClick={handleRename}>
                             <ListItemIcon><DriveFileRenameOutlineRoundedIcon fontSize="small" sx={{ color: '#a1a1aa' }} /></ListItemIcon>
@@ -797,6 +798,7 @@ function DashboardPage() {
                                     <TextField
                                         size="small"
                                         placeholder="Rechercher une production..."
+                                        aria-label="Rechercher une production"
                                         value={searchQuery}
                                         onChange={(e) => setSearchQuery(e.target.value)}
                                         InputProps={{
@@ -831,7 +833,10 @@ function DashboardPage() {
                                 <Table sx={compactTableSx}>
                                     <TableHead sx={{ backgroundColor: 'background.default' }}>
                                         <TableRow>
-                                            <TableCell sx={{ width: '42%' }}>
+                                            <TableCell
+                                                sx={{ width: '42%' }}
+                                                aria-sort={sortField === 'name' ? (sortDir === 'asc' ? 'ascending' : 'descending') : 'none'}
+                                            >
                                                 <TableSortLabel
                                                     active={sortField === 'name'}
                                                     direction={sortField === 'name' ? sortDir : 'asc'}
@@ -841,7 +846,10 @@ function DashboardPage() {
                                                     PRODUCTION
                                                 </TableSortLabel>
                                             </TableCell>
-                                            <TableCell sx={{ width: '16%' }}>
+                                            <TableCell
+                                                sx={{ width: '16%' }}
+                                                aria-sort={sortField === 'bom_count' ? (sortDir === 'asc' ? 'ascending' : 'descending') : 'none'}
+                                            >
                                                 <TableSortLabel
                                                     active={sortField === 'bom_count'}
                                                     direction={sortField === 'bom_count' ? sortDir : 'asc'}
@@ -851,7 +859,10 @@ function DashboardPage() {
                                                     BOM LIÉES
                                                 </TableSortLabel>
                                             </TableCell>
-                                            <TableCell sx={{ width: '22%' }}>
+                                            <TableCell
+                                                sx={{ width: '22%' }}
+                                                aria-sort={sortField === 'updated_at' ? (sortDir === 'asc' ? 'ascending' : 'descending') : 'none'}
+                                            >
                                                 <TableSortLabel
                                                     active={sortField === 'updated_at'}
                                                     direction={sortField === 'updated_at' ? sortDir : 'desc'}

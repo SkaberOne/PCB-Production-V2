@@ -68,6 +68,7 @@ function BomQuantityPanel({ quantityRows = [], activeProduction = null, onQuanti
                                                     fullWidth
                                                     type="number"
                                                     size="small"
+                                                    aria-label={`Quantité à produire ${row.reference || ''} ${row.revision || ''}`.trim()}
                                                     value={row.quantityToProduce}
                                                     inputProps={{ min: 1, step: 1 }}
                                                     onChange={onQuantityChange(row)}

@@ -9,7 +9,7 @@ import {
 } from '@mui/material';
 
 const DIALOG_PAPER_SX = {
-    backgroundColor: '#111827',
+    backgroundColor: '#18181b',
     color: '#f4f4f5',
     border: '1px solid #27272a',
     borderRadius: 3,
@@ -43,9 +43,10 @@ function ConfirmDialog({
             onClose={onClose}
             maxWidth="xs"
             fullWidth
+            aria-labelledby="confirm-dialog-title"
             PaperProps={{ sx: DIALOG_PAPER_SX }}
         >
-            <DialogTitle sx={{ borderBottom: '1px solid #27272a', fontWeight: 700 }}>
+            <DialogTitle id="confirm-dialog-title" sx={{ borderBottom: '1px solid #27272a', fontWeight: 700 }}>
                 {title}
             </DialogTitle>
             <DialogContent sx={{ pt: 2.5 }}>

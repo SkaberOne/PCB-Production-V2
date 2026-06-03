@@ -675,7 +675,7 @@ function BomViewerPage() {
                         value={activeTab}
                         onChange={(_, v) => setBomWorkspaceActiveTab(v)}
                         textColor="inherit"
-                        indicatorColor="secondary"
+                        indicatorColor="primary"
                         sx={TAB_SX}
                     >
                         <Tab value="review" label="Revue BOM" />

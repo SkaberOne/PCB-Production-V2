@@ -43,15 +43,15 @@ export function MachinePnpCrudDialogs({
     resetCartDialog,
     cartForm,
     setCartForm,
-    bomCategoriesLoading,
+    bomCatégoriesLoading,
     cartCategoryOptions,
-    bomCategoriesError,
+    bomCatégoriesError,
     handleCreateCart,
 }) {
     return (
         <>
             <Dialog open={machineDialogOpen} onClose={resetMachineDialog} maxWidth="sm" fullWidth>
-                <DialogTitle>{editingMachine ? 'Modifier la machine PnP' : 'Creer une machine PnP'}</DialogTitle>
+                <DialogTitle>{editingMachine ? 'Modifier la machine PnP' : 'Créer une machine PnP'}</DialogTitle>
                 <DialogContent sx={{ pt: '12px !important' }}>
                     <Stack spacing={2}>
                         {machineDialogError ? <Alert severity="error">{machineDialogError}</Alert> : null}
@@ -95,13 +95,13 @@ export function MachinePnpCrudDialogs({
                         onClick={handleCreateMachine}
                         disabled={actionLoading === 'create-machine' || actionLoading === `update-machine-${editingMachine?.id}`}
                     >
-                        {editingMachine ? 'Mettre a jour' : 'Creer'}
+                        {editingMachine ? 'Mettre a jour' : 'Créer'}
                     </Button>
                 </DialogActions>
             </Dialog>
 
             <Dialog open={feederDialogOpen} onClose={resetFeederDialog} maxWidth="sm" fullWidth>
-                <DialogTitle>Creer un type de feeder</DialogTitle>
+                <DialogTitle>Créer un type de feeder</DialogTitle>
                 <DialogContent sx={{ pt: '12px !important' }}>
                     <Stack spacing={2}>
                         {feederDialogError ? <Alert severity="error">{feederDialogError}</Alert> : null}
@@ -115,7 +115,7 @@ export function MachinePnpCrudDialogs({
                             helperText="Entier entre 1 et 100."
                         />
                         <TextField
-                            label="Capacite indicative"
+                            label="Capacité indicative"
                             type="number"
                             value={feederForm.capacity}
                             onChange={(event) => setFeederForm((current) => ({ ...current, capacity: event.target.value }))}
@@ -145,13 +145,13 @@ export function MachinePnpCrudDialogs({
                 <DialogActions>
                     <Button onClick={resetFeederDialog}>Annuler</Button>
                     <Button variant="contained" onClick={handleCreateFeeder} disabled={actionLoading === 'create-feeder'}>
-                        Creer
+                        Créer
                     </Button>
                 </DialogActions>
             </Dialog>
 
             <Dialog open={cartDialogOpen} onClose={resetCartDialog} maxWidth="sm" fullWidth>
-                <DialogTitle>Creer un chariot logique</DialogTitle>
+                <DialogTitle>Créer un chariot logique</DialogTitle>
                 <DialogContent sx={{ pt: '12px !important' }}>
                     <Stack spacing={2}>
                         {cartDialogError ? <Alert severity="error">{cartDialogError}</Alert> : null}
@@ -181,23 +181,23 @@ export function MachinePnpCrudDialogs({
                         {cartForm.kind === 'CATEGORY' ? (
                             <TextField
                                 select
-                                label="Categorie cible"
+                                label="Catégorie cible"
                                 value={cartForm.target_category}
                                 onChange={(event) => setCartForm((current) => ({ ...current, target_category: event.target.value }))}
                                 fullWidth
-                                disabled={bomCategoriesLoading || !cartCategoryOptions.length}
+                                disabled={bomCatégoriesLoading || !cartCategoryOptions.length}
                                 helperText={
-                                    bomCategoriesLoading
-                                        ? 'Chargement des categories BOM disponibles...'
-                                        : bomCategoriesError
-                                            ? bomCategoriesError
+                                    bomCatégoriesLoading
+                                        ? 'Chargement des catégories BOM disponibles...'
+                                        : bomCatégoriesError
+                                            ? bomCatégoriesError
                                             : cartCategoryOptions.length
-                                                ? 'Choisis une categorie BOM ou l option "Composant commun" reservee aux feeders fixes.'
-                                                : 'Aucune categorie BOM disponible pour le moment.'
+                                                ? 'Choisis une catégorie BOM ou l'option "Composant commun" réservée aux feeders fixes.'
+                                                : 'Aucune catégorie BOM disponible pour le moment.'
                                 }
                             >
                                 <MenuItem value="">
-                                    <em>Selectionner une categorie</em>
+                                    <em>Sélectionner une catégorie</em>
                                 </MenuItem>
                                 {cartCategoryOptions.map((category) => (
                                     <MenuItem key={category.name} value={category.name}>
@@ -210,7 +210,7 @@ export function MachinePnpCrudDialogs({
                             </TextField>
                         ) : null}
                         <TextField
-                            label="Capacite du chariot"
+                            label="Capacité du chariot"
                             type="number"
                             value={cartForm.capacity_positions}
                             onChange={(event) => setCartForm((current) => ({ ...current, capacity_positions: event.target.value }))}
@@ -239,7 +239,7 @@ export function MachinePnpCrudDialogs({
                 <DialogActions>
                     <Button onClick={resetCartDialog}>Annuler</Button>
                     <Button variant="contained" onClick={handleCreateCart} disabled={actionLoading === 'create-cart'}>
-                        Creer
+                        Créer
                     </Button>
                 </DialogActions>
             </Dialog>
@@ -273,8 +273,8 @@ export function MachinePnpAuxOverlays({
             >
                 <DialogTitle>
                     {selectedMachineSlot?.assignment
-                        ? `Detail emplacement feeder · Slot ${selectedMachineSlot.assignment.slot_start}${selectedMachineSlot.assignment.slot_end !== selectedMachineSlot.assignment.slot_start ? `-${selectedMachineSlot.assignment.slot_end}` : ''}`
-                        : `Detail emplacement feeder · Slot ${selectedMachineSlot?.position || ''}`}
+                        ? `Détail emplacement feeder · Slot ${selectedMachineSlot.assignment.slot_start}${selectedMachineSlot.assignment.slot_end !== selectedMachineSlot.assignment.slot_start ? `-${selectedMachineSlot.assignment.slot_end}` : ''}`
+                        : `Détail emplacement feeder · Slot ${selectedMachineSlot?.position || ''}`}
                 </DialogTitle>
                 <DialogContent sx={{ pt: '12px !important' }}>
                     {selectedMachineSlot ? (
@@ -290,10 +290,10 @@ export function MachinePnpAuxOverlays({
 
                                     return (
                                         <>
-                                            <Typography variant="body1" sx={{ color: '#f8fafc', fontWeight: 700 }}>
+                                            <Typography variant="body1" sx={{ color: '#f4f4f5', fontWeight: 700 }}>
                                                 {selectedMachineSlot.assignment.component_label}
                                             </Typography>
-                                            <Typography variant="body2" sx={{ color: '#94a3b8' }}>
+                                            <Typography variant="body2" sx={{ color: '#a1a1aa' }}>
                                                 {selectedMachineSlot.assignment.component_reference || '--'}
                                                 {selectedMachineSlot.assignment.feeder_type
                                                     ? ` · feeder ${selectedMachineSlot.assignment.feeder_type}`
@@ -319,7 +319,7 @@ export function MachinePnpAuxOverlays({
                                                 <Chip
                                                     size="small"
                                                     label={`${selectedMachineSlot.assignment.bom_presence_count || 0} BOM`}
-                                                    sx={{ backgroundColor: 'rgba(148,163,184,0.12)', color: '#cbd5e1' }}
+                                                    sx={{ backgroundColor: 'rgba(161,161,170,0.12)', color: '#d4d4d8' }}
                                                 />
                                                 <Chip
                                                     size="small"
@@ -329,10 +329,10 @@ export function MachinePnpAuxOverlays({
                                                 <Chip
                                                     size="small"
                                                     label={`${quantityDisplay.perBoardChipLabel} ${formatDecimal(quantityDisplay.perBoardQuantity || 0)}`}
-                                                    sx={{ backgroundColor: 'rgba(56,189,248,0.12)', color: '#bae6fd' }}
+                                                    sx={{ backgroundColor: 'rgba(59,130,246,0.12)', color: '#bae6fd' }}
                                                 />
                                             </Stack>
-                                            <Typography variant="caption" sx={{ color: '#94a3b8' }}>
+                                            <Typography variant="caption" sx={{ color: '#a1a1aa' }}>
                                                 {selectedMachineBomRevision
                                                     ? `La popup affiche ici la quantite du composant pour la BOM selectionnee (${selectedMachineBomPlannedBoardQuantity || 0} carte(s)).`
                                                     : 'Prod. = quantite totale requise pour toute la production. / carte = quantite moyenne posee pour une carte.'}
@@ -344,7 +344,7 @@ export function MachinePnpAuxOverlays({
                                                             key={label}
                                                             size="small"
                                                             label={label}
-                                                            sx={{ backgroundColor: 'rgba(148,163,184,0.12)', color: '#cbd5e1' }}
+                                                            sx={{ backgroundColor: 'rgba(161,161,170,0.12)', color: '#d4d4d8' }}
                                                         />
                                                     ))}
                                                 </Stack>
@@ -353,7 +353,7 @@ export function MachinePnpAuxOverlays({
                                     );
                                 })()
                             ) : (
-                                <Typography variant="body2" sx={{ color: '#94a3b8' }}>
+                                <Typography variant="body2" sx={{ color: '#a1a1aa' }}>
                                     Emplacement {selectedMachineSlot.position} libre.
                                 </Typography>
                             )}
@@ -406,12 +406,12 @@ export function MachinePnpAuxOverlays({
                         </Typography>
                         {deleteDialog.type === 'machine' && machineDeletePlanCount ? (
                             <Alert severity="warning">
-                                {machineDeletePlanCount} plan(s) de production et leurs affectations seront aussi supprimes.
+                                {machineDeletePlanCount} plan(s) de production et leurs affectations seront aussi supprimés.
                             </Alert>
                         ) : null}
                         {deleteDialog.type === 'cart' && cartLinkedComponents ? (
                             <Alert severity="info">
-                                {cartLinkedComponents} composant(s) fixe(s) seront detaches de ce chariot.
+                                {cartLinkedComponents} composant(s) fixe(s) seront détachés de ce chariot.
                             </Alert>
                         ) : null}
                     </Stack>
