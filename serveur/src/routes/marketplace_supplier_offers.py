@@ -23,6 +23,15 @@ class ApplyMpnRequest(BaseModel):
     mpn: str = Field(..., min_length=1, max_length=200)
 
 
+class ApplyMpnBatchItem(BaseModel):
+    component_id: int = Field(..., gt=0)
+    mpn: str = Field(..., min_length=1, max_length=200)
+
+
+class ApplyMpnBatchRequest(BaseModel):
+    items: List[ApplyMpnBatchItem] = Field(..., min_length=1)
+
+
 @router.get("/status")
 def connectors_status(
     test: bool = Query(False, description="If true, do a live sample lookup per configured connector"),
@@ -106,11 +115,25 @@ def best_offers(
 @router.get("/mpn-proposals")
 def mpn_proposals(
     component_ids: Optional[str] = Query(None, description="Optional comma-separated component ids"),
+    live: bool = Query(False, description="Query supplier APIs (else cache-only, no quota cost)"),
+    limit: int = Query(
+        25, ge=1, le=200, description="Max empty-MPN components examined per run (quota guard)"
+    ),
     db: Session = Depends(get_db),
 ):
-    """List reviewable MPN proposals (component MPN empty, offer provides one)."""
+    """List tiered MPN proposals (high / medium / manual) for empty-MPN components.
+
+    Cache-only by default. Pass ``live=true`` to hit the supplier APIs; ``limit``
+    bounds how many components are examined so we stay under supplier quotas.
+    """
     ids = _parse_ids(component_ids) if component_ids else None
-    return {"proposals": SupplierOfferService.mpn_proposals(db, ids)}
+    proposals = SupplierOfferService.build_mpn_proposals(
+        db, component_ids=ids, live=live, limit=limit
+    )
+    counts = {"high": 0, "medium": 0, "manual": 0}
+    for proposal in proposals:
+        counts[proposal["confidence"]] = counts.get(proposal["confidence"], 0) + 1
+    return {"proposals": proposals, "counts": counts, "live": live, "limit": limit}
 
 
 @router.post("/mpn-apply")
@@ -123,3 +146,12 @@ def apply_mpn(request: ApplyMpnRequest, db: Session = Depends(get_db)):
             detail="MPN not applied (component missing or already has an MPN).",
         )
     return {"applied": True, "component_id": request.component_id, "mpn": request.mpn.strip()}
+
+
+@router.post("/mpn-apply-batch")
+def apply_mpn_batch(request: ApplyMpnBatchRequest, db: Session = Depends(get_db)):
+    """Apply several reviewed MPNs at once (e.g. all HIGH-confidence proposals)."""
+    result = SupplierOfferService.apply_mpn_batch(
+        db, [item.model_dump() for item in request.items]
+    )
+    return result

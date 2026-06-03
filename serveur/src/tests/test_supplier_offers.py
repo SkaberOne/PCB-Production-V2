@@ -112,3 +112,152 @@ def test_supplier_offers_endpoints():
 
     resp = client.get(f"/api/marketplace/supplier-offers/best?component_ids={component_id}&strategy=cheapest")
     assert resp.status_code == 200
+
+
+# --------------------------------------------------------- tiered MPN proposals
+
+
+class TieredFakeConnector:
+    """Fake connector that returns different results for MPN vs keyword search."""
+
+    name = "MOUSER"
+
+    def __init__(self, mpn_offers=None, keyword_offers=None):
+        self._mpn_offers = mpn_offers or []
+        self._keyword_offers = keyword_offers or []
+
+    @property
+    def is_configured(self):
+        return True
+
+    def search_by_mpn(self, mpn):
+        return self._mpn_offers
+
+    def search_by_keyword(self, keyword):
+        return self._keyword_offers
+
+
+def _set_package(component_id, package):
+    session = TestingSessionLocal()
+    try:
+        component = session.query(Component).filter(Component.id == component_id).first()
+        component.package = package
+        session.commit()
+    finally:
+        session.close()
+
+
+def test_build_proposals_high_exact_match():
+    cid = _make_component(value="RSX101M-30", mpn=None, reference="D_RSX101")
+    offers = [OfferDTO(supplier="MOUSER", mpn="RSX101M-30", manufacturer="Rohm",
+                       unit_price=0.20, stock_qty=500)]
+    session = TestingSessionLocal()
+    try:
+        props = SupplierOfferService.build_mpn_proposals(
+            session, component_ids=[cid], live=True,
+            connectors=[TieredFakeConnector(mpn_offers=offers)],
+        )
+    finally:
+        session.close()
+    assert len(props) == 1
+    proposal = props[0]
+    assert proposal["confidence"] == "high"
+    assert proposal["source"] == "exact_mpn"
+    assert proposal["proposed_mpn"] == "RSX101M-30"
+
+
+def test_build_proposals_medium_keyword_package_ranks_in_stock_first():
+    cid = _make_component(value="10K", mpn=None, reference="R_10K_0603")
+    _set_package(cid, "0603")
+    keyword_offers = [
+        OfferDTO(supplier="MOUSER", mpn="RC0603FR-0710KL", manufacturer="Yageo",
+                 unit_price=0.01, stock_qty=0),
+        OfferDTO(supplier="MOUSER", mpn="CRCW060310K0FKEA", manufacturer="Vishay",
+                 unit_price=0.01, stock_qty=1000),
+    ]
+    session = TestingSessionLocal()
+    try:
+        props = SupplierOfferService.build_mpn_proposals(
+            session, component_ids=[cid], live=True,
+            connectors=[TieredFakeConnector(keyword_offers=keyword_offers)],
+        )
+    finally:
+        session.close()
+    proposal = props[0]
+    assert proposal["confidence"] == "medium"
+    assert proposal["source"] == "keyword_package"
+    assert len(proposal["candidates"]) == 2
+    assert proposal["proposed_mpn"] == "CRCW060310K0FKEA"  # in-stock ranked first
+
+
+def test_build_proposals_manual_when_no_offer():
+    cid = _make_component(value="NC", mpn=None, reference="X_NC")
+    session = TestingSessionLocal()
+    try:
+        props = SupplierOfferService.build_mpn_proposals(
+            session, component_ids=[cid], live=True, connectors=[TieredFakeConnector()],
+        )
+    finally:
+        session.close()
+    assert props[0]["confidence"] == "manual"
+
+
+def test_build_proposals_skips_filled_mpn():
+    cid = _make_component(value="BAV199", mpn="BAV199LT1G", reference="D_FILLED")
+    session = TestingSessionLocal()
+    try:
+        props = SupplierOfferService.build_mpn_proposals(session, component_ids=[cid], live=False)
+    finally:
+        session.close()
+    assert props == []
+
+
+def test_build_proposals_limit_caps_components():
+    ids = [_make_component(value="NC", mpn=None, reference=f"L_{i}") for i in range(3)]
+    session = TestingSessionLocal()
+    try:
+        props = SupplierOfferService.build_mpn_proposals(
+            session, component_ids=ids, live=False, limit=1
+        )
+    finally:
+        session.close()
+    assert len(props) == 1
+
+
+def test_apply_mpn_batch_applies_and_skips():
+    c1 = _make_component(value="RSX101M-30", mpn=None, reference="B_apply")
+    c2 = _make_component(value="DMG3406L-7", mpn="DMG3406L-7", reference="B_filled")
+    session = TestingSessionLocal()
+    try:
+        result = SupplierOfferService.apply_mpn_batch(session, [
+            {"component_id": c1, "mpn": "RSX101M-30"},
+            {"component_id": c2, "mpn": "OTHER"},
+            {"component_id": 999999, "mpn": "ZZZ"},
+        ])
+    finally:
+        session.close()
+    assert {a["component_id"] for a in result["applied"]} == {c1}
+    reasons = {s["component_id"]: s["reason"] for s in result["skipped"]}
+    assert reasons[c2] == "already_set"
+    assert reasons[999999] == "not_found"
+
+
+def test_mpn_proposals_endpoint_returns_counts():
+    cid = _make_component(value="someval123X", mpn=None, reference="EP_counts")
+    resp = client.get(
+        f"/api/marketplace/supplier-offers/mpn-proposals?component_ids={cid}&live=false"
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert "proposals" in body and "counts" in body
+    assert body["live"] is False
+
+
+def test_mpn_apply_batch_endpoint():
+    cid = _make_component(value="RSX999A-30", mpn=None, reference="EP_batch")
+    resp = client.post(
+        "/api/marketplace/supplier-offers/mpn-apply-batch",
+        json={"items": [{"component_id": cid, "mpn": "RSX999A-30"}]},
+    )
+    assert resp.status_code == 200
+    assert resp.json()["applied"][0]["component_id"] == cid

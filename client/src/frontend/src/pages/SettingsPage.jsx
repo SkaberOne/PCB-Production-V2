@@ -40,6 +40,7 @@ import {
     Typography,
 } from '@mui/material';
 import PageHeader from '../components/common/PageHeader';
+import MpnEnrichmentPanel from '../components/library/MpnEnrichmentPanel';
 import {
     compactCellSx,
     compactTableContainerSx,
@@ -2607,6 +2608,8 @@ function SettingsPage() {
                     </Stack>
                 </CardContent>
             </Card>
+
+            <MpnEnrichmentPanel />
 
             <Grid container spacing={3}>
                 {sections.map((section) => {
