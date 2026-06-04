@@ -37,7 +37,12 @@ export function useWorkspaceData() {
             setMachines(machinesResponse.data?.data || []);
             setFeeders(feedersResponse.data?.data || []);
             setCarts(cartsResponse.data?.data || []);
-            setProductions(productionsResponse.data?.items || productionsResponse.data?.data || []);
+            const productionsData = productionsResponse.data;
+            setProductions(
+                Array.isArray(productionsData)
+                    ? productionsData
+                    : (productionsData?.items || productionsData?.data || []),
+            );
             setFeedback({ type: 'info', message: '' });
         } catch (requestError) {
             if (!mountedRef.current) return;
