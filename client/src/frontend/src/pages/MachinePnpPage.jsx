@@ -93,19 +93,25 @@ function StatusChip({ validated }) {
     );
 }
 
+const CART_KIND_STYLES = {
+    COMMON: { label: 'Commun', bg: 'rgba(16,185,129,0.12)', color: '#a855f7', border: 'rgba(16,185,129,0.25)' },
+    CATEGORY: { label: 'Catégorie', bg: 'rgba(245,158,11,0.1)', color: '#f59e0b', border: 'rgba(245,158,11,0.25)' },
+    CUSTOM: { label: 'Personnalisé', bg: 'rgba(96,165,250,0.12)', color: '#60a5fa', border: 'rgba(96,165,250,0.25)' },
+};
+
 function KindChip({ kind }) {
-    const isCommon = kind === 'COMMON';
+    const style = CART_KIND_STYLES[kind] || CART_KIND_STYLES.CATEGORY;
     return (
         <Chip
-            label={isCommon ? 'Commun' : 'Catégorie'}
+            label={style.label}
             size="small"
             sx={{
                 height: 18,
                 fontSize: '0.6rem',
                 fontWeight: 700,
-                backgroundColor: isCommon ? 'rgba(16,185,129,0.12)' : 'rgba(245,158,11,0.1)',
-                color: isCommon ? '#a855f7' : '#f59e0b',
-                border: `1px solid ${isCommon ? 'rgba(16,185,129,0.25)' : 'rgba(245,158,11,0.25)'}`,
+                backgroundColor: style.bg,
+                color: style.color,
+                border: `1px solid ${style.border}`,
             }}
         />
     );

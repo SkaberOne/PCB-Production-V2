@@ -67,7 +67,7 @@ function ErpDefaultsPage() {
         <Box>
             <PageHeader
                 title="Valeurs par défaut ERP"
-                subtitle="Champs préremplis automatiquement dans l'export de demande d'achat."
+                description="Champs préremplis automatiquement dans l'export de demande d'achat."
             />
             {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
             {values && (

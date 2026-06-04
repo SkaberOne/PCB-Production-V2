@@ -57,6 +57,12 @@ function ProcurementTable({ rows = [], commandId, refreshNonce = 0, onRefreshSta
 
     const persistTimers = useRef({});
 
+    // Nettoyage des timers debounce au démontage pour éviter une écriture après navigation.
+    useEffect(() => {
+        const timers = persistTimers.current;
+        return () => { Object.values(timers).forEach((t) => clearTimeout(t)); };
+    }, []);
+
     // Initialise la qté reçue depuis le backend SANS écraser une saisie locale en cours.
     useEffect(() => {
         setReceived((prev) => {

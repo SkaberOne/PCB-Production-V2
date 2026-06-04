@@ -221,6 +221,7 @@ function BomImportWorkspaceCard({
                         type="file"
                         accept=".txt"
                         multiple
+                        onClick={(e) => { e.currentTarget.value = ''; }}
                         onChange={handleFileChange}
                         style={{ display: 'none' }}
                     />

@@ -131,7 +131,7 @@ function BomStockDialog({
                 {line ? (
                     <Stack spacing={3} sx={{ mt: 0.5 }}>
                         <Alert severity="info">
-                            Les informations sont enregistrées immédiatement pendant la saisie.
+                            Les valeurs saisies sont conservées dans la session et enregistrées avec la BOM.
                         </Alert>
 
                         <Grid container spacing={2}>
@@ -215,7 +215,7 @@ function BomStockDialog({
                                                         type="number"
                                                         label="Ø extérieur de la bande (mm)"
                                                         helperText="Au sommet de l'enroulement de la bande"
-                                                        value={line.draft.reel_outer_diameter_mm || ''}
+                                                        value={line.draft.reel_outer_diameter_mm ?? ''}
                                                         onChange={onStockDraftChange(line.key, 'reel_outer_diameter_mm', true)}
                                                         sx={compactInputSx}
                                                     />
@@ -226,7 +226,7 @@ function BomStockDialog({
                                                         size="small"
                                                         type="number"
                                                         label="Diamètre du moyeu (mm)"
-                                                        value={line.draft.reel_hub_diameter_mm || ''}
+                                                        value={line.draft.reel_hub_diameter_mm ?? ''}
                                                         onChange={onStockDraftChange(line.key, 'reel_hub_diameter_mm', true)}
                                                         sx={compactInputSx}
                                                     />
@@ -249,7 +249,7 @@ function BomStockDialog({
                                                         size="small"
                                                         type="number"
                                                         label="Marge de sécurité (%)"
-                                                        value={line.draft.reel_safety_pct || 25}
+                                                        value={line.draft.reel_safety_pct ?? 25}
                                                         onChange={onStockDraftChange(line.key, 'reel_safety_pct', true)}
                                                         sx={compactInputSx}
                                                     />
@@ -301,7 +301,7 @@ function BomStockDialog({
                                                         size="small"
                                                         type="number"
                                                         label="Quantité sachet"
-                                                        value={line.draft.bag_qty || ''}
+                                                        value={line.draft.bag_qty ?? ''}
                                                         onChange={onStockDraftChange(line.key, 'bag_qty', true)}
                                                         sx={compactInputSx}
                                                     />
@@ -312,7 +312,7 @@ function BomStockDialog({
                                                         size="small"
                                                         type="number"
                                                         label="Quantité tube"
-                                                        value={line.draft.tube_qty || ''}
+                                                        value={line.draft.tube_qty ?? ''}
                                                         onChange={onStockDraftChange(line.key, 'tube_qty', true)}
                                                         sx={compactInputSx}
                                                     />

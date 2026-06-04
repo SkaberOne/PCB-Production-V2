@@ -92,6 +92,7 @@ const SettingsComponentTableRow = React.memo(function SettingsComponentTableRow(
 });
 
 const componentEditorFields = [
+    'reference',
     'value',
     'mpn',
     'component_type',
@@ -681,6 +682,19 @@ function ComposantsPanel() {
                                             </Stack>
 
                                             <Grid container spacing={1}>
+                                                <Grid item xs={12}>
+                                                        <TextField
+                                                            fullWidth
+                                                            size="small"
+                                                            label="Référence"
+                                                            required
+                                                            value={componentForm.reference}
+                                                            onChange={componentChangeHandlers.reference}
+                                                            disabled={!selectedComponentId}
+                                                            error={!!selectedComponentId && !componentForm.reference.trim()}
+                                                            helperText={!!selectedComponentId && !componentForm.reference.trim() ? 'Référence obligatoire pour enregistrer.' : ''}
+                                                        />
+                                                </Grid>
                                                 <Grid item xs={12}>
                                                         <TextField
                                                             fullWidth

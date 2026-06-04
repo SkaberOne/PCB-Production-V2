@@ -157,7 +157,7 @@ function EmpreintesPanel() {
                                                         Importe le tableau `Type;Footprint;Tape_width_mm;Pitch_mm;Feeder` pour completer automatiquement les composants.
                                                     </Typography>
                                                 </Stack>
-                                                <Chip size="small" variant="outlined" label={`${machineFootprintOptions.length} empreinte(s)`} />
+                                                <Chip size="small" variant="outlined" label={`${machineFootprintOptions.length} empreinte(s) distincte(s)`} />
                                                 {machineFootprintLoading ? <Chip size="small" color="info" variant="outlined" label="Chargement..." /> : null}
                                             </Stack>
                                             <Stack direction={{ xs: 'column', md: 'row' }} spacing={1.5} alignItems={{ xs: 'stretch', md: 'center' }}>
