@@ -59,42 +59,56 @@ export function useMachineConfig({
 
     const syncingMachineProductionQuantitiesRef = React.useRef('');
 
+    // Garde de montage + jeton « dernière requête gagne » pour le plan (la
+    // sélection de production peut changer plus vite que la réponse réseau).
+    const mountedRef = React.useRef(true);
+    const latestPlanRef = React.useRef(0);
+    React.useEffect(() => () => { mountedRef.current = false; }, []);
+
     // ── Loaders ───────────────────────────────────────────────────────────────
 
     const loadMachineSummary = React.useCallback(async (machineId) => {
-        setMachineSummaryLoading(true);
-        setMachineConfigError('');
+        if (mountedRef.current) {
+            setMachineSummaryLoading(true);
+            setMachineConfigError('');
+        }
         try {
             const response = await apiClient.get(`/marketplace/machines/${machineId}/summary`);
+            if (!mountedRef.current) return null;
             setMachineSummary(response.data);
             return response.data;
         } catch (requestError) {
-            setMachineSummary(null);
-            setMachineConfigError(extractRequestError(requestError, 'Impossible de charger le résumé de la machine.'));
+            if (mountedRef.current) {
+                setMachineSummary(null);
+                setMachineConfigError(extractRequestError(requestError, 'Impossible de charger le résumé de la machine.'));
+            }
             return null;
         } finally {
-            setMachineSummaryLoading(false);
+            if (mountedRef.current) setMachineSummaryLoading(false);
         }
     }, []);
 
     const loadMachineProductionPlan = React.useCallback(async (machineId, productionId) => {
         if (!machineId || !productionId) {
-            setMachineProductionPlan(null);
+            if (mountedRef.current) setMachineProductionPlan(null);
             return null;
         }
-        setMachineProductionPlanLoading(true);
+        const requestId = (latestPlanRef.current += 1);
+        if (mountedRef.current) setMachineProductionPlanLoading(true);
         try {
             const response = await apiClient.get(
                 `/marketplace/machines/${machineId}/productions/${productionId}/feeder-plan`,
             );
+            if (!mountedRef.current || requestId !== latestPlanRef.current) return null;
             setMachineProductionPlan(response.data || null);
             return response.data || null;
         } catch (requestError) {
+            if (!mountedRef.current || requestId !== latestPlanRef.current) return null;
             setMachineProductionPlan(null);
             setMachineConfigError(extractRequestError(requestError, "Impossible de charger l'implantation feeders."));
             return null;
         } finally {
-            setMachineProductionPlanLoading(false);
+            if (mountedRef.current && requestId === latestPlanRef.current) setMachineProductionPlanLoading(false);
         }
     }, []);
 

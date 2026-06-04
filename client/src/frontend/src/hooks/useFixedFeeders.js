@@ -45,24 +45,34 @@ export function useFixedFeeders({ feeders, carts, setFeedback, setActionLoading,
     const deferredFixedFeederSearch = React.useDeferredValue(fixedFeederSearch);
     const deferredFixedFeederComponentSearch = React.useDeferredValue(fixedFeederComponentSearch);
 
+    // Garde de montage + jeton « dernière requête gagne » pour la recherche de
+    // candidats (évite qu'une réponse lente écrase une saisie plus récente, et tout
+    // setState après fermeture/démontage du dialogue).
+    const mountedRef = React.useRef(true);
+    React.useEffect(() => () => { mountedRef.current = false; }, []);
+    const latestCandidatesRef = React.useRef(0);
+
     // ── Loaders ───────────────────────────────────────────────────────────────
 
     const loadFixedFeederRows = React.useCallback(async () => {
-        setFixedFeederListLoading(true);
+        if (mountedRef.current) setFixedFeederListLoading(true);
         try {
             const response = await apiClient.get('/marketplace/fixed-feeders/components', {
                 params: { only_fixed: true, limit: 500 },
             });
+            if (!mountedRef.current) return false;
             setFixedFeederRows(response.data?.data || []);
             return true;
         } catch (requestError) {
-            setFeedback({
-                type: 'error',
-                message: extractRequestError(requestError, 'Impossible de charger la liste des feeders fixes.'),
-            });
+            if (mountedRef.current) {
+                setFeedback({
+                    type: 'error',
+                    message: extractRequestError(requestError, 'Impossible de charger la liste des feeders fixes.'),
+                });
+            }
             return false;
         } finally {
-            setFixedFeederListLoading(false);
+            if (mountedRef.current) setFixedFeederListLoading(false);
         }
     }, [setFeedback]);
 
@@ -70,7 +80,8 @@ export function useFixedFeeders({ feeders, carts, setFeedback, setActionLoading,
         if (!fixedFeederDialogOpen) {
             return;
         }
-        setFixedFeederCandidatesLoading(true);
+        const requestId = (latestCandidatesRef.current += 1);
+        if (mountedRef.current) setFixedFeederCandidatesLoading(true);
         try {
             const response = await apiClient.get('/marketplace/fixed-feeders/components', {
                 params: {
@@ -79,12 +90,14 @@ export function useFixedFeeders({ feeders, carts, setFeedback, setActionLoading,
                     ...(String(searchValue || '').trim() ? { search: String(searchValue).trim() } : {}),
                 },
             });
+            if (!mountedRef.current || requestId !== latestCandidatesRef.current) return;
             setFixedFeederCandidates(response.data?.data || []);
         } catch (requestError) {
+            if (!mountedRef.current || requestId !== latestCandidatesRef.current) return;
             setFixedFeederCandidates([]);
             setFixedFeederDialogError(extractRequestError(requestError, 'Impossible de charger les composants candidats.'));
         } finally {
-            setFixedFeederCandidatesLoading(false);
+            if (mountedRef.current && requestId === latestCandidatesRef.current) setFixedFeederCandidatesLoading(false);
         }
     }, [fixedFeederDialogOpen]);
 

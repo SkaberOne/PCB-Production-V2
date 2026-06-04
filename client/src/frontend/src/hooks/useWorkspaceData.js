@@ -16,8 +16,13 @@ export function useWorkspaceData() {
     const [actionLoading, setActionLoading] = React.useState('');
     const [deleteDialog, setDeleteDialog] = React.useState({ open: false, type: '', item: null });
 
+    // Garde de montage : empêche tout setState après démontage (warnings React /
+    // états fantômes) sur les chargeurs partagés effet + handlers.
+    const mountedRef = React.useRef(true);
+    React.useEffect(() => () => { mountedRef.current = false; }, []);
+
     const loadWorkspace = React.useCallback(async () => {
-        setLoading(true);
+        if (mountedRef.current) setLoading(true);
         try {
             const [machinesResponse, feedersResponse, cartsResponse, productionsResponse] = await Promise.all([
                 apiClient.get('/marketplace/machines', { params: { limit: 200 } }),
@@ -25,18 +30,20 @@ export function useWorkspaceData() {
                 apiClient.get('/marketplace/carts', { params: { limit: 200 } }),
                 apiClient.get('/marketplace/productions'),
             ]);
+            if (!mountedRef.current) return;
             setMachines(machinesResponse.data?.data || []);
             setFeeders(feedersResponse.data?.data || []);
             setCarts(cartsResponse.data?.data || []);
             setProductions(productionsResponse.data?.items || productionsResponse.data?.data || []);
             setFeedback({ type: 'info', message: '' });
         } catch (requestError) {
+            if (!mountedRef.current) return;
             setFeedback({
                 type: 'error',
                 message: extractRequestError(requestError, 'Impossible de charger la configuration PnP.'),
             });
         } finally {
-            setLoading(false);
+            if (mountedRef.current) setLoading(false);
         }
     }, []);
 
