@@ -370,3 +370,82 @@ class TestGetMachineProductionFeederPlan:
                 machine_id=machine.id,
                 production_id=99999,
             )
+
+
+# ── Tests: sélection « à placer à la main » au débordement ───────────────────
+
+class TestManualPlacementOnOverflow:
+    def test_overflow_prefers_big_low_pose_components(self, db):
+        # Machine 4 positions ; demande = 6 slots (1 gros 2-slots + 4 petits) → déborde de 2.
+        machine = make_machine(db, positions=4)
+        production = make_production(db, machine)
+        revision = make_bom_revision(db)
+
+        big = Component(
+            reference="J1", value="USB-C", package="USB",
+            footprint_pnp="USB", feeder_type="CL12", is_fixed_feeder=False,
+        )
+        db.add(big)
+        db.flush()
+        smalls = []
+        for index in range(4):
+            small = Component(
+                reference=f"R{index}", value=f"V{index}", package="0402",
+                footprint_pnp=f"R0402_{index}", feeder_type="CL8-4", is_fixed_feeder=False,
+            )
+            db.add(small)
+            db.flush()
+            smalls.append(small)
+
+        # Le gros feeder n'a qu'1 pose (score 2/1=2.0) ; les petits en ont 10 (score 1/10=0.1)
+        db.add(BomItem(
+            bom_revision_id=revision.id, reference_item="J1", quantity=1,
+            footprint_pnp=big.footprint_pnp, value_harmonized=big.value, dnp=False,
+        ))
+        for index, small in enumerate(smalls):
+            db.add(BomItem(
+                bom_revision_id=revision.id, reference_item=f"R{index}", quantity=10,
+                footprint_pnp=small.footprint_pnp, value_harmonized=small.value, dnp=False,
+            ))
+        link_revision(db, production, revision, order=1, quantity=1)
+        db.commit()
+
+        plan = AssignmentPlanningMixin.get_machine_production_feeder_plan(
+            db=db, machine_id=machine.id, production_id=production.id,
+        )
+
+        # Le gros feeder (2 slots, peu posé) est choisi pour la pose à la main.
+        assert plan["manual_placement_count"] == 1
+        assert plan["manual_placement_slot_savings"] == 2
+        manual = plan["manual_placement_components"][0]
+        assert manual["component_id"] == big.id
+        assert manual["slot_usage"] == 2
+        assert manual["manual_placement"] is True
+        # Les 4 petits feeders tiennent alors sur la machine, sans débordement capacitaire.
+        assert plan["assigned_component_count"] == 4
+        assert plan["occupied_slot_count"] == 4
+        capacity_unassigned = [
+            item for item in plan["unassigned_components"]
+            if "apacit" in str(item.get("reason", ""))
+        ]
+        assert capacity_unassigned == []
+
+    def test_no_manual_placement_when_everything_fits(self, db):
+        machine = make_machine(db, positions=40)
+        production = make_production(db, machine)
+        revision = make_bom_revision(db)
+        component = make_component(db)
+        db.add(BomItem(
+            bom_revision_id=revision.id, reference_item="R1", quantity=2,
+            footprint_pnp=component.footprint_pnp, value_harmonized=component.value, dnp=False,
+        ))
+        link_revision(db, production, revision, order=1, quantity=1)
+        db.commit()
+
+        plan = AssignmentPlanningMixin.get_machine_production_feeder_plan(
+            db=db, machine_id=machine.id, production_id=production.id,
+        )
+
+        assert plan["manual_placement_count"] == 0
+        assert plan["manual_placement_slot_savings"] == 0
+        assert plan["manual_placement_components"] == []

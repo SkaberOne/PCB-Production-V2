@@ -360,7 +360,53 @@ class AssignmentPlanningMixin:
         for entry in sorted(fixed_entries, key=cls._fixed_plan_sort_key):
             assign_entry(entry, "FIXED")
 
+        # ── Débordement → sélection « à placer à la main » ─────────────────────────
+        # Après les feeders fixes, si la demande dynamique dépasse la capacité
+        # restante de la machine, on choisit les composants à poser à la main par
+        # score « emplacements libérés ÷ nombre de poses » décroissant : les gros
+        # feeders (2 positions) peu posés sortent en premier — un maximum de place
+        # gagnée pour un minimum d'effort manuel — jusqu'à ce que le reste tienne.
+        manual_placement_components: List[Dict] = []
+        manual_placement_slot_savings = 0
+        manual_placement_ids: set = set()
+
+        def _dynamic_size_is_valid(candidate: Dict) -> bool:
+            feeder_size_mm = candidate["feeder_size_mm"]
+            if not machine_feeder_sizes:
+                return True
+            return feeder_size_mm is not None and feeder_size_mm in machine_feeder_sizes
+
+        size_valid_dynamic = [entry for entry in dynamic_entries if _dynamic_size_is_valid(entry)]
+        remaining_capacity = max(int(machine.num_positions or 0) - len(positions), 0)
+        dynamic_slot_demand = sum(int(entry["slot_usage"]) for entry in size_valid_dynamic)
+
+        if dynamic_slot_demand > remaining_capacity:
+            overflow_slots = dynamic_slot_demand - remaining_capacity
+            ranked_for_manual = sorted(
+                size_valid_dynamic,
+                key=lambda entry: (
+                    -(int(entry["slot_usage"]) / max(int(entry["total_quantity"]), 1)),
+                    -int(entry["slot_usage"]),
+                    int(entry["total_quantity"]),
+                    component_display_label(entry["component"]).upper(),
+                    entry["component"].id,
+                ),
+            )
+            for entry in ranked_for_manual:
+                if manual_placement_slot_savings >= overflow_slots:
+                    break
+                manual_placement_ids.add(entry["component"].id)
+                manual_placement_slot_savings += int(entry["slot_usage"])
+                manual_component = build_unassigned_payload(entry, "A placer a la main (capacite optimisee)", "MANUAL")
+                manual_component["manual_placement"] = True
+                manual_component["manual_score"] = round(
+                    int(entry["slot_usage"]) / max(int(entry["total_quantity"]), 1), 3
+                )
+                manual_placement_components.append(manual_component)
+
         for entry in sorted(dynamic_entries, key=cls._dynamic_plan_sort_key):
+            if entry["component"].id in manual_placement_ids:
+                continue
             assign_entry(entry, "DYNAMIC")
 
         slots = []
@@ -407,6 +453,9 @@ class AssignmentPlanningMixin:
             "occupied_slot_count": len(positions),
             "free_slot_count": max(total_positions - len(positions), 0),
             "unassigned_component_count": len(unassigned_components),
+            "manual_placement_components": manual_placement_components,
+            "manual_placement_count": len(manual_placement_components),
+            "manual_placement_slot_savings": manual_placement_slot_savings,
             "unmatched_bom_item_count": unmatched_bom_items,
         }
 
