@@ -13,6 +13,7 @@ import {
 } from '@mui/material';
 import { ProductionAssignPanel, ProductionSequencePanel, FeederMountPanel } from './MachineConfigPanels';
 import MachineImplantationPanel from './MachineImplantationPanel';
+import ManualPlacementPanel from './ManualPlacementPanel';
 
 /**
  * Dialogue de configuration machine — plan d'implantation feeders.
@@ -62,6 +63,7 @@ function MachineConfigDialog({ config }) {
                         <ProductionAssignPanel config={config} />
                         <ProductionSequencePanel config={config} />
                         <MachineImplantationPanel config={config} />
+                        <ManualPlacementPanel config={config} />
                         <FeederMountPanel config={config} />
                     </Stack>
                 )}

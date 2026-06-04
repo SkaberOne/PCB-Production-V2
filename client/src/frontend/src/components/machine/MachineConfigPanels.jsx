@@ -171,7 +171,24 @@ export function ProductionSequencePanel({ config }) {
                                 <TableRow key={bom.bom_revision_id} sx={{ '& td': { borderColor: '#27272a', py: 0.5 } }}>
                                     <TableCell sx={{ color: '#52525b', fontSize: '0.75rem' }}>{bom.sequence_order ?? index + 1}</TableCell>
                                     <TableCell sx={{ color: '#f4f4f5', fontSize: '0.8rem' }}>{bom.reference}</TableCell>
-                                    <TableCell sx={{ color: '#a1a1aa', fontSize: '0.75rem' }}>{bom.revision}</TableCell>
+                                    <TableCell sx={{ color: '#a1a1aa', fontSize: '0.75rem' }}>
+                                        {bom.revision}
+                                        {bom.side ? (
+                                            <Chip
+                                                label={bom.side}
+                                                size="small"
+                                                sx={{
+                                                    ml: 0.75,
+                                                    height: 16,
+                                                    fontSize: '0.58rem',
+                                                    fontWeight: 700,
+                                                    backgroundColor: bom.side === 'TOP' ? 'rgba(56,189,248,0.14)' : 'rgba(245,158,11,0.14)',
+                                                    color: bom.side === 'TOP' ? '#bae6fd' : '#fde68a',
+                                                    border: `1px solid ${bom.side === 'TOP' ? 'rgba(56,189,248,0.3)' : 'rgba(245,158,11,0.3)'}`,
+                                                }}
+                                            />
+                                        ) : null}
+                                    </TableCell>
                                     <TableCell align="right" sx={{ color: '#a1a1aa', fontSize: '0.75rem' }}>{bom.quantity_to_produce ?? 1}</TableCell>
                                     <TableCell align="right">
                                         <IconButton size="small" aria-label="Monter" disabled={busy || index === 0} onClick={() => handleMoveProductionBom(selectedMachineProduction, bom.bom_revision_id, 'up')} sx={{ color: '#52525b' }}>
