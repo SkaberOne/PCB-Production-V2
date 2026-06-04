@@ -6,6 +6,7 @@ import {
     Alert,
     Box,
     Button,
+    Chip,
     CircularProgress,
     Dialog,
     DialogActions,
@@ -17,6 +18,7 @@ import {
     Paper,
     Stack,
     Tab,
+    TablePagination,
     Tabs,
 } from '@mui/material';
 import apiClient from '../../api/client';
@@ -97,6 +99,15 @@ function MachinePnpWorkspace() {
     const [editCart, setEditCart] = useState(null);
     const [editMachine, setEditMachine] = useState(null);
     const [machineMenu, setMachineMenu] = useState(null);
+    const [feederPage, setFeederPage] = useState(0);
+    const [feederRowsPerPage, setFeederRowsPerPage] = useState(25);
+
+    const fixedRows = fixedFeeders.filteredFixedFeederRows;
+    const safeFeederPage = Math.min(feederPage, Math.max(0, Math.ceil(fixedRows.length / feederRowsPerPage) - 1));
+    const pagedFixedRows = fixedRows.slice(
+        safeFeederPage * feederRowsPerPage,
+        safeFeederPage * feederRowsPerPage + feederRowsPerPage,
+    );
 
     const closeFeedback = useCallback(
         () => setFeedback({ type: 'info', message: '' }),
@@ -245,12 +256,41 @@ function MachinePnpWorkspace() {
                                 </Button>
                             </Box>
                             <FixedFeederFilters fixedFeeders={fixedFeeders} />
+                            {(fixedFeeders.fixedFeederChips.length || fixedFeeders.fixedFeederOverviewChips.length) ? (
+                                <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+                                    {(fixedFeeders.fixedFeederChips.length
+                                        ? fixedFeeders.fixedFeederChips
+                                        : fixedFeeders.fixedFeederOverviewChips
+                                    ).map((chip) => (
+                                        <Chip
+                                            key={chip.label}
+                                            label={chip.label}
+                                            size="small"
+                                            sx={{ backgroundColor: 'rgba(255,255,255,0.04)', color: chip.color, border: '1px solid #27272a', fontSize: '0.68rem' }}
+                                        />
+                                    ))}
+                                </Stack>
+                            ) : null}
                             <Paper sx={PANEL_SX}>
                                 <FixedFeederTable
                                     actionLoading={actionLoading}
-                                    rows={fixedFeeders.filteredFixedFeederRows}
+                                    rows={pagedFixedRows}
                                     onEditFixedFeeder={fixedFeeders.openFixedFeederDialog}
                                     onRemoveFixedFeeder={fixedFeeders.handleRemoveFixedFeeder}
+                                />
+                                <TablePagination
+                                    component="div"
+                                    count={fixedRows.length}
+                                    page={safeFeederPage}
+                                    onPageChange={(_event, nextPage) => setFeederPage(nextPage)}
+                                    rowsPerPage={feederRowsPerPage}
+                                    onRowsPerPageChange={(event) => {
+                                        setFeederRowsPerPage(parseInt(event.target.value, 10));
+                                        setFeederPage(0);
+                                    }}
+                                    rowsPerPageOptions={[25, 50, 100]}
+                                    labelRowsPerPage="Lignes"
+                                    sx={{ borderTop: '1px solid #27272a', color: '#71717a', fontSize: '0.75rem' }}
                                 />
                             </Paper>
                         </Stack>

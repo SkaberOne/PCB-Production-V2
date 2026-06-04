@@ -29,6 +29,7 @@ function FixedFeederDialog({ fixedFeeders }) {
         fixedFeederForm,
         setFixedFeederForm,
         fixedFeederDialogError,
+        setFixedFeederDialogError,
         fixedFeederComponentSearch,
         setFixedFeederComponentSearch,
         fixedFeederCandidatesLoading,
@@ -55,7 +56,9 @@ function FixedFeederDialog({ fixedFeeders }) {
             <DialogTitle>{editingFixedFeeder ? 'Modifier le feeder fixe' : 'Nouveau feeder fixe'}</DialogTitle>
             <DialogContent sx={{ pt: '12px !important' }}>
                 <Stack spacing={2}>
-                    {fixedFeederDialogError ? <Alert severity="error">{fixedFeederDialogError}</Alert> : null}
+                    {fixedFeederDialogError ? (
+                        <Alert severity="error" onClose={() => setFixedFeederDialogError('')}>{fixedFeederDialogError}</Alert>
+                    ) : null}
 
                     {editingFixedFeeder ? (
                         <Box>
