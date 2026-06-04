@@ -11,22 +11,24 @@ import {
 } from '@mui/material';
 import { MachineAssignmentTable } from './MachinePnpTables';
 import MachinePnpSlotStrip from './MachinePnpSlotStrip';
-import { machineFrameSx, machineLaneSx } from '../../utils/machinePnp';
+import {
+    FEEDER_SIZE_LEGEND,
+    getFeederSizePalette,
+    machineFrameSx,
+    machineLaneSx,
+    slotEmptyPalette,
+} from '../../utils/machinePnp';
 
-const FRONT_LANE_COLOR = '#38bdf8';
-const BACK_LANE_COLOR = '#34d399';
-
-function MachineLane({ title, slots, layout, laneColor, config }) {
+function MachineLane({ title, slots, layout, config }) {
     if (!slots.length) return null;
     return (
         <Box sx={machineLaneSx}>
-            <Typography sx={{ fontSize: '0.65rem', color: '#71717a', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', mb: 0.75 }}>
+            <Typography sx={{ fontSize: '0.62rem', color: '#71717a', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', mb: 0.6 }}>
                 {title} · {slots.length} positions
             </Typography>
             <MachinePnpSlotStrip
                 slots={slots}
                 layout={layout}
-                laneColor={laneColor}
                 selectedSlotPosition={config.selectedMachineSlotPosition}
                 machinePlanSlotMap={config.machinePlanSlotMap}
                 machinePlanAssignmentMap={config.machinePlanAssignmentMap}
@@ -39,10 +41,58 @@ function MachineLane({ title, slots, layout, laneColor, config }) {
     );
 }
 
+/** Convoyeur PCB central — la carte défile entre les deux rampes de feeders. */
+function ConveyorBand() {
+    return (
+        <Box
+            sx={{
+                position: 'relative',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 1.5,
+                py: 0.75,
+                borderRadius: 1.5,
+                border: '1px dashed #2a2a31',
+                backgroundColor: 'rgba(255,255,255,0.015)',
+            }}
+        >
+            <Typography sx={{ position: 'absolute', left: 8, top: 4, fontSize: '0.55rem', letterSpacing: '0.06em', textTransform: 'uppercase', color: '#52525b' }}>
+                Convoyeur PCB
+            </Typography>
+            <Typography sx={{ color: '#52525b', fontSize: '0.9rem' }}>→</Typography>
+            <Box sx={{ px: 1.5, py: 0.4, borderRadius: 1, border: '1px solid #3b6d11', backgroundColor: 'rgba(99,153,34,0.18)', color: '#bbf7d0', fontSize: '0.6rem', fontWeight: 600 }}>
+                Carte en cours
+            </Box>
+            <Typography sx={{ color: '#52525b', fontSize: '0.9rem' }}>→</Typography>
+        </Box>
+    );
+}
+
+/** Légende : couleur des slots par taille de feeder. */
+function FeederSizeLegend() {
+    const items = FEEDER_SIZE_LEGEND.map((size) => {
+        const palette = getFeederSizePalette(size);
+        return { key: size, label: `${size} mm`, borderColor: palette.borderColor, background: palette.slotBackground };
+    });
+    items.push({ key: 'libre', label: 'Libre', borderColor: slotEmptyPalette.borderColor, background: 'transparent' });
+
+    return (
+        <Stack direction="row" spacing={1.5} flexWrap="wrap" useFlexGap sx={{ mt: 1 }}>
+            {items.map((item) => (
+                <Stack key={item.key} direction="row" spacing={0.5} alignItems="center">
+                    <Box sx={{ width: 12, height: 12, borderRadius: 0.5, border: `1px solid ${item.borderColor}`, backgroundColor: item.background }} />
+                    <Typography sx={{ fontSize: '0.65rem', color: '#a1a1aa' }}>{item.label}</Typography>
+                </Stack>
+            ))}
+        </Stack>
+    );
+}
+
 /**
- * Panneau « plan d'implantation » du dialogue de configuration machine :
- * synthèse, filtre par révision BOM, slot-strip avant/arrière, table d'affectation
- * et détail du slot sélectionné.
+ * Panneau « plan d'implantation » : synthèse, filtre par révision BOM, vue machine
+ * vue de dessus (rampe arrière → convoyeur PCB → rampe avant) colorée par taille de
+ * feeder, table d'affectation et détail du slot sélectionné.
  */
 function MachineImplantationPanel({ config }) {
     const {
@@ -139,10 +189,13 @@ function MachineImplantationPanel({ config }) {
                 </Box>
             ) : null}
 
-            <Stack spacing={1.5}>
-                <MachineLane title="Rampe avant" slots={machineTopView.frontSlots} layout={frontSlotLayout} laneColor={FRONT_LANE_COLOR} config={config} />
-                <MachineLane title="Rampe arrière" slots={machineTopView.backSlots} layout={backSlotLayout} laneColor={BACK_LANE_COLOR} config={config} />
+            {/* Vue machine vue de dessus : rampe arrière → convoyeur PCB → rampe avant */}
+            <Stack spacing={0.75}>
+                <MachineLane title="Rampe arrière" slots={machineTopView.backSlots} layout={backSlotLayout} config={config} />
+                <ConveyorBand />
+                <MachineLane title="Rampe avant" slots={machineTopView.frontSlots} layout={frontSlotLayout} config={config} />
             </Stack>
+            <FeederSizeLegend />
 
             <Divider sx={{ borderColor: '#27272a', my: 2 }} />
 

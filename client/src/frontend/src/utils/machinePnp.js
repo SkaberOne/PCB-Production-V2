@@ -368,3 +368,32 @@ export function getMachineSlotLayout(slotCount) {
         borderRadius: 1.4,
     };
 }
+
+/**
+ * Palette des slots par TAILLE de feeder (8 / 12 / 16 mm), palette sombre émeraude/zinc.
+ * Choisie pour la vue machine (slot-strip) : la couleur encode la taille de feeder,
+ * le détail composant/type passe par le survol + la table d'affectation.
+ */
+export const feederSizePalette = {
+    8: { borderColor: '#2dd4bf', slotBackground: 'rgba(45,212,191,0.16)', labelColor: '#99f6e4' },
+    12: { borderColor: '#38bdf8', slotBackground: 'rgba(56,189,248,0.16)', labelColor: '#bae6fd' },
+    16: { borderColor: '#f59e0b', slotBackground: 'rgba(245,158,11,0.16)', labelColor: '#fde68a' },
+};
+
+/** Feeder de taille non standard / inconnue. */
+export const feederSizeUnknownPalette = {
+    borderColor: '#a78bfa', slotBackground: 'rgba(167,139,250,0.16)', labelColor: '#ddd6fe',
+};
+
+/** Slot libre (aucune affectation). */
+export const slotEmptyPalette = {
+    borderColor: '#2f2f35', slotBackground: 'transparent', labelColor: '#52525b',
+};
+
+/** Tailles de feeder présentées dans la légende de la vue machine. */
+export const FEEDER_SIZE_LEGEND = [8, 12, 16];
+
+export function getFeederSizePalette(sizeMm) {
+    const key = Number(sizeMm);
+    return feederSizePalette[key] || feederSizeUnknownPalette;
+}
