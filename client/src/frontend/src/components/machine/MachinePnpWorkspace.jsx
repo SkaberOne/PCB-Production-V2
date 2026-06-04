@@ -27,6 +27,7 @@ import { extractRequestError } from '../../utils/machinePnp';
 import { MachineTable, FixedFeederTable, CartTable } from './MachinePnpTables';
 import MachineConfigDialog from './MachineConfigDialog';
 import FixedFeederDialog from './FixedFeederDialog';
+import { CreateMachineDialog, CreateCartDialog, EditCartDialog } from './MachineCrudDialogs';
 
 const PANEL_SX = { backgroundColor: '#18181b', border: '1px solid #27272a' };
 
@@ -88,6 +89,9 @@ function MachinePnpWorkspace() {
     });
 
     const [activeTab, setActiveTab] = useState(0);
+    const [createMachineOpen, setCreateMachineOpen] = useState(false);
+    const [createCartOpen, setCreateCartOpen] = useState(false);
+    const [editCart, setEditCart] = useState(null);
 
     const closeFeedback = useCallback(
         () => setFeedback({ type: 'info', message: '' }),
@@ -133,11 +137,6 @@ function MachinePnpWorkspace() {
         }
     }, [closeDelete, deleteDialog, loadWorkspace, setActionLoading, setFeedback]);
 
-    const notReady = useCallback(
-        (label) => setFeedback({ type: 'info', message: `${label} — disponible au prochain incrément.` }),
-        [setFeedback],
-    );
-
     const feedbackSeverity = feedback?.type === 'error'
         ? 'error'
         : feedback?.type === 'success'
@@ -179,16 +178,29 @@ function MachinePnpWorkspace() {
             ) : (
                 <>
                     {activeTab === 0 ? (
-                        <Paper sx={PANEL_SX}>
-                            <MachineTable
-                                actionLoading={actionLoading}
-                                machines={machines}
-                                selectedMachineId={machineConfig.machineConfigTarget?.id || null}
-                                onOpenConfig={machineConfig.openMachineConfigDialog}
-                                onDeleteMachine={openDeleteMachine}
-                                onOpenContextMenu={() => {}}
-                            />
-                        </Paper>
+                        <Stack spacing={2}>
+                            <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
+                                <Button
+                                    startIcon={<AddRoundedIcon />}
+                                    size="small"
+                                    variant="contained"
+                                    onClick={() => setCreateMachineOpen(true)}
+                                    sx={{ backgroundColor: '#059669', '&:hover': { backgroundColor: '#047857' } }}
+                                >
+                                    Nouvelle machine
+                                </Button>
+                            </Box>
+                            <Paper sx={PANEL_SX}>
+                                <MachineTable
+                                    actionLoading={actionLoading}
+                                    machines={machines}
+                                    selectedMachineId={machineConfig.machineConfigTarget?.id || null}
+                                    onOpenConfig={machineConfig.openMachineConfigDialog}
+                                    onDeleteMachine={openDeleteMachine}
+                                    onOpenContextMenu={() => {}}
+                                />
+                            </Paper>
+                        </Stack>
                     ) : null}
 
                     {activeTab === 1 ? (
@@ -233,14 +245,27 @@ function MachinePnpWorkspace() {
                     ) : null}
 
                     {activeTab === 2 ? (
-                        <Paper sx={PANEL_SX}>
-                            <CartTable
-                                actionLoading={actionLoading}
-                                carts={carts}
-                                onEditCart={() => notReady('Édition chariot')}
-                                onDeleteCart={openDeleteCart}
-                            />
-                        </Paper>
+                        <Stack spacing={2}>
+                            <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
+                                <Button
+                                    startIcon={<AddRoundedIcon />}
+                                    size="small"
+                                    variant="contained"
+                                    onClick={() => setCreateCartOpen(true)}
+                                    sx={{ backgroundColor: '#059669', '&:hover': { backgroundColor: '#047857' } }}
+                                >
+                                    Nouveau chariot
+                                </Button>
+                            </Box>
+                            <Paper sx={PANEL_SX}>
+                                <CartTable
+                                    actionLoading={actionLoading}
+                                    carts={carts}
+                                    onEditCart={setEditCart}
+                                    onDeleteCart={openDeleteCart}
+                                />
+                            </Paper>
+                        </Stack>
                     ) : null}
                 </>
             )}
@@ -248,6 +273,23 @@ function MachinePnpWorkspace() {
             <MachineConfigDialog config={machineConfig} />
 
             <FixedFeederDialog fixedFeeders={fixedFeeders} />
+
+            <CreateMachineDialog
+                open={createMachineOpen}
+                onClose={() => setCreateMachineOpen(false)}
+                onCreated={async () => { await loadWorkspace(); setFeedback({ type: 'success', message: 'Machine créée.' }); }}
+            />
+            <CreateCartDialog
+                open={createCartOpen}
+                onClose={() => setCreateCartOpen(false)}
+                onCreated={async () => { await loadWorkspace(); setFeedback({ type: 'success', message: 'Chariot créé.' }); }}
+            />
+            <EditCartDialog
+                cart={editCart}
+                open={Boolean(editCart)}
+                onClose={() => setEditCart(null)}
+                onSaved={async () => { await loadWorkspace(); setFeedback({ type: 'success', message: 'Chariot mis à jour.' }); }}
+            />
 
             <Dialog open={deleteDialog.open} onClose={closeDelete} maxWidth="xs" fullWidth>
                 <DialogTitle>Confirmer la suppression</DialogTitle>
