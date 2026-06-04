@@ -903,7 +903,10 @@ export function BomSessionProvider({ children }) {
     // Alias pour compatibilité avec les composants qui utilisent flushSessionPersistence
     const flushSessionPersistence = flushCurrentSessionPersistence;
 
-    const value = {
+    // Mémoïsé pour éviter une nouvelle référence d'objet à chaque render du
+    // provider : sans cela, tous les consommateurs du contexte re-render même
+    // quand l'état pertinent n'a pas changé.
+    const value = React.useMemo(() => ({
         currentBom,
         setCurrentBom,
         importWorkspace,
@@ -935,7 +938,36 @@ export function BomSessionProvider({ children }) {
         activeProduction,
         flushCurrentSessionPersistence,
         flushSessionPersistence,
-    };
+    }), [
+        currentBom,
+        setCurrentBom,
+        importWorkspace,
+        setImportWorkspace,
+        updateImportWorkspace,
+        resetImportWorkspace,
+        bomWorkspace,
+        setBomWorkspace,
+        setImportedBom,
+        updateBomItem,
+        setSelectedBomEntries,
+        setActiveBomRevision,
+        cacheBomRevision,
+        updateBomWorkspaceItems,
+        updateBomWorkspaceItem,
+        updateBomWorkspaceQuantity,
+        setBomWorkspaceActiveTab,
+        updateBomWorkspaceStockDraft,
+        setBomWorkspaceStockValidated,
+        removeBomWorkspaceRevision,
+        clearCurrentBom,
+        setActiveProduction,
+        clearActiveProduction,
+        purgeProductionSession,
+        activateProductionSession,
+        activeProduction,
+        flushCurrentSessionPersistence,
+        flushSessionPersistence,
+    ]);
 
     return (
         <BomSessionContext.Provider value={value}>

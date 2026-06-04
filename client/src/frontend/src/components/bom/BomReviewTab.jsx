@@ -26,7 +26,7 @@ import {
 } from '@mui/material';
 import EmptyState from '../common/EmptyState';
 import { BOM_ITEM_STATUSES, getBomItemStatus, getBomItemType } from '../../utils/bomSession';
-import { buildActiveStats, getStatusChipColor } from '../../utils/bomReviewView';
+import { getStatusChipColor } from '../../utils/bomReviewView';
 import {
     compactCellSx,
     compactInputSx,
@@ -249,11 +249,7 @@ function BomReviewTab({
     const warnings = React.useMemo(() => activeBom?.warnings || [], [activeBom]);
     const errors = React.useMemo(() => activeBom?.errors || [], [activeBom]);
 
-    // ── Stats (memoized) ─────────────────────────────────────────────────────
-    const activeStats = React.useMemo(
-        () => buildActiveStats(items, warnings, errors),
-        [items, warnings, errors],
-    );
+    // activeStats est calculé plus bas, dérivé d'itemsWithMeta (évite un 2e passage getBomItemStatus).
 
     const pendingTypeConfirmationCount = React.useMemo(
         () => items.filter((i) => i.component_type_requires_confirmation && !i.component_type_confirmed).length,
@@ -274,6 +270,17 @@ function BomReviewTab({
         })),
         [items, warnings, errors],
     );
+
+    // ── Stats dérivées d'itemsWithMeta (un seul calcul de statut) ─────────────
+    const activeStats = React.useMemo(() => {
+        let review = 0;
+        let harmonized = 0;
+        itemsWithMeta.forEach((item) => {
+            if (item._status === BOM_ITEM_STATUSES.REVIEW) review += 1;
+            else if (item._status === BOM_ITEM_STATUSES.HARMONIZED) harmonized += 1;
+        });
+        return { total: itemsWithMeta.length, review, harmonized, errors: errors.length };
+    }, [itemsWithMeta, errors]);
 
     // ── Filtered items ───────────────────────────────────────────────────────
     const filteredItems = React.useMemo(() => {
