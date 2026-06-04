@@ -158,10 +158,13 @@ export function useMachineConfig({
             }
             return true;
         } catch (requestError) {
+            // Réinitialiser la signature uniquement en cas d'erreur, pour autoriser
+            // une nouvelle tentative. En cas de succès on CONSERVE la signature :
+            // c'est la garde d'idempotence qui empêche le renvoi en boucle du même
+            // payload (cause historique de la boucle infinie).
+            syncingMachineProductionQuantitiesRef.current = '';
             setMachineConfigError(extractRequestError(requestError, 'Impossible de synchroniser les quantites BOM avec la production.'));
             return false;
-        } finally {
-            syncingMachineProductionQuantitiesRef.current = '';
         }
     }, [
         activeProduction?.id,
@@ -258,16 +261,56 @@ export function useMachineConfig({
         }
     }, [selectedMachineBomRevisionId]);
 
-    // Sync BOM quantities from session into production
+    // Ref stable vers la dernière version de la fonction de sync. Évite que
+    // l'effet ci-dessous se redéclenche à CHAQUE render uniquement parce que
+    // l'identité du callback a changé (il dépend de bomWorkspace.quantitiesByReference,
+    // recréé à chaque render). C'est l'un des deux verrous anti-boucle infinie.
+    const syncMachineProductionQuantitiesRef = React.useRef(syncMachineProductionQuantitiesFromSession);
     React.useEffect(() => {
-        if (!machineSummaryProductions.length) return;
+        syncMachineProductionQuantitiesRef.current = syncMachineProductionQuantitiesFromSession;
+    }, [syncMachineProductionQuantitiesFromSession]);
+
+    // Signature de contenu des quantités de session pour la production ciblée.
+    // L'effet de sync ne se redéclenche que lorsque les quantités changent
+    // RÉELLEMENT, et non à chaque render — second verrou anti-boucle infinie.
+    const sessionQuantitySignature = React.useMemo(() => {
+        if (!machineConfigDialogOpen || !machineSummaryProductions.length) return '';
+        const targetId = parsePositiveInteger(selectedMachineProductionPlanId);
+        const targetProduction = targetId === null
+            ? machineSummaryProductions[0] || null
+            : machineSummaryProductionsById.get(targetId) || null;
+        if (!targetProduction?.bom_revisions?.length) return '';
+        const quantityEntries = bomWorkspace?.quantitiesByReference || {};
+        return targetProduction.bom_revisions
+            .map((bom) => {
+                const quantityKey = buildReferenceRevisionKey(bom.reference, bom.revision);
+                return `${bom.bom_revision_id}:${Number(quantityEntries[quantityKey]?.quantityToProduce || 0)}`;
+            })
+            .join('|');
+    }, [
+        bomWorkspace?.quantitiesByReference,
+        machineConfigDialogOpen,
+        machineSummaryProductions,
+        machineSummaryProductionsById,
+        selectedMachineProductionPlanId,
+    ]);
+
+    // Sync BOM quantities from session into production (idempotent, signature-gated)
+    React.useEffect(() => {
+        if (!machineConfigDialogOpen || !machineSummaryProductions.length) return;
         const targetId = parsePositiveInteger(selectedMachineProductionPlanId);
         const targetProduction = targetId === null
             ? machineSummaryProductions[0] || null
             : machineSummaryProductionsById.get(targetId) || null;
         if (!targetProduction) return;
-        syncMachineProductionQuantitiesFromSession(targetProduction);
-    }, [machineSummaryProductions, machineSummaryProductionsById, selectedMachineProductionPlanId, syncMachineProductionQuantitiesFromSession]);
+        syncMachineProductionQuantitiesRef.current(targetProduction);
+    }, [
+        machineConfigDialogOpen,
+        machineSummaryProductions,
+        machineSummaryProductionsById,
+        selectedMachineProductionPlanId,
+        sessionQuantitySignature,
+    ]);
 
     // ── Dialog open/close ─────────────────────────────────────────────────────
 
@@ -277,6 +320,7 @@ export function useMachineConfig({
         setMachineSummary(null);
         setMachineProductionPlan(null);
         setMachineConfigError('');
+        syncingMachineProductionQuantitiesRef.current = '';
         setSelectedProductionId('');
         setSelectedMachineProductionPlanId('');
         setSelectedMachineBomRevisionId('');
@@ -293,6 +337,7 @@ export function useMachineConfig({
         setMachineConfigDialogOpen(true);
         setMachineSummary(null);
         setMachineProductionPlan(null);
+        syncingMachineProductionQuantitiesRef.current = '';
         setSelectedProductionId('');
         setSelectedMachineProductionPlanId('');
         setSelectedMachineBomRevisionId('');
