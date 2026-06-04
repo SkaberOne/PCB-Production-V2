@@ -5,6 +5,52 @@
 
 ---
 
+## 2026-06-05 — Session 4 : Réintégration Machine PnP en V2 (feature flag) + complétion P0/P1
+
+### Contexte
+Réintégration du « code mort » Machine PnP (~2 600 l. d'une 2e implémentation jamais
+branchée) en une page V2 derrière feature flag, puis audit et complétion
+fonctionnelle/dette. Audits : `docs/audits/Audit_2026-06-04_complet_pre_deploiement.md`
+(§4.5) et `docs/audits/Audit_2026-06-04_machine_pnp_v2.md`. Branche `audit-restructure-2026-05`.
+
+### Architecture & flag
+- `pages/MachinePnpPage.jsx` devient un **routeur de flag** : page historique extraite
+  en `MachinePnpPageLegacy.jsx` (repli, défaut) ; V2 = `components/machine/MachinePnpWorkspace.jsx`.
+- `utils/featureFlags.js` : flag runtime `machinePnpPlan` (Electron > env > défaut `false`).
+
+### Réintégration — Phase C (commits `b1b4c78` → `23f6309`)
+- Fix de la **boucle infinie** historique de `useMachineConfig` (ref de fonction stable +
+  signature de contenu + garde d'idempotence).
+- Écriture des écrans d'assemblage absents du cluster : `MachineConfigDialog` (plan
+  d'implantation : slot-strip, séquence, validation d'OF, détachement, feeders),
+  `FixedFeederDialog`, `MachineCrudDialogs`.
+- Suppression du code mort résiduel : `MachinePnpDialogs.jsx` (erreur de syntaxe l.195,
+  jamais branché) + `useBomCategories.js`. Plus aucune implémentation en double.
+
+### Complétion fonctionnelle — P0 (`a2c3f48`, `2abf60a`)
+- Recherche / filtres / tri des feeders fixes (régression vs V1 comblée).
+- Édition de machine via menu contextuel ; filtrage du plan par révision BOM + filtre
+  commun/implantation.
+
+### Robustesse & dette — P1 (`443aa62`, `221f1d0`, `ee156af`, `03f6361`)
+- Garde de montage + « dernière requête gagne » sur les chargeurs des 3 hooks.
+- Découpe : `MachineConfigDialog` 461→85 l. (panneaux), `useFixedFeeders` 375→241 l.,
+  `useMachineConfig` 802→582 l. (sélecteurs extraits dans `useMachineConfigSelectors`).
+- Bug corrigé **au test live** : `mountedRef` non remis à `true` au montage → spinner
+  bloqué sous React 18 StrictMode (non détecté par `npm test` qui ne rend que la V1).
+
+### Tests
+- `npm test` : **73/73 verts** à chaque incrément. Test live Chrome (flag activé via env,
+  clé API injectée pour contourner l'auth dev) : V2 rend, données chargent, dialogue de
+  configuration OK.
+
+### Reste à faire
+- Découpe finale de `useMachineConfig` sous 300 l. — nécessite de fractionner le cœur
+  effets/loop-fix ; reporté (ajouter d'abord un test de rendu V2 comme filet).
+- Phase 3 : redesign du slot-strip / vue machine (lisibilité à 80 positions).
+
+---
+
 ## 2026-06-03 — Session 3 : Intégration API fournisseurs (Mouser + DigiKey) + export ERP 12 colonnes
 
 ### Contexte
