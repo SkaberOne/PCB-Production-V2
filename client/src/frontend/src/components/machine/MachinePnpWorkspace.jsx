@@ -1,4 +1,5 @@
 import React, { useCallback, useState } from 'react';
+import AddRoundedIcon from '@mui/icons-material/AddRounded';
 import CalculateRoundedIcon from '@mui/icons-material/CalculateRounded';
 import RefreshRoundedIcon from '@mui/icons-material/RefreshRounded';
 import {
@@ -25,6 +26,7 @@ import { useMachineConfig } from '../../hooks/useMachineConfig';
 import { extractRequestError } from '../../utils/machinePnp';
 import { MachineTable, FixedFeederTable, CartTable } from './MachinePnpTables';
 import MachineConfigDialog from './MachineConfigDialog';
+import FixedFeederDialog from './FixedFeederDialog';
 
 const PANEL_SX = { backgroundColor: '#18181b', border: '1px solid #27272a' };
 
@@ -193,6 +195,14 @@ function MachinePnpWorkspace() {
                         <Stack spacing={2}>
                             <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1 }}>
                                 <Button
+                                    startIcon={<AddRoundedIcon />}
+                                    size="small"
+                                    variant="outlined"
+                                    onClick={() => fixedFeeders.openFixedFeederDialog()}
+                                >
+                                    Ajouter
+                                </Button>
+                                <Button
                                     startIcon={<RefreshRoundedIcon />}
                                     size="small"
                                     onClick={fixedFeeders.handleRefreshFixedFeederRows}
@@ -215,7 +225,7 @@ function MachinePnpWorkspace() {
                                 <FixedFeederTable
                                     actionLoading={actionLoading}
                                     rows={fixedFeeders.filteredFixedFeederRows}
-                                    onEditFixedFeeder={() => notReady('Édition feeder fixe')}
+                                    onEditFixedFeeder={fixedFeeders.openFixedFeederDialog}
                                     onRemoveFixedFeeder={fixedFeeders.handleRemoveFixedFeeder}
                                 />
                             </Paper>
@@ -236,6 +246,8 @@ function MachinePnpWorkspace() {
             )}
 
             <MachineConfigDialog config={machineConfig} />
+
+            <FixedFeederDialog fixedFeeders={fixedFeeders} />
 
             <Dialog open={deleteDialog.open} onClose={closeDelete} maxWidth="xs" fullWidth>
                 <DialogTitle>Confirmer la suppression</DialogTitle>
