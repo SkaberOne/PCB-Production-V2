@@ -39,6 +39,15 @@ function MachinePnpSlotStrip({
                 const assignment = slotPlanEntry?.assignment_index
                     ? machinePlanAssignmentMap.get(slotPlanEntry.assignment_index) || null
                     : null;
+                // Un gros feeder (>8 mm) occupe 2 positions : on n'affiche qu'UNE cellule
+                // d'ancrage (à sa position de départ), élargie sur sa largeur réelle. Les
+                // positions de continuation ne sont pas rendues (absorbées par l'ancrage).
+                const slotWidth = assignment
+                    ? Math.max(1, (Number(assignment.slot_end) || slot) - (Number(assignment.slot_start) || slot) + 1)
+                    : 1;
+                if (assignment && Number(assignment.slot_start) !== slot) {
+                    return null;
+                }
                 const isAssigned = Boolean(assignment);
                 const isSelected = selectedSlotPosition === slot;
                 const palette = assignment ? getFeederSizePalette(assignment.feeder_size_mm) : slotEmptyPalette;
@@ -80,6 +89,7 @@ function MachinePnpSlotStrip({
                             sx={{
                                 ...machineSlotCellSx,
                                 minWidth: 0,
+                                gridColumn: slotWidth > 1 ? `span ${slotWidth}` : undefined,
                                 height: layout.height,
                                 fontSize: layout.fontSize,
                                 borderRadius: layout.borderRadius,

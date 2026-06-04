@@ -410,7 +410,7 @@ const MachineAssignmentTableRow = React.memo(function MachineAssignmentTableRow(
         >
             <TableCell sx={compactCellSx}>
                 {assignment.slot_start}
-                {assignment.slot_end !== assignment.slot_start ? `-${assignment.slot_end}` : ''}
+                {assignment.slot_end !== assignment.slot_start ? ' (2 pos.)' : ''}
             </TableCell>
             <TableCell sx={compactWrapCellSx}>{assignment.component_label}</TableCell>
             <TableCell sx={compactWrapCellSx}>{assignment.component_reference || '--'}</TableCell>
