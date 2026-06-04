@@ -72,6 +72,16 @@ def _keyword_for(component: Component) -> str:
     return " ".join(part for part in parts if part).strip()
 
 
+# Non-component placeholders that must never receive an MPN proposal:
+# NC = not connected, DNP = do not populate.
+_PLACEHOLDER_VALUES = {"NC", "DNP"}
+
+
+def _is_placeholder_value(value: Optional[str]) -> bool:
+    """True for placeholder values (NC/DNP, any case) — skip enrichment entirely."""
+    return (value or "").strip().upper() in _PLACEHOLDER_VALUES
+
+
 class SupplierOfferService:
     """Read/refresh cached supplier offers and pick the best one per component."""
 
@@ -447,7 +457,8 @@ class SupplierOfferService:
         proposals: List[Dict] = []
         for component in components:
             value = (component.value or "").strip()
-            if not value:
+            if not value or _is_placeholder_value(value):
+                # Empty or NC/DNP placeholder: no real part to look up.
                 proposals.append(cls._manual_proposal(component))
                 continue
 

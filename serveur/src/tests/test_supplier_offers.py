@@ -191,7 +191,7 @@ def test_build_proposals_medium_keyword_package_ranks_in_stock_first():
 
 
 def test_build_proposals_manual_when_no_offer():
-    cid = _make_component(value="NC", mpn=None, reference="X_NC")
+    cid = _make_component(value="hthr", mpn=None, reference="X_NOOFFER")
     session = TestingSessionLocal()
     try:
         props = SupplierOfferService.build_mpn_proposals(
@@ -200,6 +200,28 @@ def test_build_proposals_manual_when_no_offer():
     finally:
         session.close()
     assert props[0]["confidence"] == "manual"
+
+
+def test_build_proposals_skips_nc_dnp_placeholders():
+    cid_nc = _make_component(value="NC", mpn=None, reference="PH_NC")
+    cid_dnp = _make_component(value="dnp", mpn=None, reference="PH_DNP")  # casse ignorée
+    # Connecteur qui RENVERRAIT un match — il ne doit pas être consulté pour un placeholder.
+    offers = [OfferDTO(supplier="MOUSER", mpn="SOME-PART-123", manufacturer="X",
+                       unit_price=0.1, stock_qty=99)]
+    session = TestingSessionLocal()
+    try:
+        props = SupplierOfferService.build_mpn_proposals(
+            session, component_ids=[cid_nc, cid_dnp], live=True,
+            connectors=[TieredFakeConnector(mpn_offers=offers, keyword_offers=offers)],
+        )
+    finally:
+        session.close()
+    by_id = {p["component_id"]: p for p in props}
+    assert by_id[cid_nc]["confidence"] == "manual"
+    assert by_id[cid_nc]["proposed_mpn"] is None
+    assert by_id[cid_nc]["candidates"] == []
+    assert by_id[cid_dnp]["confidence"] == "manual"
+    assert by_id[cid_dnp]["proposed_mpn"] is None
 
 
 def test_build_proposals_skips_filled_mpn():
