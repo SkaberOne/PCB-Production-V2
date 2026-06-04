@@ -59,6 +59,7 @@ function SupplierApiSettings() {
     const [testing, setTesting] = React.useState(false);
     const [feedback, setFeedback] = React.useState({ status: 'idle', message: '' });
     const [showSecret, setShowSecret] = React.useState({});
+    const [statusConfigured, setStatusConfigured] = React.useState({});
 
     const loadCredentials = React.useCallback(async () => {
         setLoading(true);
@@ -77,7 +78,21 @@ function SupplierApiSettings() {
         }
     }, []);
 
-    React.useEffect(() => { loadCredentials(); }, [loadCredentials]);
+    const loadStatus = React.useCallback(async () => {
+        // Effective state including the .env fallback (same source as "Vérifier la connexion").
+        try {
+            const response = await apiClient.get(STATUS_URL);
+            const map = {};
+            (response.data?.connectors || []).forEach((connector) => {
+                map[(connector.supplier || '').toLowerCase()] = Boolean(connector.configured);
+            });
+            setStatusConfigured(map);
+        } catch (error) {
+            // Status is optional; the badge falls back to the stored-credential flags.
+        }
+    }, []);
+
+    React.useEffect(() => { loadCredentials(); loadStatus(); }, [loadCredentials, loadStatus]);
 
     const updateField = (providerKey, field) => (event) => {
         const value = event.target.value;
@@ -110,6 +125,7 @@ function SupplierApiSettings() {
             const providers = response.data?.providers || {};
             setMeta(providers);
             setForm(buildFormFromMeta(providers));
+            loadStatus();
             setFeedback({ status: 'success', message: 'Identifiants fournisseurs enregistrés.' });
         } catch (error) {
             setFeedback({
@@ -127,6 +143,11 @@ function SupplierApiSettings() {
         try {
             const response = await apiClient.get(STATUS_URL, { params: { test: true } });
             const connectors = response.data?.connectors || [];
+            const statusMap = {};
+            connectors.forEach((connector) => {
+                statusMap[(connector.supplier || '').toLowerCase()] = Boolean(connector.configured);
+            });
+            setStatusConfigured(statusMap);
             const summary = connectors
                 .map((connector) => {
                     if (!connector.configured) return `${connector.supplier} : non configuré`;
@@ -175,7 +196,9 @@ function SupplierApiSettings() {
                 const isApiKey = entry.auth_type === 'api_key';
                 const apiKeySecretId = `${key}-api_key`;
                 const clientSecretId = `${key}-client_secret`;
-                const configured = isApiKey ? providerMeta.api_key_set : providerMeta.client_secret_set;
+                const storeConfigured = isApiKey ? providerMeta.api_key_set : providerMeta.client_secret_set;
+                // Prefer the effective state (store OR .env); fall back to the stored flag.
+                const configured = statusConfigured[key] ?? storeConfigured;
                 return (
                     <Card key={key} variant="outlined" sx={{ borderColor: 'var(--border)' }}>
                         <CardContent sx={{ py: 2 }}>
