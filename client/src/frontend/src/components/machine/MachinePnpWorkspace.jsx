@@ -1,0 +1,268 @@
+import React, { useCallback, useState } from 'react';
+import CalculateRoundedIcon from '@mui/icons-material/CalculateRounded';
+import RefreshRoundedIcon from '@mui/icons-material/RefreshRounded';
+import {
+    Alert,
+    Box,
+    Button,
+    CircularProgress,
+    Dialog,
+    DialogActions,
+    DialogContent,
+    DialogContentText,
+    DialogTitle,
+    Paper,
+    Stack,
+    Tab,
+    Tabs,
+} from '@mui/material';
+import apiClient from '../../api/client';
+import PageHeader from '../common/PageHeader';
+import { useWorkspaceData } from '../../hooks/useWorkspaceData';
+import { useFixedFeeders } from '../../hooks/useFixedFeeders';
+import { extractRequestError } from '../../utils/machinePnp';
+import { MachineTable, FixedFeederTable, CartTable } from './MachinePnpTables';
+
+const PANEL_SX = { backgroundColor: '#18181b', border: '1px solid #27272a' };
+
+const TAB_SX = {
+    fontSize: '0.8rem',
+    minHeight: 40,
+    textTransform: 'none',
+    fontWeight: 500,
+    color: '#71717a',
+    '&.Mui-selected': { color: '#10b981' },
+};
+
+/**
+ * Orchestrateur V2 de la page Machine PnP (réintégration du cluster).
+ *
+ * Monté uniquement quand le flag `machinePnpPlan` est ON. Construit à partir des
+ * briques réutilisables du cluster : useWorkspaceData (données), useFixedFeeders
+ * (feeders fixes), tables MachinePnpTables. Les dialogues d'assemblage (config
+ * machine / plan d'implantation, édition feeder fixe, CRUD) sont ajoutés par
+ * incréments successifs ; cette fondation assure le chargement, le rendu des
+ * tables et les actions ne nécessitant pas encore d'écran dédié.
+ */
+function MachinePnpWorkspace() {
+    const {
+        machines,
+        feeders,
+        carts,
+        loading,
+        feedback,
+        setFeedback,
+        actionLoading,
+        setActionLoading,
+        deleteDialog,
+        setDeleteDialog,
+        loadWorkspace,
+    } = useWorkspaceData();
+
+    const fixedFeeders = useFixedFeeders({
+        feeders,
+        carts,
+        setFeedback,
+        setActionLoading,
+        actionLoading,
+        loadWorkspace,
+    });
+
+    const [activeTab, setActiveTab] = useState(0);
+    const [configMachine, setConfigMachine] = useState(null);
+
+    const closeFeedback = useCallback(
+        () => setFeedback({ type: 'info', message: '' }),
+        [setFeedback],
+    );
+
+    const openDeleteMachine = useCallback(
+        (machine) => setDeleteDialog({ open: true, type: 'machine', item: machine }),
+        [setDeleteDialog],
+    );
+    const openDeleteCart = useCallback(
+        (cart) => setDeleteDialog({ open: true, type: 'cart', item: cart }),
+        [setDeleteDialog],
+    );
+    const closeDelete = useCallback(
+        () => setDeleteDialog({ open: false, type: '', item: null }),
+        [setDeleteDialog],
+    );
+
+    const handleConfirmDelete = useCallback(async () => {
+        const { type, item } = deleteDialog;
+        if (!type || !item) return;
+        setActionLoading(`delete-${type}-${item.id}`);
+        try {
+            if (type === 'machine') {
+                await apiClient.delete(`/marketplace/machines/${item.id}`);
+            } else if (type === 'cart') {
+                await apiClient.delete(`/marketplace/carts/${item.id}`);
+            }
+            await loadWorkspace();
+            setFeedback({
+                type: 'success',
+                message: type === 'machine' ? 'Machine supprimée.' : 'Chariot supprimé.',
+            });
+            closeDelete();
+        } catch (requestError) {
+            setFeedback({
+                type: 'error',
+                message: extractRequestError(requestError, 'Erreur lors de la suppression.'),
+            });
+        } finally {
+            setActionLoading('');
+        }
+    }, [closeDelete, deleteDialog, loadWorkspace, setActionLoading, setFeedback]);
+
+    const notReady = useCallback(
+        (label) => setFeedback({ type: 'info', message: `${label} — disponible au prochain incrément.` }),
+        [setFeedback],
+    );
+
+    const feedbackSeverity = feedback?.type === 'error'
+        ? 'error'
+        : feedback?.type === 'success'
+            ? 'success'
+            : 'info';
+
+    return (
+        <Stack spacing={3}>
+            <PageHeader
+                eyebrow="Machine PnP"
+                title="Plan d'implantation (V2)"
+                description="Réintégration en cours : plan d'implantation feeders, feeders fixes, validation d'ordre de fabrication, détachement production↔machine."
+            />
+
+            <Alert severity="info" variant="outlined">
+                Vue V2 activée par le flag « machinePnpPlan ». Construction incrémentale en cours.
+            </Alert>
+
+            {feedback?.message ? (
+                <Alert severity={feedbackSeverity} onClose={closeFeedback}>{feedback.message}</Alert>
+            ) : null}
+
+            <Box sx={{ borderBottom: '1px solid #27272a' }}>
+                <Tabs
+                    value={activeTab}
+                    onChange={(_, value) => setActiveTab(value)}
+                    sx={{ minHeight: 40, '& .MuiTabs-indicator': { backgroundColor: '#10b981' } }}
+                >
+                    <Tab label="Machines" sx={TAB_SX} />
+                    <Tab label="Feeders fixes" sx={TAB_SX} />
+                    <Tab label="Chariots" sx={TAB_SX} />
+                </Tabs>
+            </Box>
+
+            {loading ? (
+                <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
+                    <CircularProgress size={28} sx={{ color: '#059669' }} />
+                </Box>
+            ) : (
+                <>
+                    {activeTab === 0 ? (
+                        <Paper sx={PANEL_SX}>
+                            <MachineTable
+                                actionLoading={actionLoading}
+                                machines={machines}
+                                selectedMachineId={configMachine?.id || null}
+                                onOpenConfig={(machine) => setConfigMachine(machine)}
+                                onDeleteMachine={openDeleteMachine}
+                                onOpenContextMenu={() => {}}
+                            />
+                        </Paper>
+                    ) : null}
+
+                    {activeTab === 1 ? (
+                        <Stack spacing={2}>
+                            <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1 }}>
+                                <Button
+                                    startIcon={<RefreshRoundedIcon />}
+                                    size="small"
+                                    onClick={fixedFeeders.handleRefreshFixedFeederRows}
+                                    sx={{ color: '#a1a1aa' }}
+                                >
+                                    Actualiser
+                                </Button>
+                                <Button
+                                    startIcon={<CalculateRoundedIcon />}
+                                    size="small"
+                                    variant="contained"
+                                    onClick={fixedFeeders.handleCalculateFixedFeeders}
+                                    disabled={actionLoading === 'calculate-fixed-feeders'}
+                                    sx={{ backgroundColor: '#059669', '&:hover': { backgroundColor: '#047857' } }}
+                                >
+                                    Calculer les feeders fixes
+                                </Button>
+                            </Box>
+                            <Paper sx={PANEL_SX}>
+                                <FixedFeederTable
+                                    actionLoading={actionLoading}
+                                    rows={fixedFeeders.filteredFixedFeederRows}
+                                    onEditFixedFeeder={() => notReady('Édition feeder fixe')}
+                                    onRemoveFixedFeeder={fixedFeeders.handleRemoveFixedFeeder}
+                                />
+                            </Paper>
+                        </Stack>
+                    ) : null}
+
+                    {activeTab === 2 ? (
+                        <Paper sx={PANEL_SX}>
+                            <CartTable
+                                actionLoading={actionLoading}
+                                carts={carts}
+                                onEditCart={() => notReady('Édition chariot')}
+                                onDeleteCart={openDeleteCart}
+                            />
+                        </Paper>
+                    ) : null}
+                </>
+            )}
+
+            <Dialog
+                open={Boolean(configMachine)}
+                onClose={() => setConfigMachine(null)}
+                maxWidth="sm"
+                fullWidth
+            >
+                <DialogTitle>Configuration · {configMachine?.name}</DialogTitle>
+                <DialogContent sx={{ pt: '12px !important' }}>
+                    <DialogContentText>
+                        Le plan d'implantation (slot-strip, séquence de fabrication, validation d'ordre,
+                        affectation feeders, détachement) sera branché ici au prochain incrément.
+                    </DialogContentText>
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={() => setConfigMachine(null)}>Fermer</Button>
+                </DialogActions>
+            </Dialog>
+
+            <Dialog open={deleteDialog.open} onClose={closeDelete} maxWidth="xs" fullWidth>
+                <DialogTitle>Confirmer la suppression</DialogTitle>
+                <DialogContent sx={{ pt: '12px !important' }}>
+                    <DialogContentText>
+                        Supprimer {deleteDialog.type === 'machine' ? 'la machine' : 'le chariot'}
+                        {' '}«&nbsp;{deleteDialog.item?.name}&nbsp;» ? Cette action est irréversible.
+                    </DialogContentText>
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={closeDelete}>Annuler</Button>
+                    <Button
+                        color="error"
+                        variant="contained"
+                        onClick={handleConfirmDelete}
+                        disabled={Boolean(
+                            deleteDialog.type
+                            && deleteDialog.item
+                            && actionLoading === `delete-${deleteDialog.type}-${deleteDialog.item?.id}`,
+                        )}
+                    >
+                        Supprimer
+                    </Button>
+                </DialogActions>
+            </Dialog>
+        </Stack>
+    );
+}
+
+export default MachinePnpWorkspace;
