@@ -18,10 +18,13 @@ import {
 } from '@mui/material';
 import apiClient from '../../api/client';
 import PageHeader from '../common/PageHeader';
+import { useBomSession } from '../../context/BomSessionContext';
 import { useWorkspaceData } from '../../hooks/useWorkspaceData';
 import { useFixedFeeders } from '../../hooks/useFixedFeeders';
+import { useMachineConfig } from '../../hooks/useMachineConfig';
 import { extractRequestError } from '../../utils/machinePnp';
 import { MachineTable, FixedFeederTable, CartTable } from './MachinePnpTables';
+import MachineConfigDialog from './MachineConfigDialog';
 
 const PANEL_SX = { backgroundColor: '#18181b', border: '1px solid #27272a' };
 
@@ -45,10 +48,13 @@ const TAB_SX = {
  * tables et les actions ne nécessitant pas encore d'écran dédié.
  */
 function MachinePnpWorkspace() {
+    const { activeProduction, bomWorkspace } = useBomSession();
+
     const {
         machines,
         feeders,
         carts,
+        productions,
         loading,
         feedback,
         setFeedback,
@@ -68,8 +74,18 @@ function MachinePnpWorkspace() {
         loadWorkspace,
     });
 
+    const machineConfig = useMachineConfig({
+        activeProduction,
+        bomWorkspace,
+        feeders,
+        productions,
+        setFeedback,
+        setActionLoading,
+        actionLoading,
+        loadWorkspace,
+    });
+
     const [activeTab, setActiveTab] = useState(0);
-    const [configMachine, setConfigMachine] = useState(null);
 
     const closeFeedback = useCallback(
         () => setFeedback({ type: 'info', message: '' }),
@@ -165,8 +181,8 @@ function MachinePnpWorkspace() {
                             <MachineTable
                                 actionLoading={actionLoading}
                                 machines={machines}
-                                selectedMachineId={configMachine?.id || null}
-                                onOpenConfig={(machine) => setConfigMachine(machine)}
+                                selectedMachineId={machineConfig.machineConfigTarget?.id || null}
+                                onOpenConfig={machineConfig.openMachineConfigDialog}
                                 onDeleteMachine={openDeleteMachine}
                                 onOpenContextMenu={() => {}}
                             />
@@ -219,23 +235,7 @@ function MachinePnpWorkspace() {
                 </>
             )}
 
-            <Dialog
-                open={Boolean(configMachine)}
-                onClose={() => setConfigMachine(null)}
-                maxWidth="sm"
-                fullWidth
-            >
-                <DialogTitle>Configuration · {configMachine?.name}</DialogTitle>
-                <DialogContent sx={{ pt: '12px !important' }}>
-                    <DialogContentText>
-                        Le plan d'implantation (slot-strip, séquence de fabrication, validation d'ordre,
-                        affectation feeders, détachement) sera branché ici au prochain incrément.
-                    </DialogContentText>
-                </DialogContent>
-                <DialogActions>
-                    <Button onClick={() => setConfigMachine(null)}>Fermer</Button>
-                </DialogActions>
-            </Dialog>
+            <MachineConfigDialog config={machineConfig} />
 
             <Dialog open={deleteDialog.open} onClose={closeDelete} maxWidth="xs" fullWidth>
                 <DialogTitle>Confirmer la suppression</DialogTitle>
