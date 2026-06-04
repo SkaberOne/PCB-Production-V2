@@ -261,3 +261,42 @@ def test_mpn_apply_batch_endpoint():
     )
     assert resp.status_code == 200
     assert resp.json()["applied"][0]["component_id"] == cid
+
+
+def test_supplier_credentials_roundtrip(tmp_path, monkeypatch):
+    from src.services import supplier_credentials
+
+    monkeypatch.setattr(supplier_credentials, "_STORE_PATH", tmp_path / "creds.json")
+
+    # Defaults when nothing stored yet.
+    resp = client.get("/api/marketplace/supplier-offers/credentials")
+    assert resp.status_code == 200
+    providers = resp.json()["providers"]
+    assert providers["mouser"]["api_key_set"] is False
+    assert providers["mouser"]["auth_type"] == "api_key"
+    assert providers["digikey"]["auth_type"] == "client_credentials"
+
+    # Save credentials.
+    resp = client.put(
+        "/api/marketplace/supplier-offers/credentials",
+        json={
+            "mouser": {"auth_type": "api_key", "api_key": "SECRET-MOUSER-1234"},
+            "digikey": {"auth_type": "client_credentials", "client_id": "CID-9", "client_secret": "DKSECRET-5678"},
+        },
+    )
+    assert resp.status_code == 200
+    out = resp.json()["providers"]
+    assert out["mouser"]["api_key_set"] is True
+    assert out["mouser"]["api_key_hint"].endswith("1234")
+    assert out["digikey"]["client_id"] == "CID-9"
+    # Secrets are never echoed back in clear text.
+    assert "SECRET-MOUSER-1234" not in str(out)
+    assert "DKSECRET-5678" not in str(out)
+
+    # A blank secret keeps the previously stored value.
+    resp = client.put(
+        "/api/marketplace/supplier-offers/credentials",
+        json={"mouser": {"auth_type": "api_key", "api_key": ""}},
+    )
+    assert resp.json()["providers"]["mouser"]["api_key_set"] is True
+    assert supplier_credentials.load_credentials()["mouser"]["api_key"] == "SECRET-MOUSER-1234"

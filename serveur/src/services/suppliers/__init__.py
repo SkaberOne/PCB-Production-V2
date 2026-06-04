@@ -19,10 +19,22 @@ __all__ = [
 
 
 def build_connectors():
-    """Return the list of configured connectors (skips those without credentials)."""
-    connectors = []
-    for connector_cls in (MouserConnector, DigiKeyConnector):
-        connector = connector_cls()
-        if connector.is_configured:
-            connectors.append(connector)
-    return connectors
+    """Return the list of configured connectors (skips those without credentials).
+
+    Credentials saved from the Paramètres UI (``supplier_credentials`` store) are
+    overlaid on top of the ``.env`` defaults; a missing/empty stored value falls back
+    to the environment configuration.
+    """
+    from ..supplier_credentials import load_credentials
+
+    stored = load_credentials()
+    mouser_creds = stored.get("mouser") or {}
+    digikey_creds = stored.get("digikey") or {}
+
+    mouser = MouserConnector(api_key=(mouser_creds.get("api_key") or None))
+    digikey = DigiKeyConnector(
+        client_id=(digikey_creds.get("client_id") or None),
+        client_secret=(digikey_creds.get("client_secret") or None),
+    )
+
+    return [connector for connector in (mouser, digikey) if connector.is_configured]

@@ -4,6 +4,7 @@ import FolderRoundedIcon from '@mui/icons-material/FolderRounded';
 import PrecisionManufacturingRoundedIcon from '@mui/icons-material/PrecisionManufacturingRounded';
 import SettingsRoundedIcon from '@mui/icons-material/SettingsRounded';
 import ShoppingCartRoundedIcon from '@mui/icons-material/ShoppingCartRounded';
+import StorageRoundedIcon from '@mui/icons-material/StorageRounded';
 import TableViewRoundedIcon from '@mui/icons-material/TableViewRounded';
 import UploadFileRoundedIcon from '@mui/icons-material/UploadFileRounded';
 import { Navigate, Route, Routes } from 'react-router-dom';
@@ -16,6 +17,7 @@ import DashboardPage from './pages/DashboardPage';
 import ErpDefaultsPage from './pages/ErpDefaultsPage';
 import ImportBomPage from './pages/ImportBomPage';
 import MachinePnpPage from './pages/MachinePnpPage';
+import BaseDeDonneesPage from './pages/BaseDeDonneesPage';
 import SettingsPage from './pages/SettingsPage';
 import './App.css';
 
@@ -77,10 +79,19 @@ const pages = [
         step: null
     },
     {
+        path: '/base-donnees',
+        label: 'Base de données',
+        title: 'Base de données',
+        description: 'Empreintes machine, composants, règles de type et enrichissement MPN du référentiel.',
+        icon: StorageRoundedIcon,
+        group: 'library',
+        step: null
+    },
+    {
         path: '/parametre',
         label: 'Paramètres',
-        title: 'Administration et référentiels',
-        description: 'Base de données, mappings, harmonisation, machines et chemins.',
+        title: 'Réglages de l\'application',
+        description: 'Intégrations API fournisseurs, valeurs ERP par défaut et chemins des flux locaux.',
         icon: SettingsRoundedIcon,
         group: 'system',
         step: null
@@ -99,6 +110,7 @@ function App() {
                 <Route path="/visualisation-bom" element={<Navigate to="/bom" replace />} />
                 <Route path="/commande-composant" element={<ErrorBoundary context="Commande"><CommandPage /></ErrorBoundary>} />
                 <Route path="/machine-pnp" element={<ErrorBoundary context="Machine PnP"><MachinePnpPage /></ErrorBoundary>} />
+                <Route path="/base-donnees" element={<ErrorBoundary context="Base de donnees"><BaseDeDonneesPage /></ErrorBoundary>} />
                 <Route path="/parametre" element={<ErrorBoundary context="Parametres"><SettingsPage /></ErrorBoundary>} />
                 <Route path="/parametre-erp" element={<ErrorBoundary context="Defauts ERP"><ErpDefaultsPage /></ErrorBoundary>} />
             </Routes>

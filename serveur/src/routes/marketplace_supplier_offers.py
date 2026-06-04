@@ -12,10 +12,34 @@ from pydantic import BaseModel, Field
 
 from ..database import get_db
 from ..schemas.marketplace import SupplierOfferRefreshRequest
+from ..services import supplier_credentials
 from ..services.supplier_offer_service import SupplierOfferService
 from ..services.suppliers import MouserConnector, DigiKeyConnector
 
 router = APIRouter(prefix="/supplier-offers", tags=["supplier-offers"])
+
+
+def _build_connector(name: str, stored: dict):
+    """Instantiate one connector with stored-credential overlay over .env defaults."""
+    creds = stored.get(name) or {}
+    if name == "mouser":
+        return MouserConnector(api_key=(creds.get("api_key") or None))
+    return DigiKeyConnector(
+        client_id=(creds.get("client_id") or None),
+        client_secret=(creds.get("client_secret") or None),
+    )
+
+
+class SupplierCredentialUpdate(BaseModel):
+    auth_type: Optional[str] = Field(default=None, max_length=40)
+    api_key: Optional[str] = Field(default=None, max_length=400)
+    client_id: Optional[str] = Field(default=None, max_length=400)
+    client_secret: Optional[str] = Field(default=None, max_length=400)
+
+
+class SupplierCredentialsUpdateRequest(BaseModel):
+    mouser: Optional[SupplierCredentialUpdate] = None
+    digikey: Optional[SupplierCredentialUpdate] = None
 
 
 class ApplyMpnRequest(BaseModel):
@@ -42,8 +66,9 @@ def connectors_status(
     Secrets are never returned — only booleans and result counts. Use ?test=true to
     confirm credentials actually work (DigiKey OAuth token + a sample search).
     """
+    stored = supplier_credentials.load_credentials()
     result = []
-    for connector in (MouserConnector(), DigiKeyConnector()):
+    for connector in (_build_connector("mouser", stored), _build_connector("digikey", stored)):
         entry = {"supplier": connector.name, "configured": connector.is_configured}
         if test and connector.is_configured:
             try:
@@ -55,6 +80,24 @@ def connectors_status(
                 entry["error"] = str(exc)[:200]
         result.append(entry)
     return {"connectors": result}
+
+
+@router.get("/credentials")
+def get_supplier_credentials():
+    """Return the saved supplier credentials in a UI-safe form (secrets masked)."""
+    return {"providers": supplier_credentials.masked_credentials()}
+
+
+@router.put("/credentials")
+def update_supplier_credentials(request: SupplierCredentialsUpdateRequest):
+    """Persist Mouser / DigiKey credentials. Blank secret fields keep their stored value."""
+    payload = {}
+    for provider in supplier_credentials.SUPPORTED_PROVIDERS:
+        entry = getattr(request, provider, None)
+        if entry is not None:
+            payload[provider] = entry.model_dump(exclude_none=True)
+    masked = supplier_credentials.save_credentials(payload)
+    return {"providers": masked}
 
 
 def _parse_ids(component_ids: str) -> List[int]:

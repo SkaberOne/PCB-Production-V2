@@ -67,6 +67,9 @@ serveur/uploads/
 serveur/exports/
 serveur/backups/
 
+# --- Secrets identifiants API fournisseurs (jamais committer) ---
+serveur/data/supplier_credentials.json
+
 # --- Datasheets PDF source (lourd, propriété fournisseur) — ADR 0003 ---
 data/datasheets/pdf/*
 !data/datasheets/pdf/.gitkeep
