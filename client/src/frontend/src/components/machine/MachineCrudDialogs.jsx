@@ -209,7 +209,69 @@ export function EditCartDialog({ cart, open, onClose, onSaved }) {
             </DialogContent>
             <DialogActions>
                 <Button onClick={onClose}>Annuler</Button>
-                <Button variant="contained" onClick={handleSubmit} disabled={loading} sx={{ backgroundColor: '#3b82f6', '&:hover': { backgroundColor: '#2563eb' } }}>
+                <Button variant="contained" onClick={handleSubmit} disabled={loading} sx={{ backgroundColor: '#059669', '&:hover': { backgroundColor: '#047857' } }}>
+                    {loading ? <CircularProgress size={16} sx={{ color: '#fff' }} /> : 'Enregistrer'}
+                </Button>
+            </DialogActions>
+        </Dialog>
+    );
+}
+
+/** Édition d'une machine PnP existante. */
+export function EditMachineDialog({ machine, open, onClose, onSaved }) {
+    const [name, setName] = useState('');
+    const [positions, setPositions] = useState('80');
+    const [description, setDescription] = useState('');
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState('');
+
+    useEffect(() => {
+        if (machine && open) {
+            setName(machine.name || '');
+            setPositions(String(machine.num_positions ?? 80));
+            setDescription(machine.description || '');
+            setError('');
+        }
+    }, [machine, open]);
+
+    const handleSubmit = async () => {
+        if (!name.trim()) { setError('Le nom est obligatoire.'); return; }
+        const numPositions = parseInt(positions, 10);
+        if (!numPositions || numPositions < 1 || numPositions > 200) {
+            setError('Le nombre de positions doit être entre 1 et 200.');
+            return;
+        }
+        setLoading(true);
+        setError('');
+        try {
+            await apiClient.put(`/marketplace/machines/${machine.id}`, {
+                name: name.trim(),
+                num_positions: numPositions,
+                description: description.trim() || null,
+            });
+            onSaved();
+            onClose();
+        } catch (requestError) {
+            setError(extractRequestError(requestError, 'Erreur lors de la mise à jour.'));
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    return (
+        <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
+            <DialogTitle>Modifier la machine</DialogTitle>
+            <DialogContent sx={{ pt: '12px !important' }}>
+                <Stack spacing={2}>
+                    {error ? <Alert severity="error">{error}</Alert> : null}
+                    <TextField label="Nom de la machine" value={name} onChange={(e) => setName(e.target.value)} fullWidth size="small" />
+                    <TextField label="Nombre de positions feeders" type="number" value={positions} onChange={(e) => setPositions(e.target.value)} fullWidth size="small" inputProps={{ min: 1, max: 200 }} helperText="Entier entre 1 et 200." />
+                    <TextField label="Description (optionnel)" value={description} onChange={(e) => setDescription(e.target.value)} fullWidth size="small" multiline minRows={2} />
+                </Stack>
+            </DialogContent>
+            <DialogActions>
+                <Button onClick={onClose}>Annuler</Button>
+                <Button variant="contained" onClick={handleSubmit} disabled={loading} sx={{ backgroundColor: '#059669', '&:hover': { backgroundColor: '#047857' } }}>
                     {loading ? <CircularProgress size={16} sx={{ color: '#fff' }} /> : 'Enregistrer'}
                 </Button>
             </DialogActions>

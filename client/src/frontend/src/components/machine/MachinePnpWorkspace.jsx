@@ -12,6 +12,8 @@ import {
     DialogContent,
     DialogContentText,
     DialogTitle,
+    Menu,
+    MenuItem,
     Paper,
     Stack,
     Tab,
@@ -27,7 +29,8 @@ import { extractRequestError } from '../../utils/machinePnp';
 import { MachineTable, FixedFeederTable, CartTable } from './MachinePnpTables';
 import MachineConfigDialog from './MachineConfigDialog';
 import FixedFeederDialog from './FixedFeederDialog';
-import { CreateMachineDialog, CreateCartDialog, EditCartDialog } from './MachineCrudDialogs';
+import { CreateMachineDialog, EditMachineDialog, CreateCartDialog, EditCartDialog } from './MachineCrudDialogs';
+import FixedFeederFilters from './FixedFeederFilters';
 
 const PANEL_SX = { backgroundColor: '#18181b', border: '1px solid #27272a' };
 
@@ -92,6 +95,8 @@ function MachinePnpWorkspace() {
     const [createMachineOpen, setCreateMachineOpen] = useState(false);
     const [createCartOpen, setCreateCartOpen] = useState(false);
     const [editCart, setEditCart] = useState(null);
+    const [editMachine, setEditMachine] = useState(null);
+    const [machineMenu, setMachineMenu] = useState(null);
 
     const closeFeedback = useCallback(
         () => setFeedback({ type: 'info', message: '' }),
@@ -110,6 +115,12 @@ function MachinePnpWorkspace() {
         () => setDeleteDialog({ open: false, type: '', item: null }),
         [setDeleteDialog],
     );
+
+    const handleOpenMachineMenu = useCallback((event, machine) => {
+        event.preventDefault();
+        setMachineMenu({ mouseX: event.clientX, mouseY: event.clientY, machine });
+    }, []);
+    const closeMachineMenu = useCallback(() => setMachineMenu(null), []);
 
     const handleConfirmDelete = useCallback(async () => {
         const { type, item } = deleteDialog;
@@ -197,7 +208,7 @@ function MachinePnpWorkspace() {
                                     selectedMachineId={machineConfig.machineConfigTarget?.id || null}
                                     onOpenConfig={machineConfig.openMachineConfigDialog}
                                     onDeleteMachine={openDeleteMachine}
-                                    onOpenContextMenu={() => {}}
+                                    onOpenContextMenu={handleOpenMachineMenu}
                                 />
                             </Paper>
                         </Stack>
@@ -233,6 +244,7 @@ function MachinePnpWorkspace() {
                                     Calculer les feeders fixes
                                 </Button>
                             </Box>
+                            <FixedFeederFilters fixedFeeders={fixedFeeders} />
                             <Paper sx={PANEL_SX}>
                                 <FixedFeederTable
                                     actionLoading={actionLoading}
@@ -290,6 +302,25 @@ function MachinePnpWorkspace() {
                 onClose={() => setEditCart(null)}
                 onSaved={async () => { await loadWorkspace(); setFeedback({ type: 'success', message: 'Chariot mis à jour.' }); }}
             />
+            <EditMachineDialog
+                machine={editMachine}
+                open={Boolean(editMachine)}
+                onClose={() => setEditMachine(null)}
+                onSaved={async () => { await loadWorkspace(); setFeedback({ type: 'success', message: 'Machine mise à jour.' }); }}
+            />
+            <Menu
+                open={Boolean(machineMenu)}
+                onClose={closeMachineMenu}
+                anchorReference="anchorPosition"
+                anchorPosition={machineMenu ? { top: machineMenu.mouseY, left: machineMenu.mouseX } : undefined}
+            >
+                <MenuItem onClick={() => { const m = machineMenu?.machine; closeMachineMenu(); if (m) machineConfig.openMachineConfigDialog(m); }}>
+                    Configurer
+                </MenuItem>
+                <MenuItem onClick={() => { const m = machineMenu?.machine; closeMachineMenu(); setEditMachine(m); }}>
+                    Modifier
+                </MenuItem>
+            </Menu>
 
             <Dialog open={deleteDialog.open} onClose={closeDelete} maxWidth="xs" fullWidth>
                 <DialogTitle>Confirmer la suppression</DialogTitle>
