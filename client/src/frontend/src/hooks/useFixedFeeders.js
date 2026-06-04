@@ -39,7 +39,10 @@ export function useFixedFeeders({ feeders, carts, setFeedback, setActionLoading,
     // candidats (évite qu'une réponse lente écrase une saisie plus récente, et tout
     // setState après fermeture/démontage du dialogue).
     const mountedRef = React.useRef(true);
-    React.useEffect(() => () => { mountedRef.current = false; }, []);
+    React.useEffect(() => {
+        mountedRef.current = true;
+        return () => { mountedRef.current = false; };
+    }, []);
     const latestCandidatesRef = React.useRef(0);
 
     // ── Loaders ───────────────────────────────────────────────────────────────

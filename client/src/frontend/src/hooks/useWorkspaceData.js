@@ -19,7 +19,10 @@ export function useWorkspaceData() {
     // Garde de montage : empêche tout setState après démontage (warnings React /
     // états fantômes) sur les chargeurs partagés effet + handlers.
     const mountedRef = React.useRef(true);
-    React.useEffect(() => () => { mountedRef.current = false; }, []);
+    React.useEffect(() => {
+        mountedRef.current = true;
+        return () => { mountedRef.current = false; };
+    }, []);
 
     const loadWorkspace = React.useCallback(async () => {
         if (mountedRef.current) setLoading(true);
