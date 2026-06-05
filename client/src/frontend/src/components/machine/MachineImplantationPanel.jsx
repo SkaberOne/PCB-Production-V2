@@ -191,13 +191,14 @@ function MachineImplantationPanel({ config }) {
             {machineProductionPlan.ordered_boms?.length ? (
                 <Box sx={{ mb: 1.5 }}>
                     <Typography sx={{ fontSize: '0.65rem', color: '#71717a', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', mb: 0.75 }}>
-                        Filtrer l'implantation par BOM
+                        Face à produire — config PnP recalculée (clic : sélectionner / désélectionner)
                     </Typography>
                     <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
                         {machineProductionPlan.ordered_boms.map((bom) => {
                             const isActive = `${bom.bom_revision_id}` === selectedMachineBomRevisionId;
+                            const sideSuffix = bom.side ? ` · ${bom.side}` : '';
                             const label = bom.reference
-                                ? `${bom.reference}${bom.revision ? ` · ${bom.revision}` : ''}`
+                                ? `${bom.reference}${bom.revision ? ` · ${bom.revision}` : ''}${sideSuffix}`
                                 : `BOM ${bom.bom_revision_id}`;
                             return (
                                 <Chip

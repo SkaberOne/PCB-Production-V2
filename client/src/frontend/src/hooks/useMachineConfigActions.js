@@ -50,7 +50,7 @@ export function useMachineConfigActions(deps) {
         }
     }, [mountedRef, setMachineConfigError, setMachineSummary, setMachineSummaryLoading]);
 
-    const loadMachineProductionPlan = React.useCallback(async (machineId, productionId) => {
+    const loadMachineProductionPlan = React.useCallback(async (machineId, productionId, bomRevisionId = null) => {
         if (!machineId || !productionId) {
             if (mountedRef.current) setMachineProductionPlan(null);
             return null;
@@ -58,8 +58,12 @@ export function useMachineConfigActions(deps) {
         const requestId = (latestPlanRef.current += 1);
         if (mountedRef.current) setMachineProductionPlanLoading(true);
         try {
+            const parsedRevisionId = Number(bomRevisionId);
+            const faceQuery = Number.isInteger(parsedRevisionId) && parsedRevisionId > 0
+                ? `?bom_revision_id=${parsedRevisionId}`
+                : '';
             const response = await apiClient.get(
-                `/marketplace/machines/${machineId}/productions/${productionId}/feeder-plan`,
+                `/marketplace/machines/${machineId}/productions/${productionId}/feeder-plan${faceQuery}`,
             );
             if (!mountedRef.current || requestId !== latestPlanRef.current) return null;
             setMachineProductionPlan(response.data || null);

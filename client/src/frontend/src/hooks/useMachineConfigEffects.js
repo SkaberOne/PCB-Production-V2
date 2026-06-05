@@ -62,11 +62,11 @@ export function useMachineConfigEffects(deps) {
             setSelectedMachineSlotPosition(null);
             return;
         }
-        loadMachineProductionPlan(machineId, productionId);
+        loadMachineProductionPlan(machineId, productionId, selectedMachineBomRevisionId || null);
     }, [
         loadMachineProductionPlan, machineConfigDialogOpen, machineConfigTarget?.id, machineSummary?.id,
-        machineSummaryProductionsById, selectedMachineProductionPlanId, setMachineProductionPlan,
-        setSelectedMachineSlotPosition,
+        machineSummaryProductionsById, selectedMachineProductionPlanId, selectedMachineBomRevisionId,
+        setMachineProductionPlan, setSelectedMachineSlotPosition,
     ]);
 
     // Reset BOM revision filter when production changes

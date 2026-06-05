@@ -491,5 +491,7 @@ class TestPerFaceFeederPlan:
         )
         ids = {a["component_id"] for a in plan["slot_assignments"]}
         assert ids == {comp_a.id}
-        assert len(plan["ordered_boms"]) == 1
-        assert plan["ordered_boms"][0]["bom_revision_id"] == rev_a.id
+        # ordered_boms garde TOUTES les faces (sélecteur UI), seules les
+        # affectations sont scopées à la face choisie.
+        assert len(plan["ordered_boms"]) == 2
+        assert comp_b.id not in ids

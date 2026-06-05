@@ -162,8 +162,6 @@ class AssignmentPlanningMixin:
 
         for sequence_index, link in enumerate(ordered_links, start=1):
             revision = link.revision
-            if only_bom_revision_id is not None and not (revision and revision.id == only_bom_revision_id):
-                continue
             reference = revision.reference if revision else None
             side = revision.type.value if revision and hasattr(revision.type, "value") else (revision.type if revision else "")
             board_build_key = (
@@ -190,6 +188,11 @@ class AssignmentPlanningMixin:
             )
 
             if not revision:
+                continue
+
+            # Plan par face : on garde TOUTES les faces dans ordered_boms (sélecteur
+            # UI complet) mais on ne collecte l'usage que pour la face sélectionnée.
+            if only_bom_revision_id is not None and revision.id != only_bom_revision_id:
                 continue
 
             revision_quantity_to_produce = quantity_to_produce_by_revision.get(revision.id, 1)
