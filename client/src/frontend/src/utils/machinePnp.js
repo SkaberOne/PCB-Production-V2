@@ -445,3 +445,34 @@ export const PLACEMENT_GROUP_LEGEND = [
 export function getPlacementGroupPalette(placementGroup) {
     return placementGroupPalette[placementGroup] || placementGroupPalette.DYNAMIC;
 }
+
+/**
+ * Portée des nozzles (mirror du modèle backend utils/nozzles.py).
+ * La portée dépend de la POSITION du nozzle sur la tête (indice 1..N gauche→droite).
+ * Limites observées (PnP1/PnP2) : gauche L = ⌊N/2⌋, droite R = ⌊N/2⌋+1.
+ * nozzle i atteint la colonne c (1..C par rampe) ssi i+(1−L) ≤ c ≤ i+(C−R).
+ */
+export function nozzleReachLeftLimit(numNozzles) {
+    return Math.max(1, Math.floor((Number(numNozzles) || 0) / 2));
+}
+
+export function nozzleReachRightLimit(numNozzles) {
+    return Math.floor((Number(numNozzles) || 0) / 2) + 1;
+}
+
+export function nozzleReachColumns(nozzleIndex, numNozzles, columnsPerRamp) {
+    const n = Number(numNozzles) || 0;
+    const c = Number(columnsPerRamp) || 0;
+    const i = Number(nozzleIndex) || 0;
+    if (n <= 0 || c <= 0 || i < 1 || i > n) {
+        return null;
+    }
+    const left = nozzleReachLeftLimit(n);
+    const right = nozzleReachRightLimit(n);
+    const lo = Math.max(1, i + (1 - left));
+    const hi = Math.min(c, i + (c - right));
+    if (hi < lo) {
+        return null;
+    }
+    return { lo, hi };
+}

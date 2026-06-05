@@ -22,6 +22,8 @@ function MachinePnpSlotStrip({
     visibleMachineAssignmentIndexes,
     machineProductionPlan,
     onSelectSlot,
+    nozzleReach = null,
+    columnOffset = 0,
 }) {
     const showInlineRef = slots.length <= INLINE_REF_MAX_SLOTS;
 
@@ -51,6 +53,12 @@ function MachinePnpSlotStrip({
                 const isAssigned = Boolean(assignment);
                 const isSelected = selectedSlotPosition === slot;
                 const palette = assignment ? getPlacementGroupPalette(assignment.placement_group) : slotEmptyPalette;
+
+                // Portée nozzle : la colonne physique d'un slot = position − offset de
+                // rampe (rampe avant : offset 0 ; rampe arrière : offset = nb colonnes).
+                const slotColumn = slot - columnOffset;
+                const reachActive = Boolean(nozzleReach);
+                const inNozzleReach = reachActive && slotColumn >= nozzleReach.lo && slotColumn <= nozzleReach.hi;
 
                 const isVisibleInCurrentList = assignment
                     ? visibleMachineAssignmentIndexSet.has(assignment.assignment_index)
@@ -94,15 +102,19 @@ function MachinePnpSlotStrip({
                                 fontSize: layout.fontSize,
                                 borderRadius: layout.borderRadius,
                                 cursor: 'pointer',
-                                borderColor: isSelected ? '#facc15' : palette.borderColor,
+                                borderColor: isSelected ? '#facc15' : (inNozzleReach ? '#2dd4bf' : palette.borderColor),
                                 background: isAssigned ? palette.slotBackground : undefined,
-                                boxShadow: isSelected ? '0 0 0 2px rgba(250,204,21,0.45)' : 'none',
+                                boxShadow: isSelected
+                                    ? '0 0 0 2px rgba(250,204,21,0.45)'
+                                    : (inNozzleReach ? '0 0 0 2px rgba(45,212,191,0.55)' : 'none'),
                                 flexDirection: 'column',
                                 gap: 0.1,
                                 px: 0.15,
                                 overflow: 'hidden',
-                                opacity: hasFocusedAssignmentSubset && !isVisibleInCurrentList ? 0.3 : 1,
-                                transition: 'opacity 0.12s ease',
+                                opacity: reachActive && !inNozzleReach
+                                    ? 0.18
+                                    : (hasFocusedAssignmentSubset && !isVisibleInCurrentList ? 0.3 : 1),
+                                transition: 'opacity 0.12s ease, box-shadow 0.12s ease',
                             }}
                         >
                             <Typography sx={{ fontSize: layout.fontSize, lineHeight: 1, fontWeight: 700, color: isAssigned ? palette.labelColor : '#52525b' }}>
