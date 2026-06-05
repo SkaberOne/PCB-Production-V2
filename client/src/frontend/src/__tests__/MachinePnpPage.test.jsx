@@ -34,6 +34,13 @@ jest.mock('../context/BomSessionContext', () => ({
     useBomSession: jest.fn(),
 }));
 
+// La V2 est désormais le défaut ; ces tests valident le repli historique (legacy),
+// donc on force le flag OFF pour que le routeur rende MachinePnpPageLegacy.
+jest.mock('../utils/featureFlags', () => ({
+    featureFlags: { machinePnpPlan: false },
+    isFeatureEnabled: () => false,
+}));
+
 // ── Shared fixtures ──────────────────────────────────────────────────────────
 
 const EMPTY_SESSION = {

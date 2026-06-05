@@ -36,12 +36,13 @@ export const featureFlags = {
     /**
      * Plan d'implantation Machine PnP : slot-strip visuel, validation/dévalidation
      * d'ordre de fabrication, réordonnancement de séquence, CRUD feeders fixes,
-     * détachement production↔machine. Demi-fini ⇒ désactivé par défaut.
+     * détachement production↔machine. Promue en défaut (true) ; mettre à false
+     * (env ou config runtime) pour revenir à la page historique (legacy).
      */
     machinePnpPlan: resolveFlag(
         'machinePnpPlan',
         process.env.REACT_APP_FEATURE_MACHINE_PNP_PLAN,
-        false,
+        true,
     ),
 };
 

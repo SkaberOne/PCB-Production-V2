@@ -169,13 +169,9 @@ function MachinePnpWorkspace() {
         <Stack spacing={3}>
             <PageHeader
                 eyebrow="Machine PnP"
-                title="Plan d'implantation (V2)"
-                description="Réintégration en cours : plan d'implantation feeders, feeders fixes, validation d'ordre de fabrication, détachement production↔machine."
+                title="Plan d'implantation"
+                description="Affectez vos productions aux machines PnP, optimisez l'implantation des feeders et organisez la séquence de fabrication."
             />
-
-            <Alert severity="info" variant="outlined">
-                Vue V2 activée par le flag « machinePnpPlan ». Construction incrémentale en cours.
-            </Alert>
 
             {feedback?.message ? (
                 <Alert severity={feedbackSeverity} onClose={closeFeedback}>{feedback.message}</Alert>
