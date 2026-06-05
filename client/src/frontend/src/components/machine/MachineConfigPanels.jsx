@@ -24,9 +24,10 @@ import {
     Tooltip,
     Typography,
 } from '@mui/material';
+import { mpnColors, mpnSectionLabelSx } from '../../utils/machinePnp';
 
-const PANEL_SX = { backgroundColor: '#18181b', border: '1px solid #27272a', borderRadius: 2, p: 2 };
-const LABEL_SX = { fontSize: '0.7rem', color: '#71717a', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', mb: 1 };
+const PANEL_SX = { backgroundColor: mpnColors.surface, border: `1px solid ${mpnColors.border}`, borderRadius: 2, p: 2 };
+const LABEL_SX = mpnSectionLabelSx;
 
 /** Affecter une production disponible à la machine. */
 export function ProductionAssignPanel({ config }) {

@@ -1,6 +1,34 @@
+/**
+ * Tokens couleur Machine PnP (palette sombre émeraude/zinc) — source unique pour
+ * les composants de la page, afin d'éviter les hex en dur dupliqués.
+ */
+export const mpnColors = {
+    surface: '#18181b',
+    border: '#27272a',
+    accent: '#059669',
+    accentHover: '#047857',
+    accentBright: '#10b981',
+    textPrimary: '#f4f4f5',
+    textSecondary: '#a1a1aa',
+    textMuted: '#71717a',
+    textFaint: '#52525b',
+    warning: '#f59e0b',
+    danger: '#ef4444',
+};
+
 export const panelCardSx = {
-    backgroundColor: '#18181b',
-    border: '1px solid #27272a',
+    backgroundColor: mpnColors.surface,
+    border: `1px solid ${mpnColors.border}`,
+};
+
+/** Libellé de section (titre en petites capitales gris). */
+export const mpnSectionLabelSx = {
+    fontSize: '0.7rem',
+    color: mpnColors.textMuted,
+    fontWeight: 700,
+    textTransform: 'uppercase',
+    letterSpacing: '0.08em',
+    mb: 1,
 };
 
 export const machineSlotCellSx = {

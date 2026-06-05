@@ -27,14 +27,14 @@ import { useBomSession } from '../../context/BomSessionContext';
 import { useWorkspaceData } from '../../hooks/useWorkspaceData';
 import { useFixedFeeders } from '../../hooks/useFixedFeeders';
 import { useMachineConfig } from '../../hooks/useMachineConfig';
-import { extractRequestError } from '../../utils/machinePnp';
+import { extractRequestError, panelCardSx } from '../../utils/machinePnp';
 import { MachineTable, FixedFeederTable, CartTable } from './MachinePnpTables';
 import MachineConfigDialog from './MachineConfigDialog';
 import FixedFeederDialog from './FixedFeederDialog';
 import { CreateMachineDialog, EditMachineDialog, CreateCartDialog, EditCartDialog } from './MachineCrudDialogs';
 import FixedFeederFilters from './FixedFeederFilters';
 
-const PANEL_SX = { backgroundColor: '#18181b', border: '1px solid #27272a' };
+const PANEL_SX = panelCardSx;
 
 const TAB_SX = {
     fontSize: '0.8rem',
