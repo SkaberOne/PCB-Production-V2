@@ -25,6 +25,7 @@ def create_machine(
             db=db,
             name=request.name,
             num_positions=request.num_positions,
+            num_nozzles=request.num_nozzles,
             description=request.description,
             notes=request.notes,
         )
@@ -161,6 +162,7 @@ def update_machine(
             machine_id=machine_id,
             name=request.name,
             num_positions=request.num_positions,
+            num_nozzles=request.num_nozzles,
             description=request.description,
             notes=request.notes,
         )

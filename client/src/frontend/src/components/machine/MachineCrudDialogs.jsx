@@ -18,6 +18,7 @@ import { cartKindOptions, extractRequestError } from '../../utils/machinePnp';
 export function CreateMachineDialog({ open, onClose, onCreated }) {
     const [name, setName] = useState('');
     const [positions, setPositions] = useState('80');
+    const [nozzles, setNozzles] = useState('');
     const [description, setDescription] = useState('');
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
@@ -26,6 +27,7 @@ export function CreateMachineDialog({ open, onClose, onCreated }) {
         if (open) {
             setName('');
             setPositions('80');
+            setNozzles('');
             setDescription('');
             setError('');
         }
@@ -38,12 +40,18 @@ export function CreateMachineDialog({ open, onClose, onCreated }) {
             setError('Le nombre de positions doit être entre 1 et 200.');
             return;
         }
+        const numNozzles = nozzles === '' ? null : parseInt(nozzles, 10);
+        if (numNozzles !== null && (Number.isNaN(numNozzles) || numNozzles < 0 || numNozzles > 40)) {
+            setError('Le nombre de nozzles doit être entre 0 et 40.');
+            return;
+        }
         setLoading(true);
         setError('');
         try {
             await apiClient.post('/marketplace/machines', {
                 name: name.trim(),
                 num_positions: numPositions,
+                num_nozzles: numNozzles,
                 description: description.trim() || null,
             });
             onCreated();
@@ -63,6 +71,7 @@ export function CreateMachineDialog({ open, onClose, onCreated }) {
                     {error ? <Alert severity="error">{error}</Alert> : null}
                     <TextField label="Nom de la machine" value={name} onChange={(e) => setName(e.target.value)} fullWidth size="small" placeholder="PNP-01" />
                     <TextField label="Nombre de positions feeders" type="number" value={positions} onChange={(e) => setPositions(e.target.value)} fullWidth size="small" inputProps={{ min: 1, max: 200 }} helperText="Entier entre 1 et 200." />
+                    <TextField label="Nombre de nozzles (optionnel)" type="number" value={nozzles} onChange={(e) => setNozzles(e.target.value)} fullWidth size="small" inputProps={{ min: 0, max: 40 }} helperText="Nozzles sur la tête (0 à 40). Laisser vide si non configuré." />
                     <TextField label="Description (optionnel)" value={description} onChange={(e) => setDescription(e.target.value)} fullWidth size="small" multiline minRows={2} />
                 </Stack>
             </DialogContent>
@@ -221,6 +230,7 @@ export function EditCartDialog({ cart, open, onClose, onSaved }) {
 export function EditMachineDialog({ machine, open, onClose, onSaved }) {
     const [name, setName] = useState('');
     const [positions, setPositions] = useState('80');
+    const [nozzles, setNozzles] = useState('');
     const [description, setDescription] = useState('');
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
@@ -229,6 +239,7 @@ export function EditMachineDialog({ machine, open, onClose, onSaved }) {
         if (machine && open) {
             setName(machine.name || '');
             setPositions(String(machine.num_positions ?? 80));
+            setNozzles(machine.num_nozzles == null ? '' : String(machine.num_nozzles));
             setDescription(machine.description || '');
             setError('');
         }
@@ -241,12 +252,18 @@ export function EditMachineDialog({ machine, open, onClose, onSaved }) {
             setError('Le nombre de positions doit être entre 1 et 200.');
             return;
         }
+        const numNozzles = nozzles === '' ? null : parseInt(nozzles, 10);
+        if (numNozzles !== null && (Number.isNaN(numNozzles) || numNozzles < 0 || numNozzles > 40)) {
+            setError('Le nombre de nozzles doit être entre 0 et 40.');
+            return;
+        }
         setLoading(true);
         setError('');
         try {
             await apiClient.put(`/marketplace/machines/${machine.id}`, {
                 name: name.trim(),
                 num_positions: numPositions,
+                num_nozzles: numNozzles,
                 description: description.trim() || null,
             });
             onSaved();
@@ -266,6 +283,7 @@ export function EditMachineDialog({ machine, open, onClose, onSaved }) {
                     {error ? <Alert severity="error">{error}</Alert> : null}
                     <TextField label="Nom de la machine" value={name} onChange={(e) => setName(e.target.value)} fullWidth size="small" />
                     <TextField label="Nombre de positions feeders" type="number" value={positions} onChange={(e) => setPositions(e.target.value)} fullWidth size="small" inputProps={{ min: 1, max: 200 }} helperText="Entier entre 1 et 200." />
+                    <TextField label="Nombre de nozzles (optionnel)" type="number" value={nozzles} onChange={(e) => setNozzles(e.target.value)} fullWidth size="small" inputProps={{ min: 0, max: 40 }} helperText="Nozzles sur la tête (0 à 40). Laisser vide si non configuré." />
                     <TextField label="Description (optionnel)" value={description} onChange={(e) => setDescription(e.target.value)} fullWidth size="small" multiline minRows={2} />
                 </Stack>
             </DialogContent>

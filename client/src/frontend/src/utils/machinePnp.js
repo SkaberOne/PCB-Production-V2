@@ -425,3 +425,23 @@ export function getFeederSizePalette(sizeMm) {
     const key = Number(sizeMm);
     return feederSizePalette[key] || feederSizeUnknownPalette;
 }
+
+/**
+ * Palette des slots par GROUPE de placement : 2 couleurs seulement.
+ * Fixe (feeder sur chariot, rampe arrière) = ambre ; Mobile (dynamique, rampe
+ * avant) = émeraude. Remplace la coloration par taille de feeder.
+ */
+export const placementGroupPalette = {
+    FIXED: { borderColor: '#f59e0b', slotBackground: 'rgba(245,158,11,0.16)', labelColor: '#fde68a' },
+    DYNAMIC: { borderColor: '#34d399', slotBackground: 'rgba(52,211,153,0.16)', labelColor: '#bbf7d0' },
+};
+
+/** Groupes présentés dans la légende de la vue machine (fixe / mobile). */
+export const PLACEMENT_GROUP_LEGEND = [
+    { key: 'FIXED', label: 'Fixe' },
+    { key: 'DYNAMIC', label: 'Mobile' },
+];
+
+export function getPlacementGroupPalette(placementGroup) {
+    return placementGroupPalette[placementGroup] || placementGroupPalette.DYNAMIC;
+}

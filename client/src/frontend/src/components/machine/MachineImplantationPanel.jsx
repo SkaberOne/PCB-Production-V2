@@ -7,13 +7,14 @@ import {
     Divider,
     Stack,
     TableContainer,
+    Tooltip,
     Typography,
 } from '@mui/material';
 import { MachineAssignmentTable } from './MachinePnpTables';
 import MachinePnpSlotStrip from './MachinePnpSlotStrip';
 import {
-    FEEDER_SIZE_LEGEND,
-    getFeederSizePalette,
+    PLACEMENT_GROUP_LEGEND,
+    getPlacementGroupPalette,
     machineFrameSx,
     machineLaneSx,
     slotEmptyPalette,
@@ -37,6 +38,48 @@ function MachineLane({ title, slots, layout, config }) {
                 machineProductionPlan={config.machineProductionPlan}
                 onSelectSlot={config.handleSelectMachineSlot}
             />
+        </Box>
+    );
+}
+
+/**
+ * Tête PnP : rangée de N nozzles (carrés côte à côte) au centre de la machine,
+ * au-dessus du PCB. Le nombre vient de la config machine ; l'affectation
+ * nozzle→slot et la portée seront calculées une fois les mesures physiques
+ * fournies. Masquée si aucun nozzle n'est configuré.
+ */
+function NozzleHead({ count }) {
+    const nozzleCount = Math.max(0, Number(count) || 0);
+    if (!nozzleCount) return null;
+
+    return (
+        <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.4 }}>
+            <Typography sx={{ fontSize: '0.55rem', letterSpacing: '0.08em', textTransform: 'uppercase', color: '#71717a', fontWeight: 700 }}>
+                Tête · {nozzleCount} nozzle{nozzleCount > 1 ? 's' : ''}
+            </Typography>
+            <Stack direction="row" spacing={0.5} flexWrap="wrap" justifyContent="center" useFlexGap>
+                {Array.from({ length: nozzleCount }, (_value, index) => index + 1).map((nozzle) => (
+                    <Tooltip key={`nozzle-${nozzle}`} title={`Nozzle ${nozzle}`} arrow>
+                        <Box
+                            sx={{
+                                width: 22,
+                                height: 22,
+                                borderRadius: 1,
+                                border: '1px solid #6d28d9',
+                                backgroundColor: 'rgba(167,139,250,0.18)',
+                                color: '#ddd6fe',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                fontSize: '0.6rem',
+                                fontWeight: 700,
+                            }}
+                        >
+                            {nozzle}
+                        </Box>
+                    </Tooltip>
+                ))}
+            </Stack>
         </Box>
     );
 }
@@ -69,11 +112,11 @@ function ConveyorBand() {
     );
 }
 
-/** Légende : couleur des slots par taille de feeder. */
+/** Légende : couleur des slots par groupe de placement (fixe / mobile). */
 function FeederSizeLegend() {
-    const items = FEEDER_SIZE_LEGEND.map((size) => {
-        const palette = getFeederSizePalette(size);
-        return { key: size, label: `${size} mm`, borderColor: palette.borderColor, background: palette.slotBackground };
+    const items = PLACEMENT_GROUP_LEGEND.map((group) => {
+        const palette = getPlacementGroupPalette(group.key);
+        return { key: group.key, label: group.label, borderColor: palette.borderColor, background: palette.slotBackground };
     });
     items.push({ key: 'libre', label: 'Libre', borderColor: slotEmptyPalette.borderColor, background: 'transparent' });
 
@@ -91,8 +134,8 @@ function FeederSizeLegend() {
 
 /**
  * Panneau « plan d'implantation » : synthèse, filtre par révision BOM, vue machine
- * vue de dessus (rampe arrière → convoyeur PCB → rampe avant) colorée par taille de
- * feeder, table d'affectation et détail du slot sélectionné.
+ * vue de dessus (rampe arrière → convoyeur PCB → rampe avant) colorée par groupe
+ * de placement (fixe / mobile), table d'affectation et détail du slot sélectionné.
  */
 function MachineImplantationPanel({ config }) {
     const {
@@ -192,6 +235,7 @@ function MachineImplantationPanel({ config }) {
             {/* Vue machine vue de dessus : rampe arrière → convoyeur PCB → rampe avant */}
             <Stack spacing={0.75}>
                 <MachineLane title="Rampe arrière" slots={machineTopView.backSlots} layout={backSlotLayout} config={config} />
+                <NozzleHead count={config.machineNumNozzles} />
                 <ConveyorBand />
                 <MachineLane title="Rampe avant" slots={machineTopView.frontSlots} layout={frontSlotLayout} config={config} />
             </Stack>

@@ -1,15 +1,15 @@
 import React from 'react';
 import { Box, Tooltip, Typography } from '@mui/material';
-import { getFeederSizePalette, machineSlotCellSx, slotEmptyPalette } from '../../utils/machinePnp';
+import { getPlacementGroupPalette, machineSlotCellSx, slotEmptyPalette } from '../../utils/machinePnp';
 
 // Au-delà de ce nombre de slots par rampe, la cellule est trop étroite pour un
-// libellé : on n'affiche que le numéro + la couleur (taille feeder), le reste au survol.
+// libellé : on n'affiche que le numéro + la couleur (fixe/mobile), le reste au survol.
 const INLINE_REF_MAX_SLOTS = 24;
 
 /**
  * Slot-strip d'une rampe de feeders (vue machine vue de dessus).
- * La couleur encode la TAILLE de feeder (8/12/16 mm) ; le numéro de position est
- * toujours visible ; la référence apparaît en clair sur les petites machines et
+ * La couleur encode le GROUPE de placement (fixe / mobile) ; le numéro de position
+ * est toujours visible ; la référence apparaît en clair sur les petites machines et
  * au survol partout. Le détail texte complet vit dans la table d'affectation.
  */
 function MachinePnpSlotStrip({
@@ -50,7 +50,7 @@ function MachinePnpSlotStrip({
                 }
                 const isAssigned = Boolean(assignment);
                 const isSelected = selectedSlotPosition === slot;
-                const palette = assignment ? getFeederSizePalette(assignment.feeder_size_mm) : slotEmptyPalette;
+                const palette = assignment ? getPlacementGroupPalette(assignment.placement_group) : slotEmptyPalette;
 
                 const isVisibleInCurrentList = assignment
                     ? visibleMachineAssignmentIndexSet.has(assignment.assignment_index)

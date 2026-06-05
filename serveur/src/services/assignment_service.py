@@ -55,6 +55,7 @@ class AssignmentService(AssignmentFixedFeederMixin, AssignmentPlanningMixin):
         db: Session,
         name: str,
         num_positions: int,
+        num_nozzles: Optional[int] = None,
         description: Optional[str] = None,
         notes: Optional[str] = None
     ) -> PnpMachine:
@@ -88,6 +89,7 @@ class AssignmentService(AssignmentFixedFeederMixin, AssignmentPlanningMixin):
         machine = PnpMachine(
             name=name.strip(),
             num_positions=num_positions,
+            num_nozzles=num_nozzles or None,
             description=description.strip() if description else None,
             notes=notes.strip() if notes else None
         )
@@ -176,6 +178,7 @@ class AssignmentService(AssignmentFixedFeederMixin, AssignmentPlanningMixin):
         machine_id: int,
         name: Optional[str] = None,
         num_positions: Optional[int] = None,
+        num_nozzles: Optional[int] = None,
         description: Optional[str] = None,
         notes: Optional[str] = None
     ) -> PnpMachine:
@@ -217,6 +220,11 @@ class AssignmentService(AssignmentFixedFeederMixin, AssignmentPlanningMixin):
             if num_positions < 1 or num_positions > 200:
                 raise ValueError(f"Invalid number of positions: {num_positions}. Must be 1-200")
             machine.num_positions = num_positions
+
+        if num_nozzles is not None:
+            if num_nozzles < 0 or num_nozzles > 40:
+                raise ValueError(f"Invalid number of nozzles: {num_nozzles}. Must be 0-40")
+            machine.num_nozzles = num_nozzles or None
 
         if description is not None:
             machine.description = description.strip() if description else None

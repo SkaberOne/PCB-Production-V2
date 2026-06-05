@@ -319,7 +319,7 @@ class AssignmentPlanningMixin:
         slot_assignments: List[Dict] = []
         unassigned_components: List[Dict] = []
 
-        def assign_entry(entry: Dict, placement_group: str) -> None:
+        def assign_entry(entry: Dict, placement_group: str, from_back: bool = False) -> None:
             feeder_size_mm = entry["feeder_size_mm"]
             if machine_feeder_sizes:
                 if feeder_size_mm is None:
@@ -336,9 +336,15 @@ class AssignmentPlanningMixin:
                     return
 
             required_slots = entry["slot_usage"]
-            for slot_start in range(1, max(int(machine.num_positions or 0) - required_slots + 2, 1)):
+            total_positions = int(machine.num_positions or 0)
+            start_range = range(1, max(total_positions - required_slots + 2, 1))
+            # Feeders fixes : remplissage depuis l'arrière (positions hautes) pour les
+            # regrouper sur la rampe arrière ; dynamiques depuis l'avant (positions
+            # basses) afin de maximiser les feeders mobiles sur la rampe avant.
+            slot_starts = reversed(start_range) if from_back else start_range
+            for slot_start in slot_starts:
                 slot_positions = list(range(slot_start, slot_start + required_slots))
-                if slot_positions[-1] > int(machine.num_positions or 0):
+                if slot_positions[-1] > total_positions:
                     continue
                 if any(position in positions for position in slot_positions):
                     continue
@@ -358,7 +364,7 @@ class AssignmentPlanningMixin:
             unassigned_components.append(build_unassigned_payload(entry, "Capacite machine insuffisante", placement_group))
 
         for entry in sorted(fixed_entries, key=cls._fixed_plan_sort_key):
-            assign_entry(entry, "FIXED")
+            assign_entry(entry, "FIXED", from_back=True)
 
         # ── Débordement → sélection « à placer à la main » ─────────────────────────
         # Après les feeders fixes, si la demande dynamique dépasse la capacité

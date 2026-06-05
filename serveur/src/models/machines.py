@@ -22,6 +22,7 @@ class PnpMachine(Base):
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String(100), unique=True, nullable=False, index=True)
     num_positions = Column(Integer, nullable=False)  # 60, 80, etc
+    num_nozzles = Column(Integer, nullable=True)  # nb de nozzles sur la tête (None = non configuré)
     description = Column(Text, nullable=True)
     notes = Column(Text, nullable=True)
     created_at = Column(DateTime, default=utcnow)

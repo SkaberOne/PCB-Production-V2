@@ -88,6 +88,10 @@ export function useMachineConfigSelectors({
         () => getMachineSlotLayout(machineTopView.frontSlots.length),
         [machineTopView.frontSlots.length],
     );
+    const machineNumNozzles = React.useMemo(
+        () => Number(machineSummary?.num_nozzles ?? machineConfigTarget?.num_nozzles ?? 0) || 0,
+        [machineSummary?.num_nozzles, machineConfigTarget?.num_nozzles],
+    );
 
     // ── Sélection courante ─────────────────────────────────────────────────────
     const selectedMachineProduction = React.useMemo(() => {
@@ -198,6 +202,7 @@ export function useMachineConfigSelectors({
         machineTopView,
         backSlotLayout,
         frontSlotLayout,
+        machineNumNozzles,
         selectedMachineProduction,
         selectedMachineBomRevision,
         selectedMachineSlot,
