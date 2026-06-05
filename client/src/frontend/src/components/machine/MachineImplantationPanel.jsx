@@ -155,13 +155,7 @@ function MachineImplantationPanel({ config }) {
         machineProductionPlanLoading,
         machineProductionPlan,
         machinePlanOverviewChips,
-        selectedMachineBomRevisionId,
         selectedMachineBomRevision,
-        selectedMachineBomAssignmentFilter,
-        selectedMachineBomCommonAssignmentCount,
-        selectedMachineBomInstallAssignmentCount,
-        handleToggleMachineBomRevision,
-        handleChangeMachineBomAssignmentFilter,
         machineTopView,
         frontSlotLayout,
         backSlotLayout,
@@ -201,50 +195,7 @@ function MachineImplantationPanel({ config }) {
                 ))}
             </Stack>
 
-            {machineProductionPlan.ordered_boms?.length ? (
-                <Box sx={{ mb: 1.5 }}>
-                    <Typography sx={{ fontSize: '0.65rem', color: '#71717a', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', mb: 0.75 }}>
-                        Face à produire — config PnP recalculée (clic : sélectionner / désélectionner)
-                    </Typography>
-                    <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
-                        {machineProductionPlan.ordered_boms.map((bom) => {
-                            const isActive = `${bom.bom_revision_id}` === selectedMachineBomRevisionId;
-                            const sideSuffix = bom.side ? ` · ${bom.side}` : '';
-                            const label = bom.reference
-                                ? `${bom.reference}${bom.revision ? ` · ${bom.revision}` : ''}${sideSuffix}`
-                                : `BOM ${bom.bom_revision_id}`;
-                            return (
-                                <Chip
-                                    key={bom.bom_revision_id}
-                                    label={label}
-                                    size="small"
-                                    onClick={() => handleToggleMachineBomRevision(bom.bom_revision_id, true)}
-                                    variant={isActive ? 'filled' : 'outlined'}
-                                    color={isActive ? 'primary' : 'default'}
-                                />
-                            );
-                        })}
-                    </Stack>
-                    {selectedMachineBomRevision ? (
-                        <Stack direction="row" spacing={1} sx={{ mt: 1 }}>
-                            {[
-                                { key: 'all', label: 'Tous' },
-                                { key: 'common', label: `Communs (${selectedMachineBomCommonAssignmentCount})` },
-                                { key: 'install', label: `Implantation (${selectedMachineBomInstallAssignmentCount})` },
-                            ].map((option) => (
-                                <Chip
-                                    key={option.key}
-                                    label={option.label}
-                                    size="small"
-                                    onClick={() => handleChangeMachineBomAssignmentFilter(option.key)}
-                                    variant={selectedMachineBomAssignmentFilter === option.key ? 'filled' : 'outlined'}
-                                    color={selectedMachineBomAssignmentFilter === option.key ? 'primary' : 'default'}
-                                />
-                            ))}
-                        </Stack>
-                    ) : null}
-                </Box>
-            ) : null}
+            {/* Sélection de la face : via le tableau de séquence de production (au-dessus). */}
 
             {/* Vue machine vue de dessus : rampe arrière → convoyeur PCB → rampe avant */}
             <Stack spacing={0.75}>

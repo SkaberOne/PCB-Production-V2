@@ -83,6 +83,8 @@ export function ProductionSequencePanel({ config }) {
         handleRefreshMachineProductionPlan,
         handleDetachProductionFromMachine,
         handleMoveProductionBom,
+        handleToggleMachineBomRevision,
+        selectedMachineBomRevisionId,
         actionLoading,
     } = config;
 
@@ -156,6 +158,10 @@ export function ProductionSequencePanel({ config }) {
             </Stack>
 
             {revisions.length ? (
+                <>
+                <Typography sx={{ fontSize: '0.66rem', color: '#71717a', mb: 0.5 }}>
+                    Cliquez une face pour recalculer la config PnP de cette face (reclic = revenir au plan global).
+                </Typography>
                 <TableContainer>
                     <Table size="small">
                         <TableHead>
@@ -168,8 +174,19 @@ export function ProductionSequencePanel({ config }) {
                             </TableRow>
                         </TableHead>
                         <TableBody>
-                            {revisions.map((bom, index) => (
-                                <TableRow key={bom.bom_revision_id} sx={{ '& td': { borderColor: '#27272a', py: 0.5 } }}>
+                            {revisions.map((bom, index) => {
+                                const isSelectedFace = `${bom.bom_revision_id}` === `${selectedMachineBomRevisionId || ''}`;
+                                return (
+                                <TableRow
+                                    key={bom.bom_revision_id}
+                                    hover
+                                    onClick={() => handleToggleMachineBomRevision && handleToggleMachineBomRevision(bom.bom_revision_id, true)}
+                                    sx={{
+                                        cursor: 'pointer',
+                                        backgroundColor: isSelectedFace ? 'rgba(5,150,105,0.16)' : 'transparent',
+                                        '& td': { borderColor: '#27272a', py: 0.5, borderLeft: isSelectedFace ? '2px solid #10b981' : '2px solid transparent' },
+                                    }}
+                                >
                                     <TableCell sx={{ color: '#52525b', fontSize: '0.75rem' }}>{bom.sequence_order ?? index + 1}</TableCell>
                                     <TableCell sx={{ color: '#f4f4f5', fontSize: '0.8rem' }}>{bom.reference}</TableCell>
                                     <TableCell sx={{ color: '#a1a1aa', fontSize: '0.75rem' }}>
@@ -192,18 +209,20 @@ export function ProductionSequencePanel({ config }) {
                                     </TableCell>
                                     <TableCell align="right" sx={{ color: '#a1a1aa', fontSize: '0.75rem' }}>{bom.quantity_to_produce ?? 1}</TableCell>
                                     <TableCell align="right">
-                                        <IconButton size="small" aria-label="Monter" disabled={busy || index === 0} onClick={() => handleMoveProductionBom(selectedMachineProduction, bom.bom_revision_id, 'up')} sx={{ color: '#52525b' }}>
+                                        <IconButton size="small" aria-label="Monter" disabled={busy || index === 0} onClick={(e) => { e.stopPropagation(); handleMoveProductionBom(selectedMachineProduction, bom.bom_revision_id, 'up'); }} sx={{ color: '#52525b' }}>
                                             <ArrowUpwardRoundedIcon sx={{ fontSize: 15 }} />
                                         </IconButton>
-                                        <IconButton size="small" aria-label="Descendre" disabled={busy || index === revisions.length - 1} onClick={() => handleMoveProductionBom(selectedMachineProduction, bom.bom_revision_id, 'down')} sx={{ color: '#52525b' }}>
+                                        <IconButton size="small" aria-label="Descendre" disabled={busy || index === revisions.length - 1} onClick={(e) => { e.stopPropagation(); handleMoveProductionBom(selectedMachineProduction, bom.bom_revision_id, 'down'); }} sx={{ color: '#52525b' }}>
                                             <ArrowDownwardRoundedIcon sx={{ fontSize: 15 }} />
                                         </IconButton>
                                     </TableCell>
                                 </TableRow>
-                            ))}
+                                );
+                            })}
                         </TableBody>
                     </Table>
                 </TableContainer>
+                </>
             ) : (
                 <Typography sx={{ fontSize: '0.8rem', color: '#52525b' }}>Aucune BOM dans cette production.</Typography>
             )}
