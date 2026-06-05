@@ -242,6 +242,29 @@ class AssignmentPlanningMixin:
         return ordered_boms, usage_index, unmatched_bom_items
 
     @classmethod
+    def _collect_machine_queue_reuse(cls, db: Session, machine) -> Dict[int, int]:
+        """Compte, pour chaque composant, le nombre de FACES distinctes (révisions
+        BOM) qui l'utilisent sur TOUTE la file de la machine : faces de la prod en
+        cours + faces des autres productions affectées à la machine.
+
+        Sert à l'optimisation inter-productions : un composant réutilisé par
+        beaucoup de faces (réutilisation élevée) doit rester monté ; les feeders
+        propres à une seule face (réutilisation faible) sont les premiers candidats
+        à la pose « à la main » quand la capacité est dépassée.
+        """
+        reuse_faces: Dict[int, set] = {}
+        for production in list(machine.productions or []):
+            try:
+                _, usage_index, _ = cls._collect_machine_production_usage(db=db, production=production)
+            except Exception:  # noqa: BLE001 — une prod incohérente ne doit pas casser le plan
+                continue
+            for component_id, entry in usage_index.items():
+                faces = reuse_faces.setdefault(component_id, set())
+                for revision_id in entry["bom_revision_ids"]:
+                    faces.add((production.id, revision_id))
+        return {component_id: len(faces) for component_id, faces in reuse_faces.items()}
+
+    @classmethod
     def _fixed_plan_sort_key(cls, entry: Dict) -> Tuple:
         component = entry["component"]
         cart = component.fixed_cart
@@ -299,6 +322,10 @@ class AssignmentPlanningMixin:
         ordered_boms, usage_index, unmatched_bom_items = cls._collect_machine_production_usage(
             db=db, production=production, only_bom_revision_id=bom_revision_id,
         )
+        # Réutilisation inter-productions : nb de faces de la file machine qui
+        # utilisent chaque composant (≥1). Sert à garder montés les feeders
+        # réutilisés et à sortir « à la main » d'abord les feeders propres à une face.
+        queue_reuse = cls._collect_machine_queue_reuse(db=db, machine=machine)
         total_build_quantity_by_board_key: Dict[str, int] = {}
         for bom in ordered_boms:
             board_build_key = str(bom.get("board_build_key") or "")
@@ -399,14 +426,18 @@ class AssignmentPlanningMixin:
 
         if dynamic_slot_demand > remaining_capacity:
             overflow_slots = dynamic_slot_demand - remaining_capacity
-            # Ordre de sortie « à la main » : on privilégie les composants qui (1)
+            # Ordre de sortie « à la main » : on sort d'abord (0) les feeders les
+            # MOINS réutilisés sur la file de la machine (faces des prochaines
+            # productions incluses) — pour garder montés les feeders réutilisés et
+            # minimiser les changements ; puis, à réutilisation égale, ceux qui (1)
             # libèrent le plus de place par pose, (2) ont le plus gros boîtier
-            # (feeder_size_mm) car plus simples à poser à la main (ex SOIC-8), (3)
+            # (feeder_size_mm, plus simples à poser à la main, ex SOIC-8), (3)
             # occupent le plus de positions (gros feeder 2 pos), (4) ont le moins
             # de poses — pour minimiser le nombre ET l'effort des poses manuelles.
             ranked_for_manual = sorted(
                 size_valid_dynamic,
                 key=lambda entry: (
+                    int(queue_reuse.get(entry["component"].id, 1)),
                     -(int(entry["slot_usage"]) / max(int(entry["total_quantity"]), 1)),
                     -int(entry["feeder_size_mm"] or 0),
                     -int(entry["slot_usage"]),

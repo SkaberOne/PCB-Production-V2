@@ -495,3 +495,42 @@ class TestPerFaceFeederPlan:
         # affectations sont scopées à la face choisie.
         assert len(plan["ordered_boms"]) == 2
         assert comp_b.id not in ids
+
+
+# ── Tests: rétention par réutilisation inter-productions ─────────────────────
+
+class TestQueueReuseRetention:
+    def test_low_reuse_component_handplaced_first(self, db):
+        # Capacité 1 ; face A demande 2 composants (1 partagé A+B, 1 propre à A) →
+        # déborde de 1. Le partagé (réutilisé sur 2 faces) doit rester monté ; le
+        # composant propre à la face A part à la main.
+        machine = make_machine(db, positions=1)
+        production = make_production(db, machine)
+        rev_a = make_bom_revision(db, reference="BOARD-A", revision="A")
+        rev_b = make_bom_revision(db, reference="BOARD-B", revision="B")
+        shared = make_component(db, reference="SH", value="SHARED", footprint="R_SH")
+        specific = make_component(db, reference="SP", value="SPEC", footprint="R_SP")
+        db.add(BomItem(
+            bom_revision_id=rev_a.id, reference_item="R1", quantity=1,
+            footprint_pnp=shared.footprint_pnp, value_harmonized=shared.value, dnp=False,
+        ))
+        db.add(BomItem(
+            bom_revision_id=rev_b.id, reference_item="R2", quantity=1,
+            footprint_pnp=shared.footprint_pnp, value_harmonized=shared.value, dnp=False,
+        ))
+        db.add(BomItem(
+            bom_revision_id=rev_a.id, reference_item="R3", quantity=1,
+            footprint_pnp=specific.footprint_pnp, value_harmonized=specific.value, dnp=False,
+        ))
+        link_revision(db, production, rev_a, order=1, quantity=1)
+        link_revision(db, production, rev_b, order=2, quantity=1)
+        db.commit()
+
+        plan = AssignmentPlanningMixin.get_machine_production_feeder_plan(
+            db=db, machine_id=machine.id, production_id=production.id,
+            bom_revision_id=rev_a.id,
+        )
+        manual_ids = {m["component_id"] for m in plan["manual_placement_components"]}
+        assigned_ids = {a["component_id"] for a in plan["slot_assignments"]}
+        assert specific.id in manual_ids
+        assert shared.id in assigned_ids
