@@ -8,7 +8,10 @@ Verrouille les observations physiques d'Eric (2026-06) :
 """
 
 from src.utils.nozzles import (
-    deduce_nozzle_class,
+    deduce_nozzle_type,
+    default_nozzle_layout,
+    normalize_nozzle_layout,
+    nozzle_layout_red_positions,
     nozzle_reach_columns,
     nozzle_reach_left_limit,
     nozzle_reach_right_limit,
@@ -76,10 +79,52 @@ class TestNozzleReachEdgeCases:
             assert any(_reaches(i, n, c, column) for i in range(1, n + 1)), column
 
 
-class TestDeduceNozzleClass:
-    def test_small_to_large(self):
-        assert deduce_nozzle_class(8) == 1
-        assert deduce_nozzle_class(12) == 2
-        assert deduce_nozzle_class(16) == 3
-        assert deduce_nozzle_class(44) == 4
-        assert deduce_nozzle_class(None) is None
+class TestDeduceNozzleType:
+    def test_by_footprint(self):
+        assert deduce_nozzle_type("0201") == 501
+        assert deduce_nozzle_type("R0402") == 502
+        assert deduce_nozzle_type("0603") == 502
+        assert deduce_nozzle_type("0805") == 503
+        assert deduce_nozzle_type("SOT-23") == 503
+        assert deduce_nozzle_type("SOIC-8") == 504
+        assert deduce_nozzle_type("TSSOP-20") == 504
+        assert deduce_nozzle_type("LQFP-64") == 505
+        assert deduce_nozzle_type("QFN-32") == 505
+
+    def test_feeder_size_fallback_when_unknown_footprint(self):
+        assert deduce_nozzle_type("MYSTERY", 8) == 502
+        assert deduce_nozzle_type(None, 16) == 505
+        assert deduce_nozzle_type(None, None) is None
+
+
+class TestDefaultNozzleLayout:
+    def test_default_uses_503_504_505_cycle(self):
+        assert default_nozzle_layout(0) == []
+        assert default_nozzle_layout(3) == [503, 504, 505]
+        assert default_nozzle_layout(5) == [503, 504, 505, 503, 504]
+
+    def test_normalize_pads_and_clamps(self):
+        # trop court → complété par le défaut ; type inconnu → remplacé par défaut
+        assert normalize_nozzle_layout([505], 3) == [505, 504, 505]
+        assert normalize_nozzle_layout([999, 504], 2) == [503, 504]
+        # trop long → tronqué
+        assert normalize_nozzle_layout([503, 504, 505, 503], 2) == [503, 504]
+
+
+class TestNozzleLayoutRedPositions:
+    def test_red_when_type_cannot_cover_its_columns(self):
+        # 8 nozzles, 40 colonnes. Un composant 505 placé en colonne 1.
+        # Si les positions de type 505 sont toutes à droite (ne couvrent pas col 1),
+        # elles passent rouges.
+        layout = [503, 503, 503, 503, 505, 505, 505, 505]  # 505 en positions 5..8
+        # nozzle 5..8 (505) atteignent col 1 ? nozzle 5 atteint dès col 2 → non.
+        needed = {505: {1}}
+        red = nozzle_layout_red_positions(layout, needed, num_nozzles=8, columns_per_ramp=40)
+        assert red == [5, 6, 7, 8]
+
+    def test_no_red_when_a_same_type_nozzle_covers(self):
+        # Type 505 présent à gauche (position 1..4) ET droite : col 1 couverte → pas rouge.
+        layout = [505, 505, 505, 505, 503, 503, 503, 503]
+        needed = {505: {1}}
+        red = nozzle_layout_red_positions(layout, needed, num_nozzles=8, columns_per_ramp=40)
+        assert red == []

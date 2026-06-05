@@ -23,6 +23,7 @@ class PnpMachine(Base):
     name = Column(String(100), unique=True, nullable=False, index=True)
     num_positions = Column(Integer, nullable=False)  # 60, 80, etc
     num_nozzles = Column(Integer, nullable=True)  # nb de nozzles sur la tête (None = non configuré)
+    nozzle_layout = Column(Text, nullable=True)  # JSON: type de nozzle (501..505) par position
     description = Column(Text, nullable=True)
     notes = Column(Text, nullable=True)
     created_at = Column(DateTime, default=utcnow)

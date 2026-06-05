@@ -28,6 +28,7 @@ def create_machine(
             name=request.name,
             num_positions=request.num_positions,
             num_nozzles=request.num_nozzles,
+            nozzle_layout=request.nozzle_layout,
             description=request.description,
             notes=request.notes,
         )
@@ -171,6 +172,7 @@ def update_machine(
             name=request.name,
             num_positions=request.num_positions,
             num_nozzles=request.num_nozzles,
+            nozzle_layout=request.nozzle_layout,
             description=request.description,
             notes=request.notes,
         )

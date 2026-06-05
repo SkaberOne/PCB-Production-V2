@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import {
     Alert,
+    Box,
     Button,
     CircularProgress,
     Dialog,
@@ -10,9 +11,22 @@ import {
     MenuItem,
     Stack,
     TextField,
+    Typography,
 } from '@mui/material';
 import apiClient from '../../api/client';
 import { cartKindOptions, extractRequestError } from '../../utils/machinePnp';
+
+const NOZZLE_TYPE_OPTIONS = [501, 502, 503, 504, 505];
+const NOZZLE_DEFAULT_CYCLE = [503, 504, 505];
+
+/** Layout nozzle calé sur `count` : reprend la source, complète par le défaut 503/504/505. */
+function buildNozzleLayout(source, count) {
+    const total = Number.isInteger(count) && count > 0 ? count : 0;
+    return Array.from({ length: total }, (_value, index) => {
+        const candidate = source && Number(source[index]);
+        return NOZZLE_TYPE_OPTIONS.includes(candidate) ? candidate : NOZZLE_DEFAULT_CYCLE[index % NOZZLE_DEFAULT_CYCLE.length];
+    });
+}
 
 /** Création d'une machine PnP. */
 export function CreateMachineDialog({ open, onClose, onCreated }) {
@@ -231,6 +245,7 @@ export function EditMachineDialog({ machine, open, onClose, onSaved }) {
     const [name, setName] = useState('');
     const [positions, setPositions] = useState('80');
     const [nozzles, setNozzles] = useState('');
+    const [nozzleLayout, setNozzleLayout] = useState([]);
     const [description, setDescription] = useState('');
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
@@ -240,10 +255,17 @@ export function EditMachineDialog({ machine, open, onClose, onSaved }) {
             setName(machine.name || '');
             setPositions(String(machine.num_positions ?? 80));
             setNozzles(machine.num_nozzles == null ? '' : String(machine.num_nozzles));
+            setNozzleLayout(Array.isArray(machine.nozzle_layout) ? machine.nozzle_layout : []);
             setDescription(machine.description || '');
             setError('');
         }
     }, [machine, open]);
+
+    const numNozzlesValue = parseInt(nozzles, 10);
+    const renderedNozzleLayout = buildNozzleLayout(
+        nozzleLayout,
+        Number.isInteger(numNozzlesValue) ? numNozzlesValue : 0,
+    );
 
     const handleSubmit = async () => {
         if (!name.trim()) { setError('Le nom est obligatoire.'); return; }
@@ -264,6 +286,7 @@ export function EditMachineDialog({ machine, open, onClose, onSaved }) {
                 name: name.trim(),
                 num_positions: numPositions,
                 num_nozzles: numNozzles,
+                nozzle_layout: numNozzles ? buildNozzleLayout(nozzleLayout, numNozzles) : null,
                 description: description.trim() || null,
             });
             onSaved();
@@ -284,6 +307,34 @@ export function EditMachineDialog({ machine, open, onClose, onSaved }) {
                     <TextField label="Nom de la machine" value={name} onChange={(e) => setName(e.target.value)} fullWidth size="small" />
                     <TextField label="Nombre de positions feeders" type="number" value={positions} onChange={(e) => setPositions(e.target.value)} fullWidth size="small" inputProps={{ min: 1, max: 200 }} helperText="Entier entre 1 et 200." />
                     <TextField label="Nombre de nozzles (optionnel)" type="number" value={nozzles} onChange={(e) => setNozzles(e.target.value)} fullWidth size="small" inputProps={{ min: 0, max: 40 }} helperText="Nozzles sur la tête (0 à 40). Laisser vide si non configuré." />
+                    {renderedNozzleLayout.length ? (
+                        <Box>
+                            <Typography sx={{ fontSize: '0.72rem', color: '#a1a1aa', mb: 1 }}>
+                                Type de nozzle par position (pré-rempli, modifiable)
+                            </Typography>
+                            <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+                                {renderedNozzleLayout.map((nozzleType, index) => (
+                                    <TextField
+                                        key={`nozzle-pos-${index}`}
+                                        select
+                                        size="small"
+                                        label={`#${index + 1}`}
+                                        value={nozzleType}
+                                        onChange={(e) => {
+                                            const next = [...renderedNozzleLayout];
+                                            next[index] = parseInt(e.target.value, 10);
+                                            setNozzleLayout(next);
+                                        }}
+                                        sx={{ width: 92 }}
+                                    >
+                                        {NOZZLE_TYPE_OPTIONS.map((option) => (
+                                            <MenuItem key={option} value={option}>{option}</MenuItem>
+                                        ))}
+                                    </TextField>
+                                ))}
+                            </Stack>
+                        </Box>
+                    ) : null}
                     <TextField label="Description (optionnel)" value={description} onChange={(e) => setDescription(e.target.value)} fullWidth size="small" multiline minRows={2} />
                 </Stack>
             </DialogContent>

@@ -1,44 +1,80 @@
-"""Helpers de déduction nozzle ↔ composant (fondation).
+"""Helpers nozzles : déduction du type de nozzle par boîtier, config par
+machine (type par position), pré-remplissage par défaut, et validation de la
+portée (positions à signaler en rouge).
 
-La portée réelle de chaque nozzle sur le banc de feeders sera fournie par
-l'utilisateur APRÈS tests physiques (voir ``NOZZLE_REACH_BY_CLASS``, laissé
-vide). Tant que la portée n'est pas renseignée, AUCUNE contrainte de portée
-n'est appliquée par l'optimiseur de placement : ce module ne fait pour l'instant
-que *déduire* la classe de nozzle d'un composant et l'exposer pour affichage.
+Nomenclature Eric : types 501..505 (du plus petit boîtier au plus gros). En
+pratique seuls 503/504/505 sont utilisés → pré-remplissage par défaut sur ces
+trois types.
 """
 
-from typing import Dict, Optional, Tuple
+from typing import Dict, List, Optional, Set, Tuple
 
-# Classes de nozzle, du plus petit (1) au plus gros. Le libellé est neutre
-# (S/M/L/XL) en attendant le catalogue nozzle réel (ex. 501..505).
-NOZZLE_CLASS_LABELS: Dict[int, str] = {
-    1: "S",
-    2: "M",
-    3: "L",
-    4: "XL",
-}
+# Types de nozzles, du plus petit boîtier (501) au plus gros (505).
+NOZZLE_TYPES: Tuple[int, ...] = (501, 502, 503, 504, 505)
 
+# Types réellement utilisés (Eric) → base du pré-remplissage par défaut.
+DEFAULT_LAYOUT_TYPES: Tuple[int, ...] = (503, 504, 505)
 
-def deduce_nozzle_class(feeder_size_mm: Optional[int]) -> Optional[int]:
-    """Déduit la classe de nozzle depuis la largeur de feeder (proxy de la
-    taille du boîtier). Petit boîtier (≤8 mm) → petit nozzle. Seuils éditables
-    quand le catalogue nozzle réel sera connu.
-    """
-    if feeder_size_mm is None:
-        return None
-    if feeder_size_mm <= 8:
-        return 1
-    if feeder_size_mm <= 12:
-        return 2
-    if feeder_size_mm <= 24:
-        return 3
-    return 4
+# Mapping boîtier/footprint → type de nozzle (Eric 2026-06). Vérifié du plus gros
+# au plus petit ; première correspondance gagne. Tokens normalisés (alphanum, MAJ).
+_NOZZLE_TYPE_TOKENS: Tuple[Tuple[int, Tuple[str, ...]], ...] = (
+    (505, ("QFP", "TQFP", "LQFP", "QFN", "BGA", "PLCC", "CONN", "DSUB", "SOICW", "SOPW", "SSOPW")),
+    (504, ("SOIC", "SOP", "TSSOP", "SOT89", "SOT223", "TANT", "ELECTRO", "ELEC")),
+    (503, ("0805", "1206", "1210", "SOT23", "SOT323", "MELF", "SOD")),
+    (502, ("0402", "0603")),
+    (501, ("01005", "0201")),
+)
 
 
-def nozzle_class_label(nozzle_class: Optional[int]) -> Optional[str]:
-    if nozzle_class is None:
-        return None
-    return NOZZLE_CLASS_LABELS.get(nozzle_class, str(nozzle_class))
+def _normalize_footprint(value: Optional[str]) -> str:
+    return "".join(ch for ch in (value or "").upper() if ch.isalnum())
+
+
+def deduce_nozzle_type(footprint: Optional[str], feeder_size_mm: Optional[int] = None) -> Optional[int]:
+    """Déduit le type de nozzle (501..505) depuis le boîtier/footprint, avec
+    repli sur la largeur de feeder si le footprint est inconnu."""
+    norm = _normalize_footprint(footprint)
+    if norm:
+        for nozzle_type, tokens in _NOZZLE_TYPE_TOKENS:
+            if any(token in norm for token in tokens):
+                return nozzle_type
+    if feeder_size_mm is not None:
+        if feeder_size_mm <= 8:
+            return 502
+        if feeder_size_mm <= 12:
+            return 504
+        return 505
+    return None
+
+
+def default_nozzle_layout(num_nozzles: Optional[int]) -> List[int]:
+    """Pré-remplissage par défaut des positions : répartition cyclique des types
+    réellement utilisés (503/504/505)."""
+    n = int(num_nozzles or 0)
+    if n <= 0:
+        return []
+    return [DEFAULT_LAYOUT_TYPES[i % len(DEFAULT_LAYOUT_TYPES)] for i in range(n)]
+
+
+def normalize_nozzle_layout(layout: Optional[List], num_nozzles: Optional[int]) -> List[int]:
+    """Cale un layout sur num_nozzles : tronque si trop long, complète par le
+    défaut si trop court, ignore les types inconnus (remplacés par le défaut)."""
+    n = int(num_nozzles or 0)
+    if n <= 0:
+        return []
+    fallback = default_nozzle_layout(n)
+    result: List[int] = []
+    for index in range(n):
+        value = None
+        if layout and index < len(layout):
+            try:
+                candidate = int(layout[index])
+                if candidate in NOZZLE_TYPES:
+                    value = candidate
+            except (TypeError, ValueError):
+                value = None
+        result.append(value if value is not None else fallback[index])
+    return result
 
 
 # ─── Portée des nozzles (données physiques observées) ───────────────────────
@@ -95,3 +131,43 @@ def nozzle_reach_columns(
     if hi < lo:
         return None
     return (lo, hi)
+
+
+def nozzle_layout_red_positions(
+    layout: List[int],
+    needed_columns_by_type: Dict[int, Set[int]],
+    num_nozzles: int,
+    columns_per_ramp: int,
+    left_limit: Optional[int] = None,
+    right_limit: Optional[int] = None,
+) -> List[int]:
+    """Positions (1-indexées) à signaler en ROUGE.
+
+    Un nozzle de type T est rouge si au moins une colonne où un composant de
+    type T est placé n'est atteinte par AUCUN nozzle de type T du layout
+    (couverture insuffisante du type). Si un type est requis mais absent du
+    layout, ses colonnes restent non couvertes mais aucune position ne porte ce
+    type → rien à colorer (cas « type manquant », à signaler ailleurs).
+    """
+    n = int(num_nozzles or 0)
+    if n <= 0:
+        return []
+    reach_by_position = {
+        position: nozzle_reach_columns(position, n, columns_per_ramp, left_limit, right_limit)
+        for position in range(1, n + 1)
+    }
+    positions_by_type: Dict[int, List[int]] = {}
+    for index, nozzle_type in enumerate(list(layout)[:n], start=1):
+        positions_by_type.setdefault(int(nozzle_type), []).append(index)
+
+    red: Set[int] = set()
+    for nozzle_type, needed_columns in needed_columns_by_type.items():
+        type_positions = positions_by_type.get(int(nozzle_type), [])
+        covered: Set[int] = set()
+        for position in type_positions:
+            span = reach_by_position.get(position)
+            if span:
+                covered.update(range(span[0], span[1] + 1))
+        if set(needed_columns) - covered:
+            red.update(type_positions)
+    return sorted(red)

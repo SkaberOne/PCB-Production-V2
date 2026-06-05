@@ -1,5 +1,6 @@
 """Machine production planning helpers."""
 
+import json
 import logging
 from datetime import datetime
 from typing import Dict, List, Tuple
@@ -25,6 +26,7 @@ from .assignment_helpers import (
     sort_production_bom_links,
 )
 from .component_library_service import ComponentLibraryService
+from ..utils.nozzles import normalize_nozzle_layout, nozzle_layout_red_positions
 
 logger = logging.getLogger(__name__)
 
@@ -477,11 +479,41 @@ class AssignmentPlanningMixin:
         ]
         bom_assignment_summaries = build_bom_assignment_summaries(ordered_boms, slot_assignments)
 
+        # ── Config nozzles : layout par position + positions en rouge (hors portée) ──
+        num_nozzles = int(machine.num_nozzles or 0)
+        columns_per_ramp = (total_positions + 1) // 2
+        nozzle_layout: List[int] = []
+        nozzle_red_positions: List[int] = []
+        if num_nozzles > 0 and columns_per_ramp > 0:
+            raw_layout = None
+            if machine.nozzle_layout:
+                try:
+                    raw_layout = json.loads(machine.nozzle_layout)
+                except (TypeError, ValueError):
+                    raw_layout = None
+            nozzle_layout = normalize_nozzle_layout(
+                raw_layout if isinstance(raw_layout, list) else None, num_nozzles,
+            )
+            needed_columns_by_type: Dict[int, set] = {}
+            for assignment in slot_assignments:
+                nozzle_type = assignment.get("nozzle_type")
+                if not nozzle_type:
+                    continue
+                for position in assignment["slot_positions"]:
+                    column = position if position <= columns_per_ramp else position - columns_per_ramp
+                    needed_columns_by_type.setdefault(int(nozzle_type), set()).add(column)
+            nozzle_red_positions = nozzle_layout_red_positions(
+                nozzle_layout, needed_columns_by_type, num_nozzles, columns_per_ramp,
+            )
+
         return {
             "machine_id": machine.id,
             "machine_name": machine.name,
             "machine_positions": total_positions,
             "machine_feeder_sizes": machine_feeder_sizes,
+            "num_nozzles": num_nozzles,
+            "nozzle_layout": nozzle_layout,
+            "nozzle_red_positions": nozzle_red_positions,
             "production_id": production.id,
             "production_name": production.name,
             "quantity_source": "PRODUCTION",

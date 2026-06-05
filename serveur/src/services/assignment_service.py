@@ -1,5 +1,6 @@
 """Service for managing machine assignments and feeder configurations."""
 
+import json
 import logging
 from datetime import datetime
 from typing import List, Dict, Optional, Tuple
@@ -15,6 +16,13 @@ from ..models.production import Production, ProductionBomRevision
 from .assignment_fixed_feeders import AssignmentFixedFeederMixin
 from .component_library_service import ComponentLibraryService
 from .assignment_planning import AssignmentPlanningMixin
+from ..utils.nozzles import normalize_nozzle_layout
+
+
+def _serialize_nozzle_layout(layout, num_nozzles):
+    """Liste de types nozzle → JSON (ou None si pas de nozzles/layout vide)."""
+    normalized = normalize_nozzle_layout(layout, num_nozzles)
+    return json.dumps(normalized) if normalized else None
 from .assignment_helpers import (
     build_assignment_payload,
     build_bom_assignment_summaries,
@@ -56,6 +64,7 @@ class AssignmentService(AssignmentFixedFeederMixin, AssignmentPlanningMixin):
         name: str,
         num_positions: int,
         num_nozzles: Optional[int] = None,
+        nozzle_layout: Optional[List[int]] = None,
         description: Optional[str] = None,
         notes: Optional[str] = None
     ) -> PnpMachine:
@@ -86,10 +95,12 @@ class AssignmentService(AssignmentFixedFeederMixin, AssignmentPlanningMixin):
         if existing:
             raise ValueError(f"Machine '{name}' already exists")
         
+        resolved_nozzles = num_nozzles or None
         machine = PnpMachine(
             name=name.strip(),
             num_positions=num_positions,
-            num_nozzles=num_nozzles or None,
+            num_nozzles=resolved_nozzles,
+            nozzle_layout=_serialize_nozzle_layout(nozzle_layout, resolved_nozzles),
             description=description.strip() if description else None,
             notes=notes.strip() if notes else None
         )
@@ -179,6 +190,7 @@ class AssignmentService(AssignmentFixedFeederMixin, AssignmentPlanningMixin):
         name: Optional[str] = None,
         num_positions: Optional[int] = None,
         num_nozzles: Optional[int] = None,
+        nozzle_layout: Optional[List[int]] = None,
         description: Optional[str] = None,
         notes: Optional[str] = None
     ) -> PnpMachine:
@@ -225,6 +237,21 @@ class AssignmentService(AssignmentFixedFeederMixin, AssignmentPlanningMixin):
             if num_nozzles < 0 or num_nozzles > 40:
                 raise ValueError(f"Invalid number of nozzles: {num_nozzles}. Must be 0-40")
             machine.num_nozzles = num_nozzles or None
+            # Re-cale le layout existant sur le nouveau nb de nozzles si pas de
+            # nouveau layout fourni (tronque/complète par le défaut).
+            if nozzle_layout is None:
+                existing = None
+                if machine.nozzle_layout:
+                    try:
+                        existing = json.loads(machine.nozzle_layout)
+                    except (TypeError, ValueError):
+                        existing = None
+                machine.nozzle_layout = _serialize_nozzle_layout(
+                    existing if isinstance(existing, list) else None, machine.num_nozzles,
+                )
+
+        if nozzle_layout is not None:
+            machine.nozzle_layout = _serialize_nozzle_layout(nozzle_layout, machine.num_nozzles)
 
         if description is not None:
             machine.description = description.strip() if description else None

@@ -1,5 +1,6 @@
 """Pure helpers for assignment service serialization and ordering."""
 
+import json
 from datetime import datetime
 from typing import Dict, List, Optional, Tuple
 
@@ -10,7 +11,19 @@ from ..utils.feeder_types import (
     extract_component_feeder_size_mm,
     normalize_component_feeder_type,
 )
-from ..utils.nozzles import deduce_nozzle_class, nozzle_class_label
+from ..utils.nozzles import deduce_nozzle_type, normalize_nozzle_layout
+
+
+def _parse_nozzle_layout(raw, num_nozzles):
+    """Layout nozzle stocké (JSON) → liste normalisée de longueur num_nozzles
+    (complétée par le pré-remplissage par défaut si absent/partiel)."""
+    stored = None
+    if raw:
+        try:
+            stored = json.loads(raw)
+        except (TypeError, ValueError):
+            stored = None
+    return normalize_nozzle_layout(stored if isinstance(stored, list) else None, num_nozzles)
 
 
 def parse_cart_kind(kind: Optional[str]) -> PnpCart.KindEnum:
@@ -64,6 +77,7 @@ def serialize_machine(machine: PnpMachine) -> Dict:
         "name": machine.name,
         "num_positions": machine.num_positions,
         "num_nozzles": machine.num_nozzles,
+        "nozzle_layout": _parse_nozzle_layout(machine.nozzle_layout, machine.num_nozzles),
         "description": machine.description,
         "notes": machine.notes,
         "created_at": machine.created_at.isoformat() if machine.created_at else None,
@@ -230,8 +244,7 @@ def build_assignment_payload(
         "footprint_eagle": component.footprint_eagle,
         "feeder_type": normalize_component_feeder_type(component.feeder_type),
         "feeder_size_mm": entry["feeder_size_mm"],
-        "nozzle_class": deduce_nozzle_class(entry["feeder_size_mm"]),
-        "nozzle_label": nozzle_class_label(deduce_nozzle_class(entry["feeder_size_mm"])),
+        "nozzle_type": deduce_nozzle_type(component.footprint_pnp or component.package, entry["feeder_size_mm"]),
         "slot_usage": entry["slot_usage"],
         "bom_presence_count": bom_presence_count,
         "bom_revision_ids": assignment_bom_revision_ids,
@@ -279,8 +292,7 @@ def build_unassigned_payload(
         "footprint_pnp": component.footprint_pnp or component.package,
         "feeder_type": normalize_component_feeder_type(component.feeder_type),
         "feeder_size_mm": entry["feeder_size_mm"],
-        "nozzle_class": deduce_nozzle_class(entry["feeder_size_mm"]),
-        "nozzle_label": nozzle_class_label(deduce_nozzle_class(entry["feeder_size_mm"])),
+        "nozzle_type": deduce_nozzle_type(component.footprint_pnp or component.package, entry["feeder_size_mm"]),
         "slot_usage": entry["slot_usage"],
         "bom_presence_count": bom_presence_count,
         "total_build_quantity": total_build_quantity,

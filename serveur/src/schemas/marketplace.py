@@ -132,6 +132,7 @@ class CreateMachineRequest(BaseModel):
     name: str = Field(..., min_length=1, max_length=100)
     num_positions: int = Field(..., ge=1, le=200)
     num_nozzles: Optional[int] = Field(default=None, ge=0, le=40)
+    nozzle_layout: Optional[List[int]] = Field(default=None)
     description: Optional[str] = None
     notes: Optional[str] = None
 
@@ -140,6 +141,7 @@ class UpdateMachineRequest(BaseModel):
     name: Optional[str] = Field(None, min_length=1, max_length=100)
     num_positions: Optional[int] = Field(default=None, ge=1, le=200)
     num_nozzles: Optional[int] = Field(default=None, ge=0, le=40)
+    nozzle_layout: Optional[List[int]] = Field(default=None)
     description: Optional[str] = None
     notes: Optional[str] = None
 

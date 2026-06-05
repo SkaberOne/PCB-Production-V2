@@ -48,37 +48,50 @@ function MachineLane({ title, slots, layout, config }) {
  * la config par position et la validation de portée arriveront via le menu nozzles.
  * Masquée si aucun nozzle n'est configuré.
  */
-function NozzleHead({ count }) {
+function NozzleHead({ count, layout = [], redPositions = [] }) {
     const nozzleCount = Math.max(0, Number(count) || 0);
     if (!nozzleCount) return null;
+
+    const redSet = new Set((redPositions || []).map(Number));
 
     return (
         <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.4 }}>
             <Typography sx={{ fontSize: '0.55rem', letterSpacing: '0.08em', textTransform: 'uppercase', color: '#71717a', fontWeight: 700 }}>
                 Tête · {nozzleCount} nozzle{nozzleCount > 1 ? 's' : ''}
+                {redSet.size ? ` · ${redSet.size} hors portée` : ''}
             </Typography>
             <Stack direction="row" spacing={0.5} flexWrap="wrap" justifyContent="center" useFlexGap>
-                {Array.from({ length: nozzleCount }, (_value, index) => index + 1).map((nozzle) => (
-                    <Tooltip key={`nozzle-${nozzle}`} title={`Nozzle ${nozzle}`} arrow>
-                        <Box
-                            sx={{
-                                width: 22,
-                                height: 22,
-                                borderRadius: 1,
-                                border: '1px solid #6d28d9',
-                                backgroundColor: 'rgba(167,139,250,0.18)',
-                                color: '#ddd6fe',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                fontSize: '0.6rem',
-                                fontWeight: 700,
-                            }}
+                {Array.from({ length: nozzleCount }, (_value, index) => index + 1).map((position) => {
+                    const nozzleType = layout && layout[position - 1] ? layout[position - 1] : null;
+                    const isRed = redSet.has(position);
+                    return (
+                        <Tooltip
+                            key={`nozzle-${position}`}
+                            title={`Position ${position}${nozzleType ? ` · type ${nozzleType}` : ''}${isRed ? ' · hors portée d’un feeder à servir' : ''}`}
+                            arrow
                         >
-                            {nozzle}
-                        </Box>
-                    </Tooltip>
-                ))}
+                            <Box
+                                sx={{
+                                    minWidth: 26,
+                                    height: 24,
+                                    px: 0.4,
+                                    borderRadius: 1,
+                                    border: `1px solid ${isRed ? '#ef4444' : '#6d28d9'}`,
+                                    backgroundColor: isRed ? 'rgba(239,68,68,0.18)' : 'rgba(167,139,250,0.18)',
+                                    color: isRed ? '#fca5a5' : '#ddd6fe',
+                                    boxShadow: isRed ? '0 0 0 2px rgba(239,68,68,0.35)' : 'none',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    fontSize: '0.58rem',
+                                    fontWeight: 700,
+                                }}
+                            >
+                                {nozzleType ?? position}
+                            </Box>
+                        </Tooltip>
+                    );
+                })}
             </Stack>
         </Box>
     );
@@ -236,7 +249,11 @@ function MachineImplantationPanel({ config }) {
             {/* Vue machine vue de dessus : rampe arrière → convoyeur PCB → rampe avant */}
             <Stack spacing={0.75}>
                 <MachineLane title="Rampe arrière" slots={machineTopView.backSlots} layout={backSlotLayout} config={config} />
-                <NozzleHead count={config.machineNumNozzles} />
+                <NozzleHead
+                    count={machineProductionPlan?.num_nozzles || config.machineNumNozzles}
+                    layout={machineProductionPlan?.nozzle_layout}
+                    redPositions={machineProductionPlan?.nozzle_red_positions}
+                />
                 <ConveyorBand />
                 <MachineLane title="Rampe avant" slots={machineTopView.frontSlots} layout={frontSlotLayout} config={config} />
             </Stack>
