@@ -112,7 +112,15 @@ def _purge_all_tables():
 
 @pytest.fixture(scope="function", autouse=True)
 def cleanup_db():
-    """Reset the database before and after each test."""
-    _purge_all_tables()
+    """Reset the database before and after each test.
+
+    Drop+recreate du schéma (option « robuste » documentée en tête de fichier) :
+    contrairement au DELETE FROM, ça réinitialise aussi les compteurs AUTOINCREMENT
+    et garantit l'isolation en suite globale (asserts `assert N == 0`, comptages,
+    IDs). `_purge_all_tables` reste disponible pour les usages spécifiques.
+    """
+    Base.metadata.drop_all(bind=engine)
+    Base.metadata.create_all(bind=engine)
     yield
-    _purge_all_tables()
+    Base.metadata.drop_all(bind=engine)
+    Base.metadata.create_all(bind=engine)

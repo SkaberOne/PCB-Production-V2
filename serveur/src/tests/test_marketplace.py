@@ -13,6 +13,7 @@ from openpyxl import Workbook, load_workbook
 from sqlalchemy.orm import Session
 from tests.conftest import client, TestingSessionLocal
 from src.models.production import Production
+from src.models.bom import BomItem, BomReference, BomRevision
 
 def test_machine_listing_exposes_description_and_counts():
     """Machine list should expose the fields needed by the Machine PnP page."""
