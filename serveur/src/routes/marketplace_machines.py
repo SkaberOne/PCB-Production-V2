@@ -1,5 +1,7 @@
 """Marketplace machine routes."""
 
+from typing import Optional
+
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
@@ -111,14 +113,20 @@ def validate_machine_production_order(
 def get_machine_production_feeder_plan(
     machine_id: int,
     production_id: int,
+    bom_revision_id: Optional[int] = Query(None, ge=1),
     db: Session = Depends(get_db),
 ):
-    """Calculate the current feeder-slot plan for a production on a machine."""
+    """Calculate the feeder-slot plan for a production on a machine.
+
+    Si bom_revision_id est fourni, le plan est recalculé pour CETTE face
+    (TOP/BOT) seule : implantation + composants à la main propres à la face.
+    """
     try:
         return AssignmentService.get_machine_production_feeder_plan(
             db=db,
             machine_id=machine_id,
             production_id=production_id,
+            bom_revision_id=bom_revision_id,
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))

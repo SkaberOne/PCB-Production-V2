@@ -449,3 +449,47 @@ class TestManualPlacementOnOverflow:
         assert plan["manual_placement_count"] == 0
         assert plan["manual_placement_slot_savings"] == 0
         assert plan["manual_placement_components"] == []
+
+
+# ── Tests: plan recalculé par face (bom_revision_id) ─────────────────────────
+
+class TestPerFaceFeederPlan:
+    def _setup_two_faces(self, db):
+        machine = make_machine(db, positions=40)
+        production = make_production(db, machine)
+        rev_a = make_bom_revision(db, reference="BOARD-A", revision="A")
+        rev_b = make_bom_revision(db, reference="BOARD-B", revision="B")
+        comp_a = make_component(db, reference="RA", value="VAL-A", footprint="R0805_A")
+        comp_b = make_component(db, reference="RB", value="VAL-B", footprint="R0805_B")
+        db.add(BomItem(
+            bom_revision_id=rev_a.id, reference_item="R1", quantity=1,
+            footprint_pnp=comp_a.footprint_pnp, value_harmonized=comp_a.value, dnp=False,
+        ))
+        db.add(BomItem(
+            bom_revision_id=rev_b.id, reference_item="R2", quantity=1,
+            footprint_pnp=comp_b.footprint_pnp, value_harmonized=comp_b.value, dnp=False,
+        ))
+        link_revision(db, production, rev_a, order=1, quantity=1)
+        link_revision(db, production, rev_b, order=2, quantity=1)
+        db.commit()
+        return machine, production, rev_a, rev_b, comp_a, comp_b
+
+    def test_global_plan_includes_both_faces(self, db):
+        machine, production, rev_a, rev_b, comp_a, comp_b = self._setup_two_faces(db)
+        plan = AssignmentPlanningMixin.get_machine_production_feeder_plan(
+            db=db, machine_id=machine.id, production_id=production.id,
+        )
+        ids = {a["component_id"] for a in plan["slot_assignments"]}
+        assert ids == {comp_a.id, comp_b.id}
+        assert len(plan["ordered_boms"]) == 2
+
+    def test_per_face_plan_scopes_to_selected_face(self, db):
+        machine, production, rev_a, rev_b, comp_a, comp_b = self._setup_two_faces(db)
+        plan = AssignmentPlanningMixin.get_machine_production_feeder_plan(
+            db=db, machine_id=machine.id, production_id=production.id,
+            bom_revision_id=rev_a.id,
+        )
+        ids = {a["component_id"] for a in plan["slot_assignments"]}
+        assert ids == {comp_a.id}
+        assert len(plan["ordered_boms"]) == 1
+        assert plan["ordered_boms"][0]["bom_revision_id"] == rev_a.id

@@ -64,11 +64,6 @@ function ManualPlacementPanel({ config }) {
                                 <TableRow key={item.component_id} sx={{ '& td': { borderColor: '#27272a', py: 0.5 } }}>
                                     <TableCell sx={{ color: '#f4f4f5', fontSize: '0.78rem' }}>
                                         {item.component_label}
-                                        {item.component_reference ? (
-                                            <Typography component="span" sx={{ color: '#71717a', fontSize: '0.7rem', ml: 0.5 }}>
-                                                · {item.component_reference}
-                                            </Typography>
-                                        ) : null}
                                     </TableCell>
                                     <TableCell sx={{ color: '#a1a1aa', fontSize: '0.72rem' }}>{item.footprint_pnp || '--'}</TableCell>
                                     <TableCell sx={{ fontSize: '0.72rem' }}>

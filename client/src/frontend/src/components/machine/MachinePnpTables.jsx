@@ -413,7 +413,6 @@ const MachineAssignmentTableRow = React.memo(function MachineAssignmentTableRow(
                 {assignment.slot_end !== assignment.slot_start ? ' (2 pos.)' : ''}
             </TableCell>
             <TableCell sx={compactWrapCellSx}>{assignment.component_label}</TableCell>
-            <TableCell sx={compactWrapCellSx}>{assignment.component_reference || '--'}</TableCell>
             <TableCell sx={compactCellSx}>{assignment.footprint_pnp || '--'}</TableCell>
             <TableCell sx={compactCellSx}>
                 {assignment.feeder_type || (assignment.feeder_size_mm ? `${assignment.feeder_size_mm} mm` : '--')}
@@ -467,7 +466,6 @@ export const MachineAssignmentTable = React.memo(function MachineAssignmentTable
                 <TableRow>
                     <TableCell>Slot</TableCell>
                     <TableCell>Composant</TableCell>
-                    <TableCell>Référence</TableCell>
                     <TableCell>Footprint</TableCell>
                     <TableCell>Feeder</TableCell>
                     <TableCell>Type</TableCell>

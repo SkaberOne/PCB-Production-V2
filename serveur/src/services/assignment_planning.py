@@ -138,7 +138,10 @@ class AssignmentPlanningMixin:
         cls,
         db: Session,
         production: Production,
+        only_bom_revision_id: Optional[int] = None,
     ) -> Tuple[List[Dict], Dict[int, Dict], int]:
+        # only_bom_revision_id : si fourni, on ne collecte QUE cette face (TOP/BOT),
+        # pour un plan d'implantation recalculé pour cette face seule.
         ordered_links = sort_production_bom_links(production.bom_links)
         quantity_to_produce_by_revision: Dict[int, int] = {
             int(link.bom_revision_id): max(int(link.quantity_to_produce or 1), 1)
@@ -159,6 +162,8 @@ class AssignmentPlanningMixin:
 
         for sequence_index, link in enumerate(ordered_links, start=1):
             revision = link.revision
+            if only_bom_revision_id is not None and not (revision and revision.id == only_bom_revision_id):
+                continue
             reference = revision.reference if revision else None
             side = revision.type.value if revision and hasattr(revision.type, "value") else (revision.type if revision else "")
             board_build_key = (
@@ -273,6 +278,7 @@ class AssignmentPlanningMixin:
         db: Session,
         machine_id: int,
         production_id: int,
+        bom_revision_id: Optional[int] = None,
     ) -> Dict:
         machine, production = cls._get_machine_and_production_context(
             db=db,
@@ -287,7 +293,9 @@ class AssignmentPlanningMixin:
                 link.sequence_order = index
         db.flush()
 
-        ordered_boms, usage_index, unmatched_bom_items = cls._collect_machine_production_usage(db=db, production=production)
+        ordered_boms, usage_index, unmatched_bom_items = cls._collect_machine_production_usage(
+            db=db, production=production, only_bom_revision_id=bom_revision_id,
+        )
         total_build_quantity_by_board_key: Dict[str, int] = {}
         for bom in ordered_boms:
             board_build_key = str(bom.get("board_build_key") or "")
@@ -388,10 +396,16 @@ class AssignmentPlanningMixin:
 
         if dynamic_slot_demand > remaining_capacity:
             overflow_slots = dynamic_slot_demand - remaining_capacity
+            # Ordre de sortie « à la main » : on privilégie les composants qui (1)
+            # libèrent le plus de place par pose, (2) ont le plus gros boîtier
+            # (feeder_size_mm) car plus simples à poser à la main (ex SOIC-8), (3)
+            # occupent le plus de positions (gros feeder 2 pos), (4) ont le moins
+            # de poses — pour minimiser le nombre ET l'effort des poses manuelles.
             ranked_for_manual = sorted(
                 size_valid_dynamic,
                 key=lambda entry: (
                     -(int(entry["slot_usage"]) / max(int(entry["total_quantity"]), 1)),
+                    -int(entry["feeder_size_mm"] or 0),
                     -int(entry["slot_usage"]),
                     int(entry["total_quantity"]),
                     component_display_label(entry["component"]).upper(),
