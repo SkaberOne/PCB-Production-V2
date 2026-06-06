@@ -637,7 +637,7 @@ function BomViewerPage() {
                             disabled={!selectedEntries.length || saveState.loading}
                             onClick={() => handleSaveAll('validate')}
                         >
-                            Valider
+                            Valider les BOM
                         </Button>
                     </Stack>
                 )}

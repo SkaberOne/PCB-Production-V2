@@ -25,7 +25,7 @@ import {
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import DeleteIcon from '@mui/icons-material/Delete';
 import ExpandMoreRoundedIcon from '@mui/icons-material/ExpandMoreRounded';
-import OpenInNewRoundedIcon from '@mui/icons-material/OpenInNewRounded';
+import ArrowForwardRoundedIcon from '@mui/icons-material/ArrowForwardRounded';
 import {
     compactCellSx,
     compactInputSx,
@@ -384,10 +384,10 @@ function BomImportWorkspaceCard({
                         <Button
                             variant="outlined"
                             onClick={handleOpenVisualization}
-                            startIcon={<OpenInNewRoundedIcon />}
+                            startIcon={<ArrowForwardRoundedIcon />}
                             disabled={reviewNavigationLoading}
                         >
-                            {reviewNavigationLoading ? 'Sauvegarde...' : 'Ouvrir BOM'}
+                            {reviewNavigationLoading ? 'Sauvegarde...' : 'Passer à la revue'}
                         </Button>
                     )}
                 </Box>
@@ -397,3 +397,4 @@ function BomImportWorkspaceCard({
 }
 
 export default BomImportWorkspaceCard;
+

@@ -7,6 +7,7 @@ import {
     Stack,
     Typography,
 } from '@mui/material';
+import ArrowForwardRoundedIcon from '@mui/icons-material/ArrowForwardRounded';
 import BomStockTable from './BomStockTable';
 
 const INNER_CARD_SX = {
@@ -75,17 +76,26 @@ function BomStockTab({
                                         {' '}{loadedEntryCount}/{selectedEntries.length} chargées.
                                     </Typography>
                                 ) : null}
-                                <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5}>
-                                    <Button variant="outlined" onClick={onValidateStock} disabled={!canValidateStock}>
-                                        Valider le stock
-                                    </Button>
-                                    <Button
-                                        variant="contained"
-                                        onClick={onOpenCommandPage}
-                                        disabled={!canValidateStock}
-                                    >
-                                        Valider et ouvrir Commande Composant
-                                    </Button>
+                                {/* CTA unique : valide d'abord, puis devient la navigation
+                                    vers l'étape 4 une fois le stock validé. */}
+                                <Stack direction="row">
+                                    {stockValidation.isValidated ? (
+                                        <Button
+                                            variant="contained"
+                                            onClick={onOpenCommandPage}
+                                            endIcon={<ArrowForwardRoundedIcon />}
+                                        >
+                                            Commande Composant
+                                        </Button>
+                                    ) : (
+                                        <Button
+                                            variant="contained"
+                                            onClick={onValidateStock}
+                                            disabled={!canValidateStock}
+                                        >
+                                            Valider le stock
+                                        </Button>
+                                    )}
                                 </Stack>
                             </Stack>
                         </CardContent>

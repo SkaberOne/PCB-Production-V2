@@ -530,7 +530,7 @@ function BomReviewTab({
             {pendingTypeConfirmationCount ? (
                 <Alert severity="warning">
                     Des types proposés automatiquement restent à confirmer. Utilise <em>Sauvegarder brouillon</em> pour accepter les
-                    suggestions courantes, ou ajuste manuellement le champ Type avant <em>Valider</em>.
+                    suggestions courantes, ou ajuste manuellement le champ Type avant <em>Valider les BOM</em>.
                 </Alert>
             ) : null}
 
