@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
     Alert,
     Box,
@@ -15,6 +15,7 @@ import {
 } from '@mui/material';
 import { NavLink, useLocation } from 'react-router-dom';
 import { useBomSession } from '../../context/BomSessionContext';
+import { computeWorkflowProgress } from '../../utils/workflowProgress';
 
 const SIDEBAR_WIDTH = 224;
 const TOPBAR_HEIGHT = 54;
@@ -85,9 +86,9 @@ function NavGroup({ label, pages, location }) {
 }
 
 // ─── Workflow stepper strip ───────────────────────────────────────────────────
-function WorkflowStrip({ pages, currentPath }) {
-    const currentIdx = pages.findIndex((p) => p.path === currentPath);
-
+// Les connecteurs sont des jauges : chaque segment après l'étape i reflète la
+// progression réelle de cette étape (computeWorkflowProgress), pas la navigation.
+function WorkflowStrip({ pages, currentPath, progress = [] }) {
     return (
         <Box
             sx={{
@@ -104,7 +105,8 @@ function WorkflowStrip({ pages, currentPath }) {
         >
             {pages.map((page, idx) => {
                 const isActive = currentPath === page.path;
-                const isPast = currentIdx > idx;
+                const stepProgress = progress[idx] ?? 0;
+                const isDone = stepProgress >= 1;
 
                 return (
                     <React.Fragment key={page.path}>
@@ -137,11 +139,7 @@ function WorkflowStrip({ pages, currentPath }) {
                                     width: 18,
                                     height: 18,
                                     borderRadius: '50%',
-                                    backgroundColor: isActive
-                                        ? '#059669'
-                                        : isPast
-                                        ? '#059669'
-                                        : '#27272a',
+                                    backgroundColor: isActive || isDone ? '#059669' : '#27272a',
                                     display: 'flex',
                                     alignItems: 'center',
                                     justifyContent: 'center',
@@ -150,13 +148,13 @@ function WorkflowStrip({ pages, currentPath }) {
                             >
                                 <Typography
                                     sx={{
-                                        fontSize: isPast ? '0.5rem' : '0.6rem',
+                                        fontSize: isDone ? '0.5rem' : '0.6rem',
                                         color: '#fff',
                                         fontWeight: 700,
                                         lineHeight: 1
                                     }}
                                 >
-                                    {isPast ? '✓' : page.step}
+                                    {isDone ? '✓' : page.step}
                                 </Typography>
                             </Box>
 
@@ -164,7 +162,7 @@ function WorkflowStrip({ pages, currentPath }) {
                                 sx={{
                                     fontSize: '0.75rem',
                                     fontWeight: isActive ? 600 : 500,
-                                    color: isActive ? '#10b981' : isPast ? '#71717a' : '#52525b',
+                                    color: isActive ? '#10b981' : isDone ? '#71717a' : '#52525b',
                                     whiteSpace: 'nowrap'
                                 }}
                             >
@@ -172,18 +170,29 @@ function WorkflowStrip({ pages, currentPath }) {
                             </Typography>
                         </Box>
 
-                        {/* Connector line */}
+                        {/* Connector gauge — fill = progression réelle de l'étape idx */}
                         {idx < pages.length - 1 && (
                             <Box
                                 sx={{
-                                    width: 24,
-                                    height: 1,
-                                    backgroundColor: isPast ? '#059669' : '#27272a',
-                                    mx: 0.25,
-                                    flexShrink: 0,
-                                    transition: 'background-color 0.2s'
+                                    flex: 1,
+                                    minWidth: 24,
+                                    height: 4,
+                                    borderRadius: 2,
+                                    backgroundColor: '#27272a',
+                                    mx: 0.75,
+                                    overflow: 'hidden'
                                 }}
-                            />
+                            >
+                                <Box
+                                    sx={{
+                                        width: `${Math.round(stepProgress * 100)}%`,
+                                        height: '100%',
+                                        borderRadius: 2,
+                                        backgroundColor: '#059669',
+                                        transition: 'width 0.4s ease'
+                                    }}
+                                />
+                            </Box>
                         )}
                     </React.Fragment>
                 );
@@ -206,6 +215,11 @@ function AppShell({ pages, children }) {
     const workflowPages = pages.filter((p) => p.group === 'workflow');
     const libraryPages = pages.filter((p) => p.group === 'library');
     const systemPages = pages.filter((p) => p.group === 'system');
+
+    const workflowProgress = useMemo(
+        () => computeWorkflowProgress({ activeProduction, currentBom, bomWorkspace }),
+        [activeProduction, currentBom, bomWorkspace]
+    );
 
 
     // ── Events (loading, backend down) ──────────────────────────────────────
@@ -390,7 +404,11 @@ function AppShell({ pages, children }) {
 
                 {/* Workflow stepper strip */}
                 {isWorkflowPage && (
-                    <WorkflowStrip pages={workflowPages} currentPath={location.pathname} />
+                    <WorkflowStrip
+                        pages={workflowPages}
+                        currentPath={location.pathname}
+                        progress={workflowProgress}
+                    />
                 )}
 
                 {/* Global loading bar */}
