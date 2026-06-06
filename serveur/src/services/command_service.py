@@ -99,7 +99,6 @@ class CommandService:
                 offer.get("supplier"), defaults.get("default_supplier")
             )
             product_url = cls._clean_export_text(offer.get("product_url") or line.get("supplier_link"))
-            kt_reference = cls._clean_export_text(line.get("component_reference"))
             export_quantity = int(overrides.get(line.get("key"), line.get("quantity") or 0) or 0)
 
             rows.append(
@@ -108,7 +107,10 @@ class CommandService:
                     "Fournisseur": supplier_label,
                     "Description": cls._build_description(line, offer),
                     "Lien web": product_url,
-                    "Référence KT": kt_reference,
+                    # Référence KT : champ interne société, rempli à la main dans
+                    # l'ERP — toujours vide à l'export (demande Eric 2026-06-06,
+                    # remplace le mapping COMPONENTS.reference de l'audit §6.2).
+                    "Référence KT": "",
                     "Quantité": export_quantity,
                     "Unité": cls._clean_export_text(defaults.get("unit")),
                     "Projet": cls._clean_export_text(defaults.get("project")),

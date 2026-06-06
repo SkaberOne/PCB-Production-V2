@@ -65,7 +65,7 @@ def test_build_rows_maps_offer_and_defaults():
     assert row["Fournisseur"] == "Mouser"  # MOUSER -> label
     assert "Murata" in row["Description"] and "GRM188R71H104KA93D" in row["Description"]
     assert row["Lien web"] == "https://mouser.com/p/1"
-    assert row["Référence KT"] == "C0402_100NF"  # = COMPONENTS.reference
+    assert row["Référence KT"] == ""  # champ société, jamais pré-rempli
     assert row["Quantité"] == 250
     assert row["Unité"] == "pièce"
     assert row["Projet"] == "PJ2601-00241 - Achat projet client 2026"
@@ -82,7 +82,7 @@ def test_build_rows_without_offer_uses_default_supplier():
     defaults = dict(DEFAULTS, default_supplier="Mouser")
     rows = CommandService._build_erp_export_rows(summary, defaults, {})
     assert rows[0]["Fournisseur"] == "Mouser"
-    assert rows[0]["Référence KT"] == "R0402_10K"
+    assert rows[0]["Référence KT"] == ""  # champ société, jamais pré-rempli
 
 
 def test_erp_defaults_get_seeds_then_put_updates():

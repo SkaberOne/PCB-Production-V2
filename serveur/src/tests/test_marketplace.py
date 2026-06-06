@@ -1012,7 +1012,7 @@ R1 10R 0805 10.0 20.0 0 R
         assert worksheet.cell(2, 1).value == "SUP-10R"           # supplier_code
         assert worksheet.cell(2, 2).value == "MOUSER"            # default supplier
         assert "RES-10R" in worksheet.cell(2, 3).value           # description from MPN
-        assert worksheet.cell(2, 5).value == "LIB-ERP-1"         # Référence KT = COMPONENTS.reference
+        assert not worksheet.cell(2, 5).value                    # Référence KT : champ société, vide
         assert worksheet.cell(2, 6).value == 3                   # quantity
         assert worksheet.cell(2, 7).value == "pièce"             # unit
         assert worksheet.cell(2, 8).value == "PJ2601-00241 - Achat projet client 2026"
