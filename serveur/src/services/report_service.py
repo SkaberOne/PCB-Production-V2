@@ -162,6 +162,7 @@ class ReportService:
                 total_required_expr.label("total_required"),
             )
             .join(CommandItem, CommandItem.bom_revision_id == BomItem.bom_revision_id)
+            .filter(BomItem.dnp.is_(False))
             .group_by(value_expr, footprint_expr, component_type_expr)
             .order_by(total_required_expr.desc())
             .limit(limit)

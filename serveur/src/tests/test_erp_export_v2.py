@@ -1,6 +1,6 @@
 """Tests for the 12-column ERP export mapping and ERP defaults endpoints."""
 
-from tests.conftest import client
+from src.tests.conftest import client
 
 from src.services.command_service import CommandService
 

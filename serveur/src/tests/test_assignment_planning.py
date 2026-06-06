@@ -6,7 +6,7 @@ Uses the shared SQLite engine from conftest.py.
 import pytest
 from sqlalchemy.orm import Session
 
-from tests.conftest import TestingSessionLocal, engine
+from src.tests.conftest import TestingSessionLocal, engine
 from src.database import Base
 from src.models.bom import BomReference, BomRevision, BomItem, Component
 from src.models.machines import PnpMachine, PnpFeeder

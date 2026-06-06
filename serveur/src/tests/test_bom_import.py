@@ -9,7 +9,8 @@ import tempfile
 from openpyxl import Workbook, load_workbook
 
 from sqlalchemy.orm import Session
-from tests.conftest import client, TestingSessionLocal
+from src.tests.conftest import client, TestingSessionLocal
+from src.models.bom import Component, FootprintMapping
 
 def test_bom_import_missing_file():
     """Test BOM import without file fails"""

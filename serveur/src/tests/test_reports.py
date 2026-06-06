@@ -18,7 +18,7 @@ PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..
 if PROJECT_ROOT not in sys.path:
     sys.path.insert(0, PROJECT_ROOT)
 
-from tests.conftest import client, TestingSessionLocal
+from src.tests.conftest import client, TestingSessionLocal
 from src.models.bom import BomItem, BomReference, BomRevision
 from src.models.commands import Command, CommandItem
 from src.models.machines import PnpMachine

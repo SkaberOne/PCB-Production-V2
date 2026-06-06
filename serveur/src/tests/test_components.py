@@ -9,7 +9,9 @@ import tempfile
 from openpyxl import Workbook, load_workbook
 
 from sqlalchemy.orm import Session
-from tests.conftest import client, TestingSessionLocal
+from src.tests.conftest import client, TestingSessionLocal
+from src.models.bom import Component, ComponentTypeRule, MachineFootprintRule
+from src.models.production import Production
 
 def test_health_check():
     """Test health check endpoint"""

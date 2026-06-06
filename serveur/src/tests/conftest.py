@@ -119,8 +119,12 @@ def cleanup_db():
     et garantit l'isolation en suite globale (asserts `assert N == 0`, comptages,
     IDs). `_purge_all_tables` reste disponible pour les usages spécifiques.
     """
+    from src.utils.catalog_cache import invalidate_all
+
     Base.metadata.drop_all(bind=engine)
     Base.metadata.create_all(bind=engine)
+    invalidate_all()  # caches TTL process-level (rules, footprints) — sinon fuite inter-tests
     yield
     Base.metadata.drop_all(bind=engine)
     Base.metadata.create_all(bind=engine)
+    invalidate_all()

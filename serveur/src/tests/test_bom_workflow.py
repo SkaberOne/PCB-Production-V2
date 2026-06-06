@@ -9,7 +9,10 @@ import tempfile
 from openpyxl import Workbook, load_workbook
 
 from sqlalchemy.orm import Session
-from tests.conftest import client, TestingSessionLocal, bom_file_service
+from src.tests.conftest import client, TestingSessionLocal, bom_file_service
+from src.models.bom import BomReference, BomRevision, BomItem, Component
+from src.models.commands import Command, CommandItem
+from src.models.production import Production, ProductionBomRevision
 
 def test_get_bom_not_found():
     """Test getting a BOM that doesn't exist"""

@@ -1,6 +1,6 @@
 """Tests for SupplierOfferService (cache, refresh, sorting, MPN review) + routes."""
 
-from tests.conftest import client, TestingSessionLocal
+from src.tests.conftest import client, TestingSessionLocal
 
 from src.models.bom import Component
 from src.services.suppliers.base import OfferDTO
