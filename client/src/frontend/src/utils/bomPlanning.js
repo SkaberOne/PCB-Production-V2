@@ -1,8 +1,13 @@
 import { getBomItemType } from './bomSession';
 import { buildReferenceRevisionKey } from './bomWorkspace';
+import { lookupFootprint } from './eia481Footprint';
 
 const DEFAULT_TAPE_THICKNESS_MM = 1.0;
-const DEFAULT_SAFETY_PCT = 25;
+const DEFAULT_SAFETY_PCT = 5;
+// Moyeu (Ø intérieur) par défaut : normé EIA-481. Les bobines 7" (passifs
+// courants type 0603/0805) ont un moyeu ~50 mm. Modifiable à la main pour
+// les grosses bobines 13" (~100 mm).
+const DEFAULT_HUB_DIAMETER_MM = 50;
 
 function toNumber(value, fallback = 0) {
     const parsed = Number(value);
@@ -17,13 +22,19 @@ export function defaultTapeThicknessMm(tapeWidthMm) {
     if (width <= 0) {
         return DEFAULT_TAPE_THICKNESS_MM;
     }
+    // EIA-481 ne fixe pas l'épaisseur par largeur (elle dépend du composant et
+    // du matériau : papier ≤1,1 mm pour passifs fins, gaufré ≤1,6 mm). Ces
+    // valeurs sont des défauts réalistes par largeur, modifiables par bobine.
     if (width <= 8) {
-        return 1.0;
+        return 0.7;  // bande papier — passifs 0402/0603/0805/1206
     }
     if (width <= 12) {
+        return 1.0;
+    }
+    if (width <= 16) {
         return 1.2;
     }
-    return 1.5;
+    return 1.6;       // bandes gaufrées larges (24 mm et +)
 }
 
 export function buildBoardQuantityRows(entries = [], quantitiesByReference = {}) {
@@ -97,11 +108,28 @@ export function buildStockSummary(line, stockDraft = {}) {
     const resolvedTapeThicknessMm = toNumber(stockDraft.tape_thickness_mm, 0) > 0
         ? toNumber(stockDraft.tape_thickness_mm)
         : defaultTapeThicknessMm(line.componentTapeWidthMm);
+
+    // Ø extérieur effectif : soit saisi directement, soit déduit de l'épaisseur
+    // radiale de la bande enroulée (Ø_ext = Ø_moyeu + 2 × épaisseur d'enroulement).
+    // Le moyeu est requis dans les deux cas (la valeur est normée EIA-481).
+    // Moyeu résolu : valeur saisie sinon défaut normé (pré-rempli côté UI).
+    const resolvedHubDiameterMm = toNumber(stockDraft.reel_hub_diameter_mm, 0) > 0
+        ? toNumber(stockDraft.reel_hub_diameter_mm)
+        : DEFAULT_HUB_DIAMETER_MM;
+    const woundThicknessMm = toNumber(stockDraft.reel_wound_thickness_mm, 0);
+    let effectiveOuterDiameterMm = toNumber(stockDraft.reel_outer_diameter_mm, 0);
+    if (effectiveOuterDiameterMm <= 0 && woundThicknessMm > 0 && resolvedHubDiameterMm > 0) {
+        effectiveOuterDiameterMm = resolvedHubDiameterMm + (2 * woundThicknessMm);
+    }
+
     const reelEstimatedQty = estimateReelQuantity({
-        outerDiameterMm: stockDraft.reel_outer_diameter_mm,
-        hubDiameterMm: stockDraft.reel_hub_diameter_mm,
+        outerDiameterMm: effectiveOuterDiameterMm,
+        hubDiameterMm: resolvedHubDiameterMm,
         pitchMm: stockDraft.pitch_mm || line.componentPitchMm,
-        safetyPct: stockDraft.reel_safety_pct || DEFAULT_SAFETY_PCT,
+        // Honore une marge de 0 % (|| écraserait 0 en 25 %).
+        safetyPct: stockDraft.reel_safety_pct != null && stockDraft.reel_safety_pct !== ''
+            ? stockDraft.reel_safety_pct
+            : DEFAULT_SAFETY_PCT,
         tapeThicknessMm: resolvedTapeThicknessMm,
     });
     const reelManualOverrideQty = toNumber(stockDraft.reel_manual_override_qty, 0);
@@ -124,6 +152,8 @@ export function buildStockSummary(line, stockDraft = {}) {
     return {
         reelEstimatedQty,
         resolvedTapeThicknessMm,
+        resolvedHubDiameterMm,
+        effectiveOuterDiameterMm: effectiveOuterDiameterMm > 0 ? effectiveOuterDiameterMm : null,
         reelAvailableQty,
         bagQty,
         tubeQty,
@@ -202,8 +232,13 @@ export function buildAggregatedComponents(
             const componentPitchCandidates = Array.from(group.componentPitchCandidates);
             const componentTapeWidthCandidates = Array.from(group.componentTapeWidthCandidates);
             const draft = stockDraftByComponentKey[group.key] || {};
-            const componentPitchMm = componentPitchCandidates.length === 1 ? componentPitchCandidates[0] : null;
-            const componentTapeWidthMm = componentTapeWidthCandidates.length === 1 ? componentTapeWidthCandidates[0] : null;
+            // Valeur stockée si une seule candidate, sinon repli sur la norme
+            // EIA-481 déduite du footprint (ex. 0603 -> pitch 4 / largeur 8 mm).
+            const storedPitchMm = componentPitchCandidates.length === 1 ? componentPitchCandidates[0] : null;
+            const storedTapeWidthMm = componentTapeWidthCandidates.length === 1 ? componentTapeWidthCandidates[0] : null;
+            const eia481 = lookupFootprint(group.footprint);
+            const componentPitchMm = storedPitchMm != null ? storedPitchMm : eia481.pitchMm;
+            const componentTapeWidthMm = storedTapeWidthMm != null ? storedTapeWidthMm : eia481.tapeWidthMm;
             const stock = buildStockSummary(
                 {
                     requiredQuantity: group.requiredQuantity,

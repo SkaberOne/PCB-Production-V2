@@ -134,14 +134,21 @@ def feeder_for_tape_width(tape_width_mm: Optional[float]) -> Optional[str]:
 
 
 def default_tape_thickness_mm(tape_width_mm: Optional[float]) -> float:
-    """Épaisseur de bande par défaut selon la largeur (cohérent avec le frontend)."""
+    """Épaisseur de bande par défaut selon la largeur (cohérent avec le frontend).
+
+    EIA-481 ne normalise pas l'épaisseur par largeur (elle dépend du composant
+    et du matériau : papier <= 1,1 mm pour passifs fins, gaufré <= 1,6 mm).
+    Ces valeurs sont des défauts réalistes par largeur, modifiables par bobine.
+    """
     if tape_width_mm is None or tape_width_mm <= 0:
         return 1.0
     if tape_width_mm <= 8:
-        return 1.0
+        return 0.7  # bande papier — passifs 0402/0603/0805/1206
     if tape_width_mm <= 12:
+        return 1.0
+    if tape_width_mm <= 16:
         return 1.2
-    return 1.5
+    return 1.6  # bandes gaufrées larges (24 mm et +)
 
 
 def lookup_package(package: str) -> Eia481Match:

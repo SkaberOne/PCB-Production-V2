@@ -21,10 +21,10 @@ class TestFeederForTapeWidth:
 
 class TestDefaultTapeThickness:
     def test_width_based(self):
-        assert default_tape_thickness_mm(8) == 1.0
-        assert default_tape_thickness_mm(12) == 1.2
-        assert default_tape_thickness_mm(16) == 1.5
-        assert default_tape_thickness_mm(24) == 1.5
+        assert default_tape_thickness_mm(8) == 0.7
+        assert default_tape_thickness_mm(12) == 1.0
+        assert default_tape_thickness_mm(16) == 1.2
+        assert default_tape_thickness_mm(24) == 1.6
 
     def test_unknown_width(self):
         assert default_tape_thickness_mm(0) == 1.0
@@ -38,7 +38,7 @@ class TestLookupPackage:
         assert result["pitch_mm"] == 4.0
         assert result["tape_width_mm"] == 8.0
         assert result["feeder"] == "CL8"
-        assert result["tape_thickness_mm"] == 1.0
+        assert result["tape_thickness_mm"] == 0.7
 
     def test_tiny_passive_2mm(self):
         result = lookup_package("0402")

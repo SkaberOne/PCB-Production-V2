@@ -1,6 +1,7 @@
 import React from 'react';
 import {
     Alert,
+    Autocomplete,
     Box,
     Button,
     Card,
@@ -23,8 +24,17 @@ const panelCardSx = {
     border: '1px solid #27272a',
 };
 
+// Padding resserré pour les cartes de stats et les panneaux (gain de hauteur).
+const statContentSx = { py: 1, px: 1.5, '&:last-child': { pb: 1 } };
+const panelContentSx = { p: 1.75, '&:last-child': { pb: 1.75 } };
+
 const REEL_EMERALD = '#34d399';
 const REEL_ZINC = '#d4d4d8';
+
+// Valeurs courantes (EIA-481) proposées dans les listes déroulantes.
+// freeSolo => la saisie manuelle d'une valeur hors-liste reste possible.
+const PITCH_OPTIONS = ['2', '4', '8', '12', '16', '20', '24'];
+const TAPE_THICKNESS_OPTIONS = ['0.7', '1.0', '1.2', '1.5', '2.0', '4.0'];
 
 // Schéma représentatif d'une bobine. Le disque vert = le corps de la bobine ;
 // le cercle en pointillé vert = le sommet de la bande enroulée, et c'est SON
@@ -43,8 +53,8 @@ function ReelSchematic({ outerMm, hubMm }) {
     const hole = Math.max(7, r * 0.34);
 
     return (
-        <Stack spacing={1} alignItems="center" sx={{ py: 0.5 }}>
-            <Box sx={{ width: '100%', maxWidth: 260 }}>
+        <Stack spacing={0.5} alignItems="center" sx={{ py: 0 }}>
+            <Box sx={{ width: '100%', maxWidth: 112 }}>
                 <svg
                     viewBox="0 0 240 190"
                     role="img"
@@ -106,7 +116,7 @@ function BomStockDialog({
             open={open}
             onClose={onClose}
             fullWidth
-            maxWidth="md"
+            maxWidth="lg"
             PaperProps={{
                 sx: {
                     backgroundColor: '#18181b',
@@ -127,54 +137,50 @@ function BomStockDialog({
                 </Stack>
             </DialogTitle>
 
-            <DialogContent sx={{ pt: 3 }}>
+            <DialogContent sx={{ pt: 2 }}>
                 {line ? (
-                    <Stack spacing={3} sx={{ mt: 0.5 }}>
-                        <Alert severity="info">
-                            Les valeurs saisies sont conservées dans la session et enregistrées avec la BOM.
-                        </Alert>
-
-                        <Grid container spacing={2}>
-                            <Grid item xs={12} sm={3}>
+                    <Stack spacing={2} sx={{ mt: 0.5 }}>
+                        <Grid container spacing={1.5}>
+                            <Grid item xs={6} sm={3}>
                                 <Card sx={panelCardSx}>
-                                    <CardContent>
+                                    <CardContent sx={statContentSx}>
                                         <Typography variant="caption" sx={{ color: '#a1a1aa' }}>
                                             Besoin total
                                         </Typography>
-                                        <Typography variant="h5" sx={{ mt: 0.5, fontWeight: 700 }}>
+                                        <Typography variant="h6" sx={{ mt: 0.25, fontWeight: 700 }}>
                                             {line.requiredQuantity}
                                         </Typography>
                                     </CardContent>
                                 </Card>
                             </Grid>
-                            <Grid item xs={12} sm={3}>
+                            <Grid item xs={6} sm={3}>
                                 <Card sx={panelCardSx}>
-                                    <CardContent>
+                                    <CardContent sx={statContentSx}>
                                         <Typography variant="caption" sx={{ color: '#a1a1aa' }}>
                                             Stock dispo
                                         </Typography>
-                                        <Typography variant="h5" sx={{ mt: 0.5, fontWeight: 700 }}>
+                                        <Typography variant="h6" sx={{ mt: 0.25, fontWeight: 700 }}>
                                             {line.totalAvailableQty}
                                         </Typography>
                                     </CardContent>
                                 </Card>
                             </Grid>
-                            <Grid item xs={12} sm={3}>
+                            <Grid item xs={6} sm={3}>
                                 <Card sx={panelCardSx}>
-                                    <CardContent>
+                                    <CardContent sx={statContentSx}>
                                         <Typography variant="caption" sx={{ color: '#a1a1aa' }}>
                                             À commander
                                         </Typography>
-                                        <Typography variant="h5" sx={{ mt: 0.5, fontWeight: 700 }}>
+                                        <Typography variant="h6" sx={{ mt: 0.25, fontWeight: 700 }}>
                                             {line.quantityToOrder}
                                         </Typography>
                                     </CardContent>
                                 </Card>
                             </Grid>
-                            <Grid item xs={12} sm={3}>
+                            <Grid item xs={6} sm={3}>
                                 <Card sx={panelCardSx}>
-                                    <CardContent>
-                                        <Typography variant="caption" sx={{ color: '#a1a1aa', display: 'block', mb: 1 }}>
+                                    <CardContent sx={statContentSx}>
+                                        <Typography variant="caption" sx={{ color: '#a1a1aa', display: 'block', mb: 0.5 }}>
                                             Statut
                                         </Typography>
                                         <Chip
@@ -188,33 +194,109 @@ function BomStockDialog({
                             </Grid>
                         </Grid>
 
-                        <Grid container spacing={3}>
-                            <Grid item xs={12} md={6}>
+                        <Grid container spacing={2}>
+                            <Grid item xs={12} sm={6}>
                                 <Card sx={{ ...panelCardSx, height: '100%' }}>
-                                    <CardContent>
-                                        <Stack spacing={2}>
+                                    <CardContent sx={panelContentSx}>
+                                        <Stack spacing={1.5}>
                                             <Box>
-                                                <Typography variant="h6" sx={{ fontWeight: 600 }}>
+                                                <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
                                                     Bobine
                                                 </Typography>
-                                                <Typography variant="body2" sx={{ color: '#a1a1aa', mt: 0.5 }}>
-                                                    Estimation à partir des diamètres (Ø extérieur = sommet de la bande enroulée), du pitch et de la marge.
+                                                <Typography variant="caption" sx={{ color: '#a1a1aa' }}>
+                                                    Saisis l'épaisseur d'enroulement (ou le Ø extérieur) ; le reste est pré-rempli.
                                                 </Typography>
                                             </Box>
 
                                             <ReelSchematic
-                                                outerMm={line.draft.reel_outer_diameter_mm}
+                                                outerMm={line.effectiveOuterDiameterMm ?? line.draft.reel_outer_diameter_mm}
                                                 hubMm={line.draft.reel_hub_diameter_mm}
                                             />
 
-                                            <Grid container spacing={1.5}>
+                                            <Grid container spacing={1}>
+                                                {/* Saisie principale : juste l'épaisseur d'enroulement */}
+                                                <Grid item xs={12}>
+                                                    <TextField
+                                                        fullWidth
+                                                        size="small"
+                                                        type="number"
+                                                        label="Épaisseur d'enroulement (mm)"
+                                                        helperText={
+                                                            line.draft.reel_outer_diameter_mm != null && line.draft.reel_outer_diameter_mm !== ''
+                                                                ? 'Ignoré (Ø ext. saisi)'
+                                                                : undefined
+                                                        }
+                                                        disabled={line.draft.reel_outer_diameter_mm != null && line.draft.reel_outer_diameter_mm !== ''}
+                                                        value={line.draft.reel_wound_thickness_mm ?? ''}
+                                                        onChange={onStockDraftChange(line.key, 'reel_wound_thickness_mm', true)}
+                                                        sx={compactInputSx}
+                                                    />
+                                                </Grid>
+
+                                                {/* Paramètres bande (pré-remplis depuis le boîtier) */}
+                                                <Grid item xs={12} sm={6}>
+                                                    <Autocomplete
+                                                        freeSolo
+                                                        fullWidth
+                                                        size="small"
+                                                        options={PITCH_OPTIONS}
+                                                        inputValue={
+                                                            line.draft.pitch_mm != null && line.draft.pitch_mm !== ''
+                                                                ? String(line.draft.pitch_mm)
+                                                                : (line.componentPitchMm != null ? String(line.componentPitchMm) : '')
+                                                        }
+                                                        onInputChange={(event, newValue) =>
+                                                            onStockDraftChange(line.key, 'pitch_mm')({ target: { value: newValue } })
+                                                        }
+                                                        onBlur={onPitchBlur(line)}
+                                                        renderInput={(params) => (
+                                                            <TextField
+                                                                {...params}
+                                                                label="Pitch (mm)"
+                                                                inputProps={{ ...params.inputProps, inputMode: 'decimal' }}
+                                                                sx={compactInputSx}
+                                                            />
+                                                        )}
+                                                    />
+                                                </Grid>
+                                                <Grid item xs={12} sm={6}>
+                                                    <Autocomplete
+                                                        freeSolo
+                                                        fullWidth
+                                                        size="small"
+                                                        options={TAPE_THICKNESS_OPTIONS}
+                                                        inputValue={
+                                                            line.draft.tape_thickness_mm != null && line.draft.tape_thickness_mm !== ''
+                                                                ? String(line.draft.tape_thickness_mm)
+                                                                : (line.resolvedTapeThicknessMm != null ? String(line.resolvedTapeThicknessMm) : '')
+                                                        }
+                                                        onInputChange={(event, newValue) =>
+                                                            onStockDraftChange(line.key, 'tape_thickness_mm')({ target: { value: newValue } })
+                                                        }
+                                                        renderInput={(params) => (
+                                                            <TextField
+                                                                {...params}
+                                                                label="Épaisseur de bande (mm)"
+                                                                helperText={
+                                                                    line.draft.tape_thickness_mm
+                                                                        ? null
+                                                                        : 'Auto (boîtier)'
+                                                                }
+                                                                inputProps={{ ...params.inputProps, inputMode: 'decimal' }}
+                                                                sx={compactInputSx}
+                                                            />
+                                                        )}
+                                                    />
+                                                </Grid>
+
+                                                {/* Diamètres + marge */}
                                                 <Grid item xs={12} sm={6}>
                                                     <TextField
                                                         fullWidth
                                                         size="small"
                                                         type="number"
                                                         label="Ø extérieur de la bande (mm)"
-                                                        helperText="Au sommet de l'enroulement de la bande"
+                                                        helperText="Optionnel"
                                                         value={line.draft.reel_outer_diameter_mm ?? ''}
                                                         onChange={onStockDraftChange(line.key, 'reel_outer_diameter_mm', true)}
                                                         sx={compactInputSx}
@@ -226,7 +308,8 @@ function BomStockDialog({
                                                         size="small"
                                                         type="number"
                                                         label="Diamètre du moyeu (mm)"
-                                                        value={line.draft.reel_hub_diameter_mm ?? ''}
+                                                        helperText="Auto (norme) — modifiable"
+                                                        value={line.draft.reel_hub_diameter_mm ?? line.resolvedHubDiameterMm ?? ''}
                                                         onChange={onStockDraftChange(line.key, 'reel_hub_diameter_mm', true)}
                                                         sx={compactInputSx}
                                                     />
@@ -236,38 +319,9 @@ function BomStockDialog({
                                                         fullWidth
                                                         size="small"
                                                         type="number"
-                                                        label="Pitch (mm)"
-                                                        value={line.draft.pitch_mm ?? line.componentPitchMm ?? ''}
-                                                        onChange={onStockDraftChange(line.key, 'pitch_mm', true)}
-                                                        onBlur={onPitchBlur(line)}
-                                                        sx={compactInputSx}
-                                                    />
-                                                </Grid>
-                                                <Grid item xs={12} sm={6}>
-                                                    <TextField
-                                                        fullWidth
-                                                        size="small"
-                                                        type="number"
                                                         label="Marge de sécurité (%)"
-                                                        value={line.draft.reel_safety_pct ?? 25}
+                                                        value={line.draft.reel_safety_pct ?? 5}
                                                         onChange={onStockDraftChange(line.key, 'reel_safety_pct', true)}
-                                                        sx={compactInputSx}
-                                                    />
-                                                </Grid>
-                                                <Grid item xs={12} sm={6}>
-                                                    <TextField
-                                                        fullWidth
-                                                        size="small"
-                                                        type="number"
-                                                        label="Épaisseur de bande (mm)"
-                                                        value={line.draft.tape_thickness_mm ?? ''}
-                                                        placeholder={line.resolvedTapeThicknessMm != null ? `défaut ${line.resolvedTapeThicknessMm}` : ''}
-                                                        helperText={
-                                                            line.draft.tape_thickness_mm
-                                                                ? null
-                                                                : `Défaut appliqué : ${line.resolvedTapeThicknessMm ?? '-'} mm`
-                                                        }
-                                                        onChange={onStockDraftChange(line.key, 'tape_thickness_mm', true)}
                                                         sx={compactInputSx}
                                                     />
                                                 </Grid>
@@ -281,20 +335,20 @@ function BomStockDialog({
                                 </Card>
                             </Grid>
 
-                            <Grid item xs={12} md={6}>
+                            <Grid item xs={12} sm={6}>
                                 <Card sx={{ ...panelCardSx, height: '100%' }}>
-                                    <CardContent>
-                                        <Stack spacing={2}>
+                                    <CardContent sx={panelContentSx}>
+                                        <Stack spacing={1.5}>
                                             <Box>
-                                                <Typography variant="h6" sx={{ fontWeight: 600 }}>
+                                                <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
                                                     Sachet, tube et préparation
                                                 </Typography>
-                                                <Typography variant="body2" sx={{ color: '#a1a1aa', mt: 0.5 }}>
+                                                <Typography variant="caption" sx={{ color: '#a1a1aa' }}>
                                                     Toute quantité en sachet ou tube implique une pose manuelle.
                                                 </Typography>
                                             </Box>
 
-                                            <Grid container spacing={1.5}>
+                                            <Grid container spacing={1}>
                                                 <Grid item xs={12} sm={6}>
                                                     <TextField
                                                         fullWidth

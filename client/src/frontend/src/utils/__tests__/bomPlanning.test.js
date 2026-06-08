@@ -4,13 +4,28 @@ import {
     defaultTapeThicknessMm,
     estimateReelQuantity,
 } from '../bomPlanning';
+import { lookupFootprint } from '../eia481Footprint';
+
+describe('lookupFootprint (repli EIA-481 depuis le footprint)', () => {
+    it('résout les passifs courants', () => {
+        expect(lookupFootprint('0603')).toEqual({ pitchMm: 4, tapeWidthMm: 8 });
+        expect(lookupFootprint('R0603')).toEqual({ pitchMm: 4, tapeWidthMm: 8 });
+        expect(lookupFootprint('0402')).toEqual({ pitchMm: 2, tapeWidthMm: 8 });
+        expect(lookupFootprint('SOIC8')).toEqual({ pitchMm: 8, tapeWidthMm: 12 });
+    });
+
+    it('renvoie des null pour un footprint inconnu', () => {
+        expect(lookupFootprint('ZZZ')).toEqual({ pitchMm: null, tapeWidthMm: null });
+        expect(lookupFootprint('')).toEqual({ pitchMm: null, tapeWidthMm: null });
+    });
+});
 
 describe('defaultTapeThicknessMm', () => {
     it('returns width-based defaults', () => {
-        expect(defaultTapeThicknessMm(8)).toBe(1.0);
-        expect(defaultTapeThicknessMm(12)).toBe(1.2);
-        expect(defaultTapeThicknessMm(16)).toBe(1.5);
-        expect(defaultTapeThicknessMm(24)).toBe(1.5);
+        expect(defaultTapeThicknessMm(8)).toBe(0.7);
+        expect(defaultTapeThicknessMm(12)).toBe(1.0);
+        expect(defaultTapeThicknessMm(16)).toBe(1.2);
+        expect(defaultTapeThicknessMm(24)).toBe(1.6);
     });
 
     it('falls back to the generic default for unknown/invalid width', () => {
@@ -58,7 +73,7 @@ describe('buildStockSummary tape thickness resolution', () => {
             { requiredQuantity: 10, componentTapeWidthMm: 12 },
             {},
         );
-        expect(summary.resolvedTapeThicknessMm).toBe(1.2);
+        expect(summary.resolvedTapeThicknessMm).toBe(1.0);
     });
 
     it('prefers an explicit draft thickness over the default', () => {
@@ -67,6 +82,61 @@ describe('buildStockSummary tape thickness resolution', () => {
             { tape_thickness_mm: 2 },
         );
         expect(summary.resolvedTapeThicknessMm).toBe(2);
+    });
+});
+
+describe('buildStockSummary wound-thickness mode', () => {
+    const line = { requiredQuantity: 10, componentTapeWidthMm: 8, componentPitchMm: 4 };
+
+    it('derives the outer diameter from hub + 2 × wound thickness', () => {
+        // hub 60 + 2×59 = 178 -> identique à une saisie directe du Ø extérieur.
+        const summary = buildStockSummary(line, {
+            reel_hub_diameter_mm: 60,
+            reel_wound_thickness_mm: 59,
+            tape_thickness_mm: 1.0,
+            reel_safety_pct: 0,
+        });
+        expect(summary.effectiveOuterDiameterMm).toBe(178);
+        expect(summary.reelEstimatedQty).toBe(
+            estimateReelQuantity({
+                outerDiameterMm: 178,
+                hubDiameterMm: 60,
+                pitchMm: 4,
+                safetyPct: 0,
+                tapeThicknessMm: 1.0,
+            }),
+        );
+    });
+
+    it('ignores wound thickness when an explicit outer diameter is provided', () => {
+        const summary = buildStockSummary(line, {
+            reel_outer_diameter_mm: 146,
+            reel_hub_diameter_mm: 56.8,
+            reel_wound_thickness_mm: 999,
+            tape_thickness_mm: 0.7,
+            reel_safety_pct: 0,
+        });
+        expect(summary.effectiveOuterDiameterMm).toBe(146);
+    });
+
+    it('falls back to the default hub (50 mm) when none is provided', () => {
+        const summary = buildStockSummary(line, {
+            reel_wound_thickness_mm: 59,
+            tape_thickness_mm: 1.0,
+            reel_safety_pct: 0,
+        });
+        expect(summary.resolvedHubDiameterMm).toBe(50);
+        // Ø extérieur déduit = 50 + 2×59 = 168 mm.
+        expect(summary.effectiveOuterDiameterMm).toBe(168);
+        expect(summary.reelEstimatedQty).toBe(
+            estimateReelQuantity({
+                outerDiameterMm: 168,
+                hubDiameterMm: 50,
+                pitchMm: 4,
+                safetyPct: 0,
+                tapeThicknessMm: 1.0,
+            }),
+        );
     });
 });
 
