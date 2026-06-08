@@ -13,6 +13,7 @@ import {
     DialogContent,
     DialogContentText,
     DialogTitle,
+    Divider,
     Menu,
     MenuItem,
     Paper,
@@ -355,6 +356,13 @@ function MachinePnpWorkspace() {
                 </MenuItem>
                 <MenuItem onClick={() => { const m = machineMenu?.machine; closeMachineMenu(); setEditMachine(m); }}>
                     Modifier
+                </MenuItem>
+                <MenuItem onClick={() => { const m = machineMenu?.machine; closeMachineMenu(); if (m) machineConfig.openMachineConfigDialog(m); }}>
+                    Exporter la config PnP…
+                </MenuItem>
+                <Divider sx={{ borderColor: '#27272a' }} />
+                <MenuItem onClick={() => { const m = machineMenu?.machine; closeMachineMenu(); if (m) openDeleteMachine(m); }} sx={{ color: '#f87171' }}>
+                    Supprimer
                 </MenuItem>
             </Menu>
 

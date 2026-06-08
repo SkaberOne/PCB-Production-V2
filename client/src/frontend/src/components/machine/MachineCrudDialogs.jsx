@@ -1,30 +1,128 @@
 import React, { useEffect, useState } from 'react';
+import FileDownloadOutlinedIcon from '@mui/icons-material/FileDownloadOutlined';
 import {
     Alert,
     Box,
     Button,
+    Chip,
     CircularProgress,
     Dialog,
     DialogActions,
     DialogContent,
     DialogTitle,
+    FormControlLabel,
     MenuItem,
+    Radio,
+    RadioGroup,
     Stack,
     TextField,
+    ToggleButton,
+    ToggleButtonGroup,
     Typography,
 } from '@mui/material';
 import apiClient from '../../api/client';
-import { cartKindOptions, extractRequestError } from '../../utils/machinePnp';
+import {
+    PNP_EXPORT_COLUMNS,
+    PNP_EXPORT_DEFAULT_COLUMNS,
+    cartKindOptions,
+    extractRequestError,
+    normalizeExportColumns,
+} from '../../utils/machinePnp';
+
+/** Bloc de configuration du format d'export PnP (partagé création/édition). */
+function ExportFormatSection({ format, setFormat, columns, setColumns, separator, setSeparator }) {
+    const toggleColumn = (id) => {
+        setColumns((current) => (current.includes(id)
+            ? current.filter((colId) => colId !== id)
+            : [...current, id]));
+    };
+    return (
+        <Box sx={{ mt: 1, pt: 2, borderTop: '1px solid #27272a' }}>
+            <Typography sx={{ fontSize: '0.72rem', fontWeight: 600, letterSpacing: '0.04em', textTransform: 'uppercase', color: '#10b981', mb: 1.5, display: 'flex', alignItems: 'center', gap: 0.75 }}>
+                <FileDownloadOutlinedIcon sx={{ fontSize: 16 }} /> Format d'export PnP
+            </Typography>
+            <ToggleButtonGroup
+                exclusive
+                size="small"
+                value={format}
+                onChange={(_event, value) => { if (value) setFormat(value); }}
+                sx={{
+                    '& .MuiToggleButton-root': { textTransform: 'none', color: '#a1a1aa', borderColor: '#2f2f35', fontSize: '0.78rem' },
+                    '& .Mui-selected': { backgroundColor: '#059669 !important', color: '#fff !important' },
+                }}
+            >
+                <ToggleButton value="CSV">CSV (colonnes personnalisées)</ToggleButton>
+                <ToggleButton value="TXT">TXT (BOM empreintes harmonisées)</ToggleButton>
+            </ToggleButtonGroup>
+
+            {format === 'CSV' ? (
+                <>
+                    <Typography sx={{ fontSize: '0.72rem', color: '#a1a1aa', mt: 1.75, mb: 1 }}>
+                        Colonnes incluses — cliquer pour activer/désactiver
+                    </Typography>
+                    <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap sx={{ mb: 1.5 }}>
+                        {PNP_EXPORT_COLUMNS.map((col) => {
+                            const active = columns.includes(col.id);
+                            return (
+                                <Chip
+                                    key={col.id}
+                                    size="small"
+                                    label={col.required ? `${col.header} ·req` : col.header}
+                                    onClick={col.required ? undefined : () => toggleColumn(col.id)}
+                                    sx={{
+                                        cursor: col.required ? 'default' : 'pointer',
+                                        backgroundColor: active ? 'rgba(5,150,105,0.14)' : 'rgba(255,255,255,0.04)',
+                                        color: active ? '#6ee7b7' : '#71717a',
+                                        border: `1px solid ${active ? 'rgba(5,150,105,0.4)' : '#2f2f35'}`,
+                                    }}
+                                />
+                            );
+                        })}
+                    </Stack>
+                    <RadioGroup row value={separator} onChange={(event) => setSeparator(event.target.value)} sx={{ '& .MuiFormControlLabel-label': { fontSize: '0.78rem', color: '#a1a1aa' } }}>
+                        <FormControlLabel value="," control={<Radio size="small" sx={{ color: '#52525b', '&.Mui-checked': { color: '#10b981' } }} />} label="virgule ," />
+                        <FormControlLabel value=";" control={<Radio size="small" sx={{ color: '#52525b', '&.Mui-checked': { color: '#10b981' } }} />} label="point-virgule ;" />
+                    </RadioGroup>
+                </>
+            ) : (
+                <Typography sx={{ fontSize: '0.78rem', color: '#71717a', mt: 1.75 }}>
+                    Export simple : la BOM avec les empreintes harmonisées (Référence, Valeur, Empreinte, Qté), séparé par tabulation.
+                </Typography>
+            )}
+        </Box>
+    );
+}
 
 const NOZZLE_TYPE_OPTIONS = [501, 502, 503, 504, 505];
-const NOZZLE_DEFAULT_CYCLE = [503, 504, 505];
+const NOZZLE_DEFAULT_TYPES = [503, 504, 505];
 
-/** Layout nozzle calé sur `count` : reprend la source, complète par le défaut 503/504/505. */
+/** Pré-remplissage par défaut : du plus petit au plus grand, gauche→droite, en
+ * blocs croissants (503/504/505). Doit rester aligné avec default_nozzle_layout
+ * de serveur/src/utils/nozzles.py. Ex. 10 → 503,503,503,504,504,504,505,505,505,505. */
+function defaultNozzleLayout(count) {
+    const n = Number.isInteger(count) && count > 0 ? count : 0;
+    if (!n) return [];
+    const types = NOZZLE_DEFAULT_TYPES;
+    const base = Math.floor(n / types.length);
+    const remainder = n % types.length;
+    const counts = types.map(() => base);
+    for (let offset = 0; offset < remainder; offset += 1) {
+        counts[types.length - 1 - offset] += 1;
+    }
+    const layout = [];
+    types.forEach((nozzleType, i) => {
+        for (let k = 0; k < counts[i]; k += 1) layout.push(nozzleType);
+    });
+    return layout;
+}
+
+/** Layout nozzle calé sur `count` : reprend la source, complète par le défaut croissant. */
 function buildNozzleLayout(source, count) {
     const total = Number.isInteger(count) && count > 0 ? count : 0;
+    const fallback = defaultNozzleLayout(total);
     return Array.from({ length: total }, (_value, index) => {
         const candidate = source && Number(source[index]);
-        return NOZZLE_TYPE_OPTIONS.includes(candidate) ? candidate : NOZZLE_DEFAULT_CYCLE[index % NOZZLE_DEFAULT_CYCLE.length];
+        return NOZZLE_TYPE_OPTIONS.includes(candidate) ? candidate : fallback[index];
     });
 }
 
@@ -34,6 +132,9 @@ export function CreateMachineDialog({ open, onClose, onCreated }) {
     const [positions, setPositions] = useState('80');
     const [nozzles, setNozzles] = useState('');
     const [description, setDescription] = useState('');
+    const [exportFormat, setExportFormat] = useState('CSV');
+    const [exportColumns, setExportColumns] = useState(PNP_EXPORT_DEFAULT_COLUMNS);
+    const [exportSeparator, setExportSeparator] = useState(',');
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
 
@@ -43,6 +144,9 @@ export function CreateMachineDialog({ open, onClose, onCreated }) {
             setPositions('80');
             setNozzles('');
             setDescription('');
+            setExportFormat('CSV');
+            setExportColumns(PNP_EXPORT_DEFAULT_COLUMNS);
+            setExportSeparator(',');
             setError('');
         }
     }, [open]);
@@ -66,6 +170,9 @@ export function CreateMachineDialog({ open, onClose, onCreated }) {
                 name: name.trim(),
                 num_positions: numPositions,
                 num_nozzles: numNozzles,
+                export_format: exportFormat,
+                export_columns: normalizeExportColumns(exportColumns),
+                export_separator: exportSeparator,
                 description: description.trim() || null,
             });
             onCreated();
@@ -87,6 +194,14 @@ export function CreateMachineDialog({ open, onClose, onCreated }) {
                     <TextField label="Nombre de positions feeders" type="number" value={positions} onChange={(e) => setPositions(e.target.value)} fullWidth size="small" inputProps={{ min: 1, max: 200 }} helperText="Entier entre 1 et 200." />
                     <TextField label="Nombre de nozzles (optionnel)" type="number" value={nozzles} onChange={(e) => setNozzles(e.target.value)} fullWidth size="small" inputProps={{ min: 0, max: 40 }} helperText="Nozzles sur la tête (0 à 40). Laisser vide si non configuré." />
                     <TextField label="Description (optionnel)" value={description} onChange={(e) => setDescription(e.target.value)} fullWidth size="small" multiline minRows={2} />
+                    <ExportFormatSection
+                        format={exportFormat}
+                        setFormat={setExportFormat}
+                        columns={exportColumns}
+                        setColumns={setExportColumns}
+                        separator={exportSeparator}
+                        setSeparator={setExportSeparator}
+                    />
                 </Stack>
             </DialogContent>
             <DialogActions>
@@ -247,6 +362,9 @@ export function EditMachineDialog({ machine, open, onClose, onSaved }) {
     const [nozzles, setNozzles] = useState('');
     const [nozzleLayout, setNozzleLayout] = useState([]);
     const [description, setDescription] = useState('');
+    const [exportFormat, setExportFormat] = useState('CSV');
+    const [exportColumns, setExportColumns] = useState(PNP_EXPORT_DEFAULT_COLUMNS);
+    const [exportSeparator, setExportSeparator] = useState(',');
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
 
@@ -257,6 +375,9 @@ export function EditMachineDialog({ machine, open, onClose, onSaved }) {
             setNozzles(machine.num_nozzles == null ? '' : String(machine.num_nozzles));
             setNozzleLayout(Array.isArray(machine.nozzle_layout) ? machine.nozzle_layout : []);
             setDescription(machine.description || '');
+            setExportFormat(machine.export_format === 'TXT' ? 'TXT' : 'CSV');
+            setExportColumns(normalizeExportColumns(machine.export_columns));
+            setExportSeparator(machine.export_separator === ';' ? ';' : ',');
             setError('');
         }
     }, [machine, open]);
@@ -287,6 +408,9 @@ export function EditMachineDialog({ machine, open, onClose, onSaved }) {
                 num_positions: numPositions,
                 num_nozzles: numNozzles,
                 nozzle_layout: numNozzles ? buildNozzleLayout(nozzleLayout, numNozzles) : null,
+                export_format: exportFormat,
+                export_columns: normalizeExportColumns(exportColumns),
+                export_separator: exportSeparator,
                 description: description.trim() || null,
             });
             onSaved();
@@ -336,6 +460,14 @@ export function EditMachineDialog({ machine, open, onClose, onSaved }) {
                         </Box>
                     ) : null}
                     <TextField label="Description (optionnel)" value={description} onChange={(e) => setDescription(e.target.value)} fullWidth size="small" multiline minRows={2} />
+                    <ExportFormatSection
+                        format={exportFormat}
+                        setFormat={setExportFormat}
+                        columns={exportColumns}
+                        setColumns={setExportColumns}
+                        separator={exportSeparator}
+                        setSeparator={setExportSeparator}
+                    />
                 </Stack>
             </DialogContent>
             <DialogActions>

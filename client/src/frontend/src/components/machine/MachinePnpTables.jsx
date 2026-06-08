@@ -1,6 +1,7 @@
 import React from 'react';
 import DeleteOutlineRoundedIcon from '@mui/icons-material/DeleteOutlineRounded';
 import EditRoundedIcon from '@mui/icons-material/EditRounded';
+import MoreVertRoundedIcon from '@mui/icons-material/MoreVertRounded';
 import TuneRoundedIcon from '@mui/icons-material/TuneRounded';
 import {
     Box,
@@ -69,6 +70,9 @@ const MachineTableRow = React.memo(function MachineTableRow({
             <TableCell sx={compactCellSx}>{machine.num_positions}</TableCell>
             <TableCell sx={compactCellSx}>{machine.assigned_feeder_types || 0}</TableCell>
             <TableCell sx={compactCellSx}>{machine.active_production_plans || 0}</TableCell>
+            <TableCell sx={compactCellSx}>
+                <ExportFormatChip machine={machine} />
+            </TableCell>
             <TableCell sx={compactWrapCellSx}>{machine.description || 'Machine prete pour configuration.'}</TableCell>
             <TableCell>{formatDate(machine.created_at)}</TableCell>
             <TableCell>
@@ -100,9 +104,53 @@ const MachineTableRow = React.memo(function MachineTableRow({
                             <DeleteOutlineRoundedIcon fontSize="small" />
                         </IconButton>
                     </Tooltip>
+                    <Tooltip title="Plus d'actions (modifier, exporter)">
+                        <IconButton
+                            size="small"
+                            aria-label={`Menu d'actions de la machine ${machine.name}`}
+                            onClick={(event) => {
+                                event.stopPropagation();
+                                onOpenContextMenu(event, machine);
+                            }}
+                            sx={{ color: '#a1a1aa' }}
+                        >
+                            <MoreVertRoundedIcon fontSize="small" />
+                        </IconButton>
+                    </Tooltip>
                 </Stack>
             </TableCell>
         </TableRow>
+    );
+});
+
+/** Pastille du format d'export configuré pour la machine. */
+const ExportFormatChip = React.memo(function ExportFormatChip({ machine }) {
+    const fmt = machine.export_format;
+    if (fmt === 'TXT') {
+        return (
+            <Chip
+                size="small"
+                label="TXT · BOM"
+                sx={{ backgroundColor: 'rgba(167,139,250,0.12)', color: '#c4b5fd', border: '1px solid rgba(167,139,250,0.3)' }}
+            />
+        );
+    }
+    if (fmt === 'CSV') {
+        const count = Array.isArray(machine.export_columns) ? machine.export_columns.length : 10;
+        return (
+            <Chip
+                size="small"
+                label={`CSV · ${count} col.`}
+                sx={{ backgroundColor: 'rgba(56,189,248,0.12)', color: '#7dd3fc', border: '1px solid rgba(56,189,248,0.3)' }}
+            />
+        );
+    }
+    return (
+        <Chip
+            size="small"
+            label="non défini"
+            sx={{ backgroundColor: 'rgba(255,255,255,0.04)', color: '#71717a', border: '1px solid #27272a' }}
+        />
     );
 });
 
@@ -119,13 +167,14 @@ export const MachineTable = React.memo(function MachineTable({
             <Table sx={compactTableSx}>
                 <TableHead>
                     <TableRow>
-                        <TableCell sx={{ width: '22%' }}>Nom</TableCell>
-                        <TableCell sx={{ width: '10%' }}>Positions</TableCell>
-                        <TableCell sx={{ width: '10%' }}>Feeders</TableCell>
-                        <TableCell sx={{ width: '10%' }}>Plans</TableCell>
-                        <TableCell sx={{ width: '28%' }}>Description</TableCell>
+                        <TableCell sx={{ width: '20%' }}>Nom</TableCell>
+                        <TableCell sx={{ width: '9%' }}>Positions</TableCell>
+                        <TableCell sx={{ width: '9%' }}>Feeders</TableCell>
+                        <TableCell sx={{ width: '8%' }}>Plans</TableCell>
+                        <TableCell sx={{ width: '12%' }}>Format export</TableCell>
+                        <TableCell sx={{ width: '20%' }}>Description</TableCell>
                         <TableCell sx={{ width: '12%' }}>Creee le</TableCell>
-                        <TableCell sx={{ width: '8%' }}>Actions</TableCell>
+                        <TableCell sx={{ width: '10%' }}>Actions</TableCell>
                     </TableRow>
                 </TableHead>
                 <TableBody>

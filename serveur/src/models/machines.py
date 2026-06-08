@@ -24,6 +24,13 @@ class PnpMachine(Base):
     num_positions = Column(Integer, nullable=False)  # 60, 80, etc
     num_nozzles = Column(Integer, nullable=True)  # nb de nozzles sur la tête (None = non configuré)
     nozzle_layout = Column(Text, nullable=True)  # JSON: type de nozzle (501..505) par position
+    # Configuration d'export PnP (fichier envoyé au logiciel Pick&Place).
+    # export_format   : 'CSV' (colonnes personnalisées) ou 'TXT' (BOM empreintes harmonisées)
+    # export_columns  : JSON liste d'ids de colonnes (ordre = ordre d'export) pour le CSV
+    # export_separator: ',' ou ';' pour le CSV
+    export_format = Column(String(10), nullable=True)
+    export_columns = Column(Text, nullable=True)
+    export_separator = Column(String(4), nullable=True)
     description = Column(Text, nullable=True)
     notes = Column(Text, nullable=True)
     created_at = Column(DateTime, default=utcnow)

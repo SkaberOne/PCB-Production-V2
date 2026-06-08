@@ -98,15 +98,23 @@ class TestDeduceNozzleType:
 
 
 class TestDefaultNozzleLayout:
-    def test_default_uses_503_504_505_cycle(self):
+    def test_default_is_ascending_blocks_503_504_505(self):
+        # Rangé du plus petit au plus grand, gauche→droite, en blocs croissants ;
+        # le reste de la division va aux plus gros types.
         assert default_nozzle_layout(0) == []
         assert default_nozzle_layout(3) == [503, 504, 505]
-        assert default_nozzle_layout(5) == [503, 504, 505, 503, 504]
+        assert default_nozzle_layout(5) == [503, 504, 504, 505, 505]
+        assert default_nozzle_layout(10) == [503, 503, 503, 504, 504, 504, 505, 505, 505, 505]
+        # toujours non décroissant
+        for n in range(1, 40):
+            layout = default_nozzle_layout(n)
+            assert layout == sorted(layout)
 
     def test_normalize_pads_and_clamps(self):
         # trop court → complété par le défaut ; type inconnu → remplacé par défaut
         assert normalize_nozzle_layout([505], 3) == [505, 504, 505]
-        assert normalize_nozzle_layout([999, 504], 2) == [503, 504]
+        # n=2 → défaut [504, 505] ; index0 invalide (999) → 504, index1 = 504
+        assert normalize_nozzle_layout([999, 504], 2) == [504, 504]
         # trop long → tronqué
         assert normalize_nozzle_layout([503, 504, 505, 503], 2) == [503, 504]
 

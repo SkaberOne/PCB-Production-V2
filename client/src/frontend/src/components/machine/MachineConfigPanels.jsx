@@ -1,5 +1,6 @@
 import React from 'react';
 import AddRoundedIcon from '@mui/icons-material/AddRounded';
+import FileDownloadOutlinedIcon from '@mui/icons-material/FileDownloadOutlined';
 import ArrowDownwardRoundedIcon from '@mui/icons-material/ArrowDownwardRounded';
 import ArrowUpwardRoundedIcon from '@mui/icons-material/ArrowUpwardRounded';
 import CheckCircleRoundedIcon from '@mui/icons-material/CheckCircleRounded';
@@ -84,6 +85,7 @@ export function ProductionSequencePanel({ config }) {
         handleDetachProductionFromMachine,
         handleMoveProductionBom,
         handleToggleMachineBomRevision,
+        handleExportPnpConfig,
         selectedMachineBomRevisionId,
         actionLoading,
     } = config;
@@ -137,6 +139,20 @@ export function ProductionSequencePanel({ config }) {
                         >
                             Valider l'ordre
                         </Button>
+                        <Tooltip title="Générer le fichier d'export PnP (face sélectionnée si une face est active)">
+                            <span>
+                                <Button
+                                    variant="outlined"
+                                    size="small"
+                                    startIcon={<FileDownloadOutlinedIcon />}
+                                    onClick={() => handleExportPnpConfig(selectedMachineProduction, selectedMachineBomRevisionId || null)}
+                                    disabled={busy || !revisions.length}
+                                    sx={{ borderColor: 'rgba(5,150,105,0.5)', color: '#10b981', '&:hover': { borderColor: '#10b981', backgroundColor: 'rgba(5,150,105,0.08)' } }}
+                                >
+                                    Exporter PnP
+                                </Button>
+                            </span>
+                        </Tooltip>
                         {validated ? (
                             <Tooltip title="Recalculer l'implantation">
                                 <span>

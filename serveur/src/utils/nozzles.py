@@ -48,12 +48,25 @@ def deduce_nozzle_type(footprint: Optional[str], feeder_size_mm: Optional[int] =
 
 
 def default_nozzle_layout(num_nozzles: Optional[int]) -> List[int]:
-    """Pré-remplissage par défaut des positions : répartition cyclique des types
-    réellement utilisés (503/504/505)."""
+    """Pré-remplissage par défaut : nozzles rangés du plus PETIT au plus GRAND,
+    de gauche à droite, en blocs croissants des types réellement utilisés
+    (503/504/505). Le reste de la division va aux plus gros types.
+
+    Ex. 10 positions → 503,503,503,504,504,504,505,505,505,505.
+    """
     n = int(num_nozzles or 0)
     if n <= 0:
         return []
-    return [DEFAULT_LAYOUT_TYPES[i % len(DEFAULT_LAYOUT_TYPES)] for i in range(n)]
+    types = DEFAULT_LAYOUT_TYPES
+    base, remainder = divmod(n, len(types))
+    counts = [base] * len(types)
+    # Les positions restantes sont attribuées aux plus gros types (fin du banc).
+    for offset in range(remainder):
+        counts[len(types) - 1 - offset] += 1
+    layout: List[int] = []
+    for nozzle_type, count in zip(types, counts):
+        layout.extend([nozzle_type] * count)
+    return layout
 
 
 def normalize_nozzle_layout(layout: Optional[List], num_nozzles: Optional[int]) -> List[int]:

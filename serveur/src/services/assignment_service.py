@@ -16,7 +16,13 @@ from ..models.production import Production, ProductionBomRevision
 from .assignment_fixed_feeders import AssignmentFixedFeederMixin
 from .component_library_service import ComponentLibraryService
 from .assignment_planning import AssignmentPlanningMixin
+from .pnp_export_service import build_pnp_export
 from ..utils.nozzles import normalize_nozzle_layout
+from ..utils.pnp_export import (
+    normalize_columns as normalize_export_columns,
+    normalize_format as normalize_export_format,
+    normalize_separator as normalize_export_separator,
+)
 
 
 def _serialize_nozzle_layout(layout, num_nozzles):
@@ -65,6 +71,9 @@ class AssignmentService(AssignmentFixedFeederMixin, AssignmentPlanningMixin):
         num_positions: int,
         num_nozzles: Optional[int] = None,
         nozzle_layout: Optional[List[int]] = None,
+        export_format: Optional[str] = None,
+        export_columns: Optional[List[str]] = None,
+        export_separator: Optional[str] = None,
         description: Optional[str] = None,
         notes: Optional[str] = None
     ) -> PnpMachine:
@@ -101,6 +110,12 @@ class AssignmentService(AssignmentFixedFeederMixin, AssignmentPlanningMixin):
             num_positions=num_positions,
             num_nozzles=resolved_nozzles,
             nozzle_layout=_serialize_nozzle_layout(nozzle_layout, resolved_nozzles),
+            export_format=normalize_export_format(export_format) if export_format else None,
+            export_columns=(
+                json.dumps(normalize_export_columns(export_columns))
+                if export_columns is not None else None
+            ),
+            export_separator=normalize_export_separator(export_separator) if export_separator else None,
             description=description.strip() if description else None,
             notes=notes.strip() if notes else None
         )
@@ -191,6 +206,9 @@ class AssignmentService(AssignmentFixedFeederMixin, AssignmentPlanningMixin):
         num_positions: Optional[int] = None,
         num_nozzles: Optional[int] = None,
         nozzle_layout: Optional[List[int]] = None,
+        export_format: Optional[str] = None,
+        export_columns: Optional[List[str]] = None,
+        export_separator: Optional[str] = None,
         description: Optional[str] = None,
         notes: Optional[str] = None
     ) -> PnpMachine:
@@ -253,6 +271,15 @@ class AssignmentService(AssignmentFixedFeederMixin, AssignmentPlanningMixin):
         if nozzle_layout is not None:
             machine.nozzle_layout = _serialize_nozzle_layout(nozzle_layout, machine.num_nozzles)
 
+        if export_format is not None:
+            machine.export_format = normalize_export_format(export_format)
+
+        if export_columns is not None:
+            machine.export_columns = json.dumps(normalize_export_columns(export_columns))
+
+        if export_separator is not None:
+            machine.export_separator = normalize_export_separator(export_separator)
+
         if description is not None:
             machine.description = description.strip() if description else None
         
@@ -292,9 +319,65 @@ class AssignmentService(AssignmentFixedFeederMixin, AssignmentPlanningMixin):
         
         db.delete(machine)
         db.commit()
-        
+
         logger.info("Deleted machine %s", machine_id)
         return True
+
+    @classmethod
+    def export_machine_production_config(
+        cls,
+        db: Session,
+        machine_id: int,
+        production_id: int,
+        bom_revision_id: Optional[int] = None,
+        export_format: Optional[str] = None,
+        export_columns: Optional[List[str]] = None,
+        export_separator: Optional[str] = None,
+    ) -> Tuple[str, str, str]:
+        """Génère le fichier d'export PnP (CSV/TXT) d'une production sur une machine.
+
+        Réutilise l'implantation calculée (slots feeders + nozzles) pour renseigner les
+        colonnes Feeder/Nozzle. Retourne (filename, media_type, content).
+        """
+        # Calcul de l'implantation : valide aussi le lien machine↔production.
+        plan = cls.get_machine_production_feeder_plan(
+            db=db,
+            machine_id=machine_id,
+            production_id=production_id,
+            bom_revision_id=bom_revision_id,
+        )
+        assignment_by_component = {
+            assignment["component_id"]: assignment
+            for assignment in plan.get("slot_assignments", [])
+        }
+
+        machine = cls.get_machine_by_id(db=db, machine_id=machine_id)
+        if not machine:
+            raise ValueError(f"Machine {machine_id} not found")
+
+        production = (
+            db.query(Production)
+            .options(
+                joinedload(Production.bom_links)
+                .joinedload(ProductionBomRevision.revision)
+                .joinedload(BomRevision.items)
+            )
+            .filter(Production.id == production_id)
+            .first()
+        )
+        if not production:
+            raise ValueError(f"Production {production_id} not found")
+
+        return build_pnp_export(
+            db=db,
+            machine=machine,
+            production=production,
+            bom_revision_id=bom_revision_id,
+            export_format=export_format,
+            export_columns=export_columns,
+            export_separator=export_separator,
+            assignment_by_component=assignment_by_component,
+        )
 
     @staticmethod
     def create_cart(

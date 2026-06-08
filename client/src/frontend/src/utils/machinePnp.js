@@ -16,6 +16,51 @@ export const mpnColors = {
     danger: '#ef4444',
 };
 
+/**
+ * Référentiel des colonnes d'export PnP (fichier envoyé au logiciel Pick&Place).
+ * Doit rester aligné avec serveur/src/utils/pnp_export.py. Les `required` sont
+ * verrouillées (la machine ne peut pas poser sans Position/Valeur/Empreinte/X/Y).
+ */
+export const PNP_EXPORT_COLUMNS = [
+    { id: 'position', header: 'Position', required: true },
+    { id: 'name', header: 'Component Name', required: true },
+    { id: 'footprint', header: 'Footprint', required: true },
+    { id: 'x', header: 'X', required: true },
+    { id: 'y', header: 'Y', required: true },
+    { id: 'angle', header: 'Angle', required: false },
+    { id: 'side', header: 'Top/Bottom', required: false },
+    { id: 'feeder', header: 'Feeder', required: false },
+    { id: 'nozzle', header: 'Nozzle', required: false },
+    { id: 'group', header: 'Group', required: false },
+    { id: 'quantity', header: 'Quantity', required: false },
+    { id: 'comment', header: 'Comment', required: false },
+];
+
+export const PNP_EXPORT_DEFAULT_COLUMNS = [
+    'position', 'name', 'footprint', 'x', 'y', 'angle', 'side', 'feeder', 'nozzle', 'group',
+];
+
+export const PNP_EXPORT_REQUIRED_COLUMNS = ['position', 'name', 'footprint', 'x', 'y'];
+
+/** Nettoie une liste d'ids de colonnes : ids connus, dédoublonnés, obligatoires garantis. */
+export function normalizeExportColumns(columns) {
+    const valid = new Set(PNP_EXPORT_COLUMNS.map((col) => col.id));
+    const seen = new Set();
+    const ordered = [];
+    (Array.isArray(columns) ? columns : []).forEach((raw) => {
+        const id = String(raw || '').trim();
+        if (valid.has(id) && !seen.has(id)) {
+            seen.add(id);
+            ordered.push(id);
+        }
+    });
+    if (!ordered.length) {
+        return [...PNP_EXPORT_DEFAULT_COLUMNS];
+    }
+    const missing = PNP_EXPORT_REQUIRED_COLUMNS.filter((id) => !seen.has(id));
+    return [...missing, ...ordered];
+}
+
 export const panelCardSx = {
     backgroundColor: mpnColors.surface,
     border: `1px solid ${mpnColors.border}`,

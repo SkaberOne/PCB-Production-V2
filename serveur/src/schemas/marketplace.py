@@ -133,6 +133,9 @@ class CreateMachineRequest(BaseModel):
     num_positions: int = Field(..., ge=1, le=200)
     num_nozzles: Optional[int] = Field(default=None, ge=0, le=40)
     nozzle_layout: Optional[List[int]] = Field(default=None)
+    export_format: Optional[str] = Field(default=None, pattern="^(CSV|TXT)$")
+    export_columns: Optional[List[str]] = Field(default=None)
+    export_separator: Optional[str] = Field(default=None, pattern="^[,;]$")
     description: Optional[str] = None
     notes: Optional[str] = None
 
@@ -142,6 +145,9 @@ class UpdateMachineRequest(BaseModel):
     num_positions: Optional[int] = Field(default=None, ge=1, le=200)
     num_nozzles: Optional[int] = Field(default=None, ge=0, le=40)
     nozzle_layout: Optional[List[int]] = Field(default=None)
+    export_format: Optional[str] = Field(default=None, pattern="^(CSV|TXT)$")
+    export_columns: Optional[List[str]] = Field(default=None)
+    export_separator: Optional[str] = Field(default=None, pattern="^[,;]$")
     description: Optional[str] = None
     notes: Optional[str] = None
 

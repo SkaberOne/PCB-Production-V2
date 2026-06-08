@@ -12,6 +12,24 @@ from ..utils.feeder_types import (
     normalize_component_feeder_type,
 )
 from ..utils.nozzles import deduce_nozzle_type, normalize_nozzle_layout
+from ..utils.pnp_export import (
+    DEFAULT_FORMAT as DEFAULT_EXPORT_FORMAT,
+    DEFAULT_SEPARATOR as DEFAULT_EXPORT_SEPARATOR,
+    normalize_columns as normalize_export_columns,
+    normalize_format as normalize_export_format,
+    normalize_separator as normalize_export_separator,
+)
+
+
+def _parse_export_columns(raw):
+    """Colonnes d'export PnP stockées (JSON) → liste normalisée (défaut si absent/invalide)."""
+    stored = None
+    if raw:
+        try:
+            stored = json.loads(raw)
+        except (TypeError, ValueError):
+            stored = None
+    return normalize_export_columns(stored if isinstance(stored, list) else None)
 
 
 def _parse_nozzle_layout(raw, num_nozzles):
@@ -78,6 +96,9 @@ def serialize_machine(machine: PnpMachine) -> Dict:
         "num_positions": machine.num_positions,
         "num_nozzles": machine.num_nozzles,
         "nozzle_layout": _parse_nozzle_layout(machine.nozzle_layout, machine.num_nozzles),
+        "export_format": normalize_export_format(machine.export_format),
+        "export_columns": _parse_export_columns(machine.export_columns),
+        "export_separator": normalize_export_separator(machine.export_separator),
         "description": machine.description,
         "notes": machine.notes,
         "created_at": machine.created_at.isoformat() if machine.created_at else None,

@@ -2,7 +2,10 @@
 
 from typing import Optional
 
+from urllib.parse import quote
+
 from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi.responses import Response
 from sqlalchemy.orm import Session
 
 from ..database import get_db
@@ -29,6 +32,9 @@ def create_machine(
             num_positions=request.num_positions,
             num_nozzles=request.num_nozzles,
             nozzle_layout=request.nozzle_layout,
+            export_format=request.export_format,
+            export_columns=request.export_columns,
+            export_separator=request.export_separator,
             description=request.description,
             notes=request.notes,
         )
@@ -135,6 +141,40 @@ def get_machine_production_feeder_plan(
         raise HTTPException(status_code=500, detail=f"Error calculating feeder plan: {str(e)}")
 
 
+@router.get("/{machine_id}/productions/{production_id}/export")
+def export_machine_production_config(
+    machine_id: int,
+    production_id: int,
+    bom_revision_id: Optional[int] = Query(None, ge=1),
+    export_format: Optional[str] = Query(None, pattern="^(CSV|TXT)$"),
+    db: Session = Depends(get_db),
+):
+    """Génère et télécharge le fichier d'export PnP (CSV/TXT) pour le logiciel Pick&Place.
+
+    Le format/colonnes/séparateur proviennent de la config de la machine ; `export_format`
+    permet un override ponctuel. `bom_revision_id` restreint à une face (TOP/BOT).
+    """
+    try:
+        filename, media_type, content = AssignmentService.export_machine_production_config(
+            db=db,
+            machine_id=machine_id,
+            production_id=production_id,
+            bom_revision_id=bom_revision_id,
+            export_format=export_format,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error exporting PnP config: {str(e)}")
+
+    disposition = f"attachment; filename=\"{filename}\"; filename*=UTF-8''{quote(filename)}"
+    return Response(
+        content=content,
+        media_type=media_type,
+        headers={"Content-Disposition": disposition},
+    )
+
+
 @router.get("")
 def list_machines(
     limit: int = Query(50, ge=1, le=500),
@@ -173,6 +213,9 @@ def update_machine(
             num_positions=request.num_positions,
             num_nozzles=request.num_nozzles,
             nozzle_layout=request.nozzle_layout,
+            export_format=request.export_format,
+            export_columns=request.export_columns,
+            export_separator=request.export_separator,
             description=request.description,
             notes=request.notes,
         )

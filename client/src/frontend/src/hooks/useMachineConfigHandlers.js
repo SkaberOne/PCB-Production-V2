@@ -230,6 +230,38 @@ export function useMachineConfigHandlers(deps) {
         setSelectedMachineBomAssignmentFilter(nextFilter);
     }, [setSelectedMachineBomAssignmentFilter, setSelectedMachineSlotPosition]);
 
+    const handleExportPnpConfig = React.useCallback(async (selectedMachineProduction, bomRevisionId = null) => {
+        if (!machineSummary?.id || !selectedMachineProduction) return;
+        setActionLoading(`export-pnp-${selectedMachineProduction.id}`);
+        setMachineConfigError('');
+        try {
+            const params = {};
+            if (bomRevisionId) params.bom_revision_id = bomRevisionId;
+            const response = await apiClient.get(
+                `/marketplace/machines/${machineSummary.id}/productions/${selectedMachineProduction.id}/export`,
+                { params, responseType: 'blob' },
+            );
+            const contentDisposition = response.headers?.['content-disposition'] || '';
+            const fileNameMatch = contentDisposition.match(/filename\*=UTF-8''([^;]+)|filename="?([^"]+)"?/i);
+            const fileName = decodeURIComponent(
+                fileNameMatch?.[1] || fileNameMatch?.[2] || `${selectedMachineProduction.name || 'production'}_pnp.csv`,
+            );
+            const downloadUrl = window.URL.createObjectURL(response.data);
+            const link = document.createElement('a');
+            link.href = downloadUrl;
+            link.download = fileName;
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            window.URL.revokeObjectURL(downloadUrl);
+            setFeedback({ type: 'success', message: `Export PnP généré : ${fileName}.` });
+        } catch (requestError) {
+            setMachineConfigError(extractRequestError(requestError, "Erreur lors de l'export PnP."));
+        } finally {
+            setActionLoading('');
+        }
+    }, [machineSummary?.id, setActionLoading, setFeedback, setMachineConfigError]);
+
     return {
         handleAssignFeederToMachine,
         handleRemoveFeederFromMachine,
@@ -240,5 +272,6 @@ export function useMachineConfigHandlers(deps) {
         handleRefreshMachineProductionPlan,
         handleToggleMachineBomRevision,
         handleChangeMachineBomAssignmentFilter,
+        handleExportPnpConfig,
     };
 }

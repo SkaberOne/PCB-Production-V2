@@ -26,7 +26,7 @@ from .assignment_helpers import (
     sort_production_bom_links,
 )
 from .component_library_service import ComponentLibraryService
-from ..utils.nozzles import normalize_nozzle_layout, nozzle_layout_red_positions
+from ..utils.nozzles import deduce_nozzle_type, normalize_nozzle_layout, nozzle_layout_red_positions
 
 logger = logging.getLogger(__name__)
 
@@ -359,72 +359,55 @@ class AssignmentPlanningMixin:
         slot_assignments: List[Dict] = []
         unassigned_components: List[Dict] = []
 
-        def assign_entry(entry: Dict, placement_group: str, from_back: bool = False) -> None:
+        total_positions = int(machine.num_positions or 0)
+        # Le banc = deux rampes (avant/arrière), chacune de `front_cols` colonnes
+        # numérotées de GAUCHE (1) à DROITE. Position linéaire : avant = colonne,
+        # arrière = front_cols + colonne.
+        front_cols = (total_positions + 1) // 2
+        back_cols = total_positions - front_cols
+        ramp_cols = {"front": front_cols, "back": back_cols}
+        ramp_base = {"front": 0, "back": front_cols}
+
+        def _entry_nozzle_type(entry: Dict) -> int:
+            component = entry["component"]
+            return deduce_nozzle_type(
+                component.footprint_pnp or component.package, entry["feeder_size_mm"]
+            ) or 0
+
+        def _size_invalid_reason(entry: Dict):
             feeder_size_mm = entry["feeder_size_mm"]
-            if machine_feeder_sizes:
-                if feeder_size_mm is None:
-                    unassigned_components.append(build_unassigned_payload(entry, "Taille de feeder inconnue", placement_group))
-                    return
-                if feeder_size_mm not in machine_feeder_sizes:
-                    unassigned_components.append(
-                        build_unassigned_payload(
-                            entry,
-                            f"Taille {feeder_size_mm} mm non disponible sur cette machine",
-                            placement_group,
-                        )
-                    )
-                    return
+            if not machine_feeder_sizes:
+                return None
+            if feeder_size_mm is None:
+                return "Taille de feeder inconnue"
+            if feeder_size_mm not in machine_feeder_sizes:
+                return f"Taille {feeder_size_mm} mm non disponible sur cette machine"
+            return None
 
-            required_slots = entry["slot_usage"]
-            total_positions = int(machine.num_positions or 0)
-            start_range = range(1, max(total_positions - required_slots + 2, 1))
-            # Feeders fixes : remplissage depuis l'arrière (positions hautes) pour les
-            # regrouper sur la rampe arrière ; dynamiques depuis l'avant (positions
-            # basses) afin de maximiser les feeders mobiles sur la rampe avant.
-            slot_starts = reversed(start_range) if from_back else start_range
-            for slot_start in slot_starts:
-                slot_positions = list(range(slot_start, slot_start + required_slots))
-                if slot_positions[-1] > total_positions:
-                    continue
-                if any(position in positions for position in slot_positions):
-                    continue
+        # 1) Tailles de feeder non disponibles → non assignables.
+        placeable_fixed: List[Dict] = []
+        placeable_dynamic: List[Dict] = []
+        for entry in fixed_entries:
+            reason = _size_invalid_reason(entry)
+            if reason:
+                unassigned_components.append(build_unassigned_payload(entry, reason, "FIXED"))
+            else:
+                placeable_fixed.append(entry)
+        for entry in dynamic_entries:
+            reason = _size_invalid_reason(entry)
+            if reason:
+                unassigned_components.append(build_unassigned_payload(entry, reason, "DYNAMIC"))
+            else:
+                placeable_dynamic.append(entry)
 
-                assignment = build_assignment_payload(
-                    entry=entry,
-                    slot_positions=slot_positions,
-                    placement_group=placement_group,
-                    assignment_index=len(slot_assignments) + 1,
-                    ordered_boms=ordered_boms,
-                )
-                slot_assignments.append(assignment)
-                for position in slot_positions:
-                    positions[position] = assignment
-                return
-
-            unassigned_components.append(build_unassigned_payload(entry, "Capacite machine insuffisante", placement_group))
-
-        for entry in sorted(fixed_entries, key=cls._fixed_plan_sort_key):
-            assign_entry(entry, "FIXED", from_back=True)
-
-        # ── Débordement → sélection « à placer à la main » ─────────────────────────
-        # Après les feeders fixes, si la demande dynamique dépasse la capacité
-        # restante de la machine, on choisit les composants à poser à la main par
-        # score « emplacements libérés ÷ nombre de poses » décroissant : les gros
-        # feeders (2 positions) peu posés sortent en premier — un maximum de place
-        # gagnée pour un minimum d'effort manuel — jusqu'à ce que le reste tienne.
+        # 2) Débordement capacité → sélection « à placer à la main » (dynamiques
+        #    seulement ; les fixes restent prioritairement montés). Logique inchangée.
         manual_placement_components: List[Dict] = []
         manual_placement_slot_savings = 0
         manual_placement_ids: set = set()
-
-        def _dynamic_size_is_valid(candidate: Dict) -> bool:
-            feeder_size_mm = candidate["feeder_size_mm"]
-            if not machine_feeder_sizes:
-                return True
-            return feeder_size_mm is not None and feeder_size_mm in machine_feeder_sizes
-
-        size_valid_dynamic = [entry for entry in dynamic_entries if _dynamic_size_is_valid(entry)]
-        remaining_capacity = max(int(machine.num_positions or 0) - len(positions), 0)
-        dynamic_slot_demand = sum(int(entry["slot_usage"]) for entry in size_valid_dynamic)
+        fixed_slot_demand = sum(int(entry["slot_usage"]) for entry in placeable_fixed)
+        remaining_capacity = max(total_positions - fixed_slot_demand, 0)
+        dynamic_slot_demand = sum(int(entry["slot_usage"]) for entry in placeable_dynamic)
 
         if dynamic_slot_demand > remaining_capacity:
             overflow_slots = dynamic_slot_demand - remaining_capacity
@@ -437,7 +420,7 @@ class AssignmentPlanningMixin:
             # occupent le plus de positions (gros feeder 2 pos), (4) ont le moins
             # de poses — pour minimiser le nombre ET l'effort des poses manuelles.
             ranked_for_manual = sorted(
-                size_valid_dynamic,
+                placeable_dynamic,
                 key=lambda entry: (
                     int(queue_reuse.get(entry["component"].id, 1)),
                     -(int(entry["slot_usage"]) / max(int(entry["total_quantity"]), 1)),
@@ -460,10 +443,55 @@ class AssignmentPlanningMixin:
                 )
                 manual_placement_components.append(manual_component)
 
-        for entry in sorted(dynamic_entries, key=cls._dynamic_plan_sort_key):
-            if entry["component"].id in manual_placement_ids:
-                continue
-            assign_entry(entry, "DYNAMIC")
+        # 3) Placement : TOUT le banc rangé par type de nozzle CROISSANT — petits
+        #    nozzles à GAUCHE, gros à DROITE — pour que chaque station atteigne sa
+        #    colonne. Les deux rampes se remplissent de gauche à droite ; chaque
+        #    feeder va sur la rampe la moins avancée (équilibrage + croissance
+        #    monotone, puisqu'on traite les entrées par type de nozzle croissant).
+        to_place = list(placeable_fixed) + [
+            entry for entry in placeable_dynamic if entry["component"].id not in manual_placement_ids
+        ]
+        placement_group_by_id = {
+            entry["component"].id: ("FIXED" if bool(entry["component"].is_fixed_feeder) else "DYNAMIC")
+            for entry in to_place
+        }
+        to_place.sort(
+            key=lambda entry: (
+                _entry_nozzle_type(entry),
+                -int(entry["slot_usage"]),
+                -int(entry["total_quantity"]),
+                component_display_label(entry["component"]).upper(),
+                entry["component"].id,
+            )
+        )
+
+        ramp_next = {"front": 1, "back": 1}
+
+        def place_entry(entry: Dict) -> None:
+            required_slots = int(entry["slot_usage"])
+            placement_group = placement_group_by_id[entry["component"].id]
+            # Rampe la moins avancée d'abord (avant en cas d'égalité).
+            for ramp in sorted(("front", "back"), key=lambda r: (ramp_next[r], 0 if r == "front" else 1)):
+                start_col = ramp_next[ramp]
+                if start_col + required_slots - 1 > ramp_cols[ramp]:
+                    continue
+                slot_positions = [ramp_base[ramp] + col for col in range(start_col, start_col + required_slots)]
+                assignment = build_assignment_payload(
+                    entry=entry,
+                    slot_positions=slot_positions,
+                    placement_group=placement_group,
+                    assignment_index=len(slot_assignments) + 1,
+                    ordered_boms=ordered_boms,
+                )
+                slot_assignments.append(assignment)
+                for position in slot_positions:
+                    positions[position] = assignment
+                ramp_next[ramp] = start_col + required_slots
+                return
+            unassigned_components.append(build_unassigned_payload(entry, "Capacite machine insuffisante", placement_group))
+
+        for entry in to_place:
+            place_entry(entry)
 
         slots = []
         total_positions = int(machine.num_positions or 0)
