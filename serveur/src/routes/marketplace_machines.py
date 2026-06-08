@@ -35,6 +35,7 @@ def create_machine(
             export_format=request.export_format,
             export_columns=request.export_columns,
             export_separator=request.export_separator,
+            feeder_back_order=request.feeder_back_order,
             description=request.description,
             notes=request.notes,
         )
@@ -216,6 +217,7 @@ def update_machine(
             export_format=request.export_format,
             export_columns=request.export_columns,
             export_separator=request.export_separator,
+            feeder_back_order=request.feeder_back_order,
             description=request.description,
             notes=request.notes,
         )

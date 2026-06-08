@@ -8,6 +8,8 @@ Verrouille les observations physiques d'Eric (2026-06) :
 """
 
 from src.utils.nozzles import (
+    available_nozzle_types,
+    clamp_nozzle_type,
     deduce_nozzle_type,
     default_nozzle_layout,
     normalize_nozzle_layout,
@@ -16,6 +18,27 @@ from src.utils.nozzles import (
     nozzle_reach_left_limit,
     nozzle_reach_right_limit,
 )
+
+
+def test_available_nozzle_types_from_layout():
+    assert available_nozzle_types([503, 503, 504, 504, 505]) == [503, 504, 505]
+    # Repli sur les types par défaut (503/504/505) si layout vide/None.
+    assert available_nozzle_types(None) == [503, 504, 505]
+    assert available_nozzle_types([]) == [503, 504, 505]
+
+
+def test_clamp_nozzle_type_floors_to_available():
+    avail = [503, 504, 505]
+    # 0603 → 502 déduit → ramené au plus petit dispo (503).
+    assert clamp_nozzle_type(502, avail) == 503
+    assert clamp_nozzle_type(501, avail) == 503
+    # Types présents inchangés.
+    assert clamp_nozzle_type(504, avail) == 504
+    # Au-dessus du max → plafonné au plus grand dispo.
+    assert clamp_nozzle_type(506, avail) == 505
+    # None et liste vide : aucun changement.
+    assert clamp_nozzle_type(None, avail) is None
+    assert clamp_nozzle_type(502, []) == 502
 
 
 def _reaches(nozzle_index, num_nozzles, columns, column):

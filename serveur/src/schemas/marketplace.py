@@ -136,6 +136,7 @@ class CreateMachineRequest(BaseModel):
     export_format: Optional[str] = Field(default=None, pattern="^(CSV|TXT)$")
     export_columns: Optional[List[str]] = Field(default=None)
     export_separator: Optional[str] = Field(default=None, pattern="^[,;]$")
+    feeder_back_order: Optional[str] = Field(default=None, pattern="^(ASC|DESC)$")
     description: Optional[str] = None
     notes: Optional[str] = None
 
@@ -148,6 +149,7 @@ class UpdateMachineRequest(BaseModel):
     export_format: Optional[str] = Field(default=None, pattern="^(CSV|TXT)$")
     export_columns: Optional[List[str]] = Field(default=None)
     export_separator: Optional[str] = Field(default=None, pattern="^[,;]$")
+    feeder_back_order: Optional[str] = Field(default=None, pattern="^(ASC|DESC)$")
     description: Optional[str] = None
     notes: Optional[str] = None
 

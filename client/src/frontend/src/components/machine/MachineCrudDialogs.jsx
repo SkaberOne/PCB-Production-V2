@@ -93,6 +93,40 @@ function ExportFormatSection({ format, setFormat, columns, setColumns, separator
     );
 }
 
+/** Numérotation physique du rail arrière (colonne « Feeder » de l'export).
+ * Partagé création/édition. ASC = l'arrière prolonge l'avant (ex. 41→80) ;
+ * DESC = l'arrière décroît de gauche à droite (ex. 80→41). L'avant reste 1→N/2. */
+function FeederBackOrderSection({ value, setValue, numPositions }) {
+    const total = Number.parseInt(numPositions, 10);
+    const n = Number.isInteger(total) && total > 0 ? total : 80;
+    const front = Math.ceil(n / 2);
+    const ascExample = `${front + 1}→${n}`;
+    const descExample = `${n}→${front + 1}`;
+    return (
+        <Box sx={{ mt: 1, pt: 2, borderTop: '1px solid #27272a' }}>
+            <Typography sx={{ fontSize: '0.72rem', fontWeight: 600, letterSpacing: '0.04em', textTransform: 'uppercase', color: '#10b981', mb: 1 }}>
+                Numérotation du rail arrière
+            </Typography>
+            <Typography sx={{ fontSize: '0.72rem', color: '#a1a1aa', mb: 1.25 }}>
+                Sens des numéros de feeder à l'arrière, de gauche à droite. L'avant reste {`1→${front}`} sur toutes les machines.
+            </Typography>
+            <ToggleButtonGroup
+                exclusive
+                size="small"
+                value={value}
+                onChange={(_event, next) => { if (next) setValue(next); }}
+                sx={{
+                    '& .MuiToggleButton-root': { textTransform: 'none', color: '#a1a1aa', borderColor: '#2f2f35', fontSize: '0.78rem' },
+                    '& .Mui-selected': { backgroundColor: '#059669 !important', color: '#fff !important' },
+                }}
+            >
+                <ToggleButton value="ASC">{`Continue (${ascExample})`}</ToggleButton>
+                <ToggleButton value="DESC">{`Inversée (${descExample})`}</ToggleButton>
+            </ToggleButtonGroup>
+        </Box>
+    );
+}
+
 const NOZZLE_TYPE_OPTIONS = [501, 502, 503, 504, 505];
 const NOZZLE_DEFAULT_TYPES = [503, 504, 505];
 
@@ -135,6 +169,7 @@ export function CreateMachineDialog({ open, onClose, onCreated }) {
     const [exportFormat, setExportFormat] = useState('CSV');
     const [exportColumns, setExportColumns] = useState(PNP_EXPORT_DEFAULT_COLUMNS);
     const [exportSeparator, setExportSeparator] = useState(',');
+    const [feederBackOrder, setFeederBackOrder] = useState('ASC');
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
 
@@ -147,6 +182,7 @@ export function CreateMachineDialog({ open, onClose, onCreated }) {
             setExportFormat('CSV');
             setExportColumns(PNP_EXPORT_DEFAULT_COLUMNS);
             setExportSeparator(',');
+            setFeederBackOrder('ASC');
             setError('');
         }
     }, [open]);
@@ -173,6 +209,7 @@ export function CreateMachineDialog({ open, onClose, onCreated }) {
                 export_format: exportFormat,
                 export_columns: normalizeExportColumns(exportColumns),
                 export_separator: exportSeparator,
+                feeder_back_order: feederBackOrder,
                 description: description.trim() || null,
             });
             onCreated();
@@ -194,6 +231,7 @@ export function CreateMachineDialog({ open, onClose, onCreated }) {
                     <TextField label="Nombre de positions feeders" type="number" value={positions} onChange={(e) => setPositions(e.target.value)} fullWidth size="small" inputProps={{ min: 1, max: 200 }} helperText="Entier entre 1 et 200." />
                     <TextField label="Nombre de nozzles (optionnel)" type="number" value={nozzles} onChange={(e) => setNozzles(e.target.value)} fullWidth size="small" inputProps={{ min: 0, max: 40 }} helperText="Nozzles sur la tête (0 à 40). Laisser vide si non configuré." />
                     <TextField label="Description (optionnel)" value={description} onChange={(e) => setDescription(e.target.value)} fullWidth size="small" multiline minRows={2} />
+                    <FeederBackOrderSection value={feederBackOrder} setValue={setFeederBackOrder} numPositions={positions} />
                     <ExportFormatSection
                         format={exportFormat}
                         setFormat={setExportFormat}
@@ -365,6 +403,7 @@ export function EditMachineDialog({ machine, open, onClose, onSaved }) {
     const [exportFormat, setExportFormat] = useState('CSV');
     const [exportColumns, setExportColumns] = useState(PNP_EXPORT_DEFAULT_COLUMNS);
     const [exportSeparator, setExportSeparator] = useState(',');
+    const [feederBackOrder, setFeederBackOrder] = useState('ASC');
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
 
@@ -378,6 +417,7 @@ export function EditMachineDialog({ machine, open, onClose, onSaved }) {
             setExportFormat(machine.export_format === 'TXT' ? 'TXT' : 'CSV');
             setExportColumns(normalizeExportColumns(machine.export_columns));
             setExportSeparator(machine.export_separator === ';' ? ';' : ',');
+            setFeederBackOrder(machine.feeder_back_order === 'DESC' ? 'DESC' : 'ASC');
             setError('');
         }
     }, [machine, open]);
@@ -411,6 +451,7 @@ export function EditMachineDialog({ machine, open, onClose, onSaved }) {
                 export_format: exportFormat,
                 export_columns: normalizeExportColumns(exportColumns),
                 export_separator: exportSeparator,
+                feeder_back_order: feederBackOrder,
                 description: description.trim() || null,
             });
             onSaved();
@@ -460,6 +501,7 @@ export function EditMachineDialog({ machine, open, onClose, onSaved }) {
                         </Box>
                     ) : null}
                     <TextField label="Description (optionnel)" value={description} onChange={(e) => setDescription(e.target.value)} fullWidth size="small" multiline minRows={2} />
+                    <FeederBackOrderSection value={feederBackOrder} setValue={setFeederBackOrder} numPositions={positions} />
                     <ExportFormatSection
                         format={exportFormat}
                         setFormat={setExportFormat}

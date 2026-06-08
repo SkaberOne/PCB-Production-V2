@@ -31,6 +31,12 @@ class PnpMachine(Base):
     export_format = Column(String(10), nullable=True)
     export_columns = Column(Text, nullable=True)
     export_separator = Column(String(4), nullable=True)
+    # Numérotation physique du rail ARRIÈRE pour la colonne « Feeder » de l'export.
+    # 'ASC'  : continue (ex. 80 positions → arrière 41→80, gauche→droite) — défaut,
+    #          correspond aux positions linéaires internes (machine A).
+    # 'DESC' : inversée (ex. arrière 80→41, gauche→droite) — machine B.
+    # L'avant reste toujours 1→front_cols. None ⇒ traité comme 'ASC'.
+    feeder_back_order = Column(String(4), nullable=True)
     description = Column(Text, nullable=True)
     notes = Column(Text, nullable=True)
     created_at = Column(DateTime, default=utcnow)

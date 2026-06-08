@@ -26,7 +26,13 @@ from .assignment_helpers import (
     sort_production_bom_links,
 )
 from .component_library_service import ComponentLibraryService
-from ..utils.nozzles import deduce_nozzle_type, normalize_nozzle_layout, nozzle_layout_red_positions
+from ..utils.nozzles import (
+    available_nozzle_types,
+    clamp_nozzle_type,
+    deduce_nozzle_type,
+    normalize_nozzle_layout,
+    nozzle_layout_red_positions,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -346,6 +352,19 @@ class AssignmentPlanningMixin:
             }
         )
 
+        # Types de nozzles réellement montés sur la tête (layout machine ; défaut
+        # 503/504/505). Sert à BORNER le type déduit : un boîtier qui déduit un
+        # type absent (ex. 0603 → 502) est ramené au plus petit type disponible.
+        machine_nozzle_layout_raw = None
+        if machine.nozzle_layout:
+            try:
+                machine_nozzle_layout_raw = json.loads(machine.nozzle_layout)
+            except (TypeError, ValueError):
+                machine_nozzle_layout_raw = None
+        machine_available_nozzles = available_nozzle_types(
+            machine_nozzle_layout_raw if isinstance(machine_nozzle_layout_raw, list) else None
+        )
+
         fixed_entries: List[Dict] = []
         dynamic_entries: List[Dict] = []
         for entry in usage_index.values():
@@ -370,9 +389,10 @@ class AssignmentPlanningMixin:
 
         def _entry_nozzle_type(entry: Dict) -> int:
             component = entry["component"]
-            return deduce_nozzle_type(
+            deduced = deduce_nozzle_type(
                 component.footprint_pnp or component.package, entry["feeder_size_mm"]
-            ) or 0
+            )
+            return clamp_nozzle_type(deduced, machine_available_nozzles) or 0
 
         def _size_invalid_reason(entry: Dict):
             feeder_size_mm = entry["feeder_size_mm"]
@@ -390,13 +410,13 @@ class AssignmentPlanningMixin:
         for entry in fixed_entries:
             reason = _size_invalid_reason(entry)
             if reason:
-                unassigned_components.append(build_unassigned_payload(entry, reason, "FIXED"))
+                unassigned_components.append(build_unassigned_payload(entry, reason, "FIXED", machine_available_nozzles))
             else:
                 placeable_fixed.append(entry)
         for entry in dynamic_entries:
             reason = _size_invalid_reason(entry)
             if reason:
-                unassigned_components.append(build_unassigned_payload(entry, reason, "DYNAMIC"))
+                unassigned_components.append(build_unassigned_payload(entry, reason, "DYNAMIC", machine_available_nozzles))
             else:
                 placeable_dynamic.append(entry)
 
@@ -436,18 +456,21 @@ class AssignmentPlanningMixin:
                     break
                 manual_placement_ids.add(entry["component"].id)
                 manual_placement_slot_savings += int(entry["slot_usage"])
-                manual_component = build_unassigned_payload(entry, "A placer a la main (capacite optimisee)", "MANUAL")
+                manual_component = build_unassigned_payload(entry, "A placer a la main (capacite optimisee)", "MANUAL", machine_available_nozzles)
                 manual_component["manual_placement"] = True
                 manual_component["manual_score"] = round(
                     int(entry["slot_usage"]) / max(int(entry["total_quantity"]), 1), 3
                 )
                 manual_placement_components.append(manual_component)
 
-        # 3) Placement : TOUT le banc rangé par type de nozzle CROISSANT — petits
-        #    nozzles à GAUCHE, gros à DROITE — pour que chaque station atteigne sa
-        #    colonne. Les deux rampes se remplissent de gauche à droite ; chaque
-        #    feeder va sur la rampe la moins avancée (équilibrage + croissance
-        #    monotone, puisqu'on traite les entrées par type de nozzle croissant).
+        # 3) Placement BILATÉRAL par rampe. Règles métier :
+        #    - rampe préférée selon le groupe : fixé→ARRIÈRE, dynamique→AVANT
+        #      (repli sur l'autre rampe si la préférée est pleine) ;
+        #    - PETITS feeders (1 position) collés au BORD GAUCHE, remplis vers
+        #      l'intérieur ; GROS feeders (>8 mm ⇒ 2 positions) collés au BORD
+        #      DROIT, remplis vers l'intérieur ; positions libres au milieu ;
+        #    - tri par type de nozzle CROISSANT conservé dans chaque bloc (petits
+        #      nozzles à gauche, gros à droite) → portée des têtes garantie.
         to_place = list(placeable_fixed) + [
             entry for entry in placeable_dynamic if entry["component"].id not in manual_placement_ids
         ]
@@ -455,43 +478,74 @@ class AssignmentPlanningMixin:
             entry["component"].id: ("FIXED" if bool(entry["component"].is_fixed_feeder) else "DYNAMIC")
             for entry in to_place
         }
-        to_place.sort(
-            key=lambda entry: (
+
+        def _is_big(entry: Dict) -> bool:
+            # Gros feeder = largeur > 8 mm ⇒ occupe 2 positions.
+            return int(entry["slot_usage"]) >= 2
+
+        def _placement_sort_key(entry: Dict) -> Tuple:
+            return (
                 _entry_nozzle_type(entry),
-                -int(entry["slot_usage"]),
+                int(entry["feeder_size_mm"] or 0),
+                int(entry["slot_usage"]),
                 -int(entry["total_quantity"]),
                 component_display_label(entry["component"]).upper(),
                 entry["component"].id,
             )
-        )
 
-        ramp_next = {"front": 1, "back": 1}
+        # Petits : ordre croissant → remplis du bord GAUCHE vers l'intérieur.
+        small_entries = sorted((e for e in to_place if not _is_big(e)), key=_placement_sort_key)
+        # Gros : ordre DÉcroissant → le plus gros nozzle atterrit tout à DROITE,
+        # puis on remplit vers l'intérieur ; le bloc reste croissant gauche→droite.
+        big_entries = sorted((e for e in to_place if _is_big(e)), key=_placement_sort_key, reverse=True)
 
-        def place_entry(entry: Dict) -> None:
-            required_slots = int(entry["slot_usage"])
+        left_next = {"front": 1, "back": 1}
+        right_next = {"front": ramp_cols["front"], "back": ramp_cols["back"]}
+
+        def _commit(entry: Dict, ramp: str, cols: List[int], placement_group: str) -> None:
+            slot_positions = [ramp_base[ramp] + col for col in cols]
+            assignment = build_assignment_payload(
+                entry=entry,
+                slot_positions=slot_positions,
+                placement_group=placement_group,
+                assignment_index=len(slot_assignments) + 1,
+                ordered_boms=ordered_boms,
+                available_nozzle_types=machine_available_nozzles,
+            )
+            slot_assignments.append(assignment)
+            for position in slot_positions:
+                positions[position] = assignment
+
+        def _try_side(entry: Dict, ramp: str, side: str, placement_group: str) -> bool:
+            required = int(entry["slot_usage"])
+            if side == "right":
+                end = right_next[ramp]
+                start = end - required + 1
+                if start < left_next[ramp]:
+                    return False  # collision avec le bloc gauche / plus de place
+                _commit(entry, ramp, list(range(start, end + 1)), placement_group)
+                right_next[ramp] = start - 1
+            else:
+                start = left_next[ramp]
+                end = start + required - 1
+                if end > right_next[ramp]:
+                    return False  # collision avec le bloc droit / plus de place
+                _commit(entry, ramp, list(range(start, end + 1)), placement_group)
+                left_next[ramp] = end + 1
+            return True
+
+        def place_entry(entry: Dict, side: str) -> None:
             placement_group = placement_group_by_id[entry["component"].id]
-            # Rampe la moins avancée d'abord (avant en cas d'égalité).
-            for ramp in sorted(("front", "back"), key=lambda r: (ramp_next[r], 0 if r == "front" else 1)):
-                start_col = ramp_next[ramp]
-                if start_col + required_slots - 1 > ramp_cols[ramp]:
-                    continue
-                slot_positions = [ramp_base[ramp] + col for col in range(start_col, start_col + required_slots)]
-                assignment = build_assignment_payload(
-                    entry=entry,
-                    slot_positions=slot_positions,
-                    placement_group=placement_group,
-                    assignment_index=len(slot_assignments) + 1,
-                    ordered_boms=ordered_boms,
-                )
-                slot_assignments.append(assignment)
-                for position in slot_positions:
-                    positions[position] = assignment
-                ramp_next[ramp] = start_col + required_slots
-                return
-            unassigned_components.append(build_unassigned_payload(entry, "Capacite machine insuffisante", placement_group))
+            preferred = "back" if placement_group == "FIXED" else "front"
+            for ramp in (preferred, "front" if preferred == "back" else "back"):
+                if _try_side(entry, ramp, side, placement_group):
+                    return
+            unassigned_components.append(build_unassigned_payload(entry, "Capacite machine insuffisante", placement_group, machine_available_nozzles))
 
-        for entry in to_place:
-            place_entry(entry)
+        for entry in small_entries:
+            place_entry(entry, "left")
+        for entry in big_entries:
+            place_entry(entry, "right")
 
         slots = []
         total_positions = int(machine.num_positions or 0)

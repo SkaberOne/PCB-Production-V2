@@ -11,10 +11,11 @@ from ..utils.feeder_types import (
     extract_component_feeder_size_mm,
     normalize_component_feeder_type,
 )
-from ..utils.nozzles import deduce_nozzle_type, normalize_nozzle_layout
+from ..utils.nozzles import clamp_nozzle_type, deduce_nozzle_type, normalize_nozzle_layout
 from ..utils.pnp_export import (
     DEFAULT_FORMAT as DEFAULT_EXPORT_FORMAT,
     DEFAULT_SEPARATOR as DEFAULT_EXPORT_SEPARATOR,
+    normalize_back_order as normalize_feeder_back_order,
     normalize_columns as normalize_export_columns,
     normalize_format as normalize_export_format,
     normalize_separator as normalize_export_separator,
@@ -99,6 +100,7 @@ def serialize_machine(machine: PnpMachine) -> Dict:
         "export_format": normalize_export_format(machine.export_format),
         "export_columns": _parse_export_columns(machine.export_columns),
         "export_separator": normalize_export_separator(machine.export_separator),
+        "feeder_back_order": normalize_feeder_back_order(machine.feeder_back_order),
         "description": machine.description,
         "notes": machine.notes,
         "created_at": machine.created_at.isoformat() if machine.created_at else None,
@@ -237,6 +239,7 @@ def build_assignment_payload(
     placement_group: str,
     assignment_index: int,
     ordered_boms: List[Dict],
+    available_nozzle_types: Optional[List[int]] = None,
 ) -> Dict:
     component = entry["component"]
     bom_presence_count = len(entry["bom_revision_ids"])
@@ -265,7 +268,10 @@ def build_assignment_payload(
         "footprint_eagle": component.footprint_eagle,
         "feeder_type": normalize_component_feeder_type(component.feeder_type),
         "feeder_size_mm": entry["feeder_size_mm"],
-        "nozzle_type": deduce_nozzle_type(component.footprint_pnp or component.package, entry["feeder_size_mm"]),
+        "nozzle_type": clamp_nozzle_type(
+            deduce_nozzle_type(component.footprint_pnp or component.package, entry["feeder_size_mm"]),
+            available_nozzle_types,
+        ),
         "slot_usage": entry["slot_usage"],
         "bom_presence_count": bom_presence_count,
         "bom_revision_ids": assignment_bom_revision_ids,
@@ -300,6 +306,7 @@ def build_unassigned_payload(
     entry: Dict,
     reason: str,
     placement_group: str,
+    available_nozzle_types: Optional[List[int]] = None,
 ) -> Dict:
     component = entry["component"]
     bom_presence_count = len(entry["bom_revision_ids"])
@@ -313,7 +320,10 @@ def build_unassigned_payload(
         "footprint_pnp": component.footprint_pnp or component.package,
         "feeder_type": normalize_component_feeder_type(component.feeder_type),
         "feeder_size_mm": entry["feeder_size_mm"],
-        "nozzle_type": deduce_nozzle_type(component.footprint_pnp or component.package, entry["feeder_size_mm"]),
+        "nozzle_type": clamp_nozzle_type(
+            deduce_nozzle_type(component.footprint_pnp or component.package, entry["feeder_size_mm"]),
+            available_nozzle_types,
+        ),
         "slot_usage": entry["slot_usage"],
         "bom_presence_count": bom_presence_count,
         "total_build_quantity": total_build_quantity,

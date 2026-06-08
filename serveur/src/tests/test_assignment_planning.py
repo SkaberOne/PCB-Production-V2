@@ -3,6 +3,8 @@ Unit/integration tests for AssignmentPlanningMixin service methods.
 
 Uses the shared SQLite engine from conftest.py.
 """
+import json
+
 import pytest
 from sqlalchemy.orm import Session
 
@@ -534,3 +536,107 @@ class TestQueueReuseRetention:
         assigned_ids = {a["component_id"] for a in plan["slot_assignments"]}
         assert specific.id in manual_ids
         assert shared.id in assigned_ids
+
+
+# ── Tests: placement auto dynamiques→avant / fixés→arrière ───────────────────
+
+class TestRampSegregation:
+    def test_dynamic_goes_front_fixed_goes_back(self, db):
+        # 8 positions : rampe AVANT = positions 1..4, rampe ARRIÈRE = 5..8.
+        machine = make_machine(db, positions=8)
+        production = make_production(db, machine)
+        revision = make_bom_revision(db)
+        dyn = Component(
+            reference="RD", value="VD", package="0805",
+            footprint_pnp="R0805_D", feeder_type="CL8-4", is_fixed_feeder=False,
+        )
+        fix = Component(
+            reference="RF", value="VF", package="0805",
+            footprint_pnp="R0805_F", feeder_type="CL8-4", is_fixed_feeder=True,
+        )
+        db.add_all([dyn, fix])
+        db.flush()
+        db.add(BomItem(
+            bom_revision_id=revision.id, reference_item="R1", quantity=1,
+            footprint_pnp=dyn.footprint_pnp, value_harmonized=dyn.value, dnp=False,
+        ))
+        db.add(BomItem(
+            bom_revision_id=revision.id, reference_item="R2", quantity=1,
+            footprint_pnp=fix.footprint_pnp, value_harmonized=fix.value, dnp=False,
+        ))
+        link_revision(db, production, revision, order=1, quantity=1)
+        db.commit()
+
+        plan = AssignmentPlanningMixin.get_machine_production_feeder_plan(
+            db=db, machine_id=machine.id, production_id=production.id,
+        )
+        by_group = {a["placement_group"]: a for a in plan["slot_assignments"]}
+        assert by_group["DYNAMIC"]["slot_positions"][0] <= 4   # rampe avant
+        assert by_group["FIXED"]["slot_positions"][0] >= 5     # rampe arrière
+
+    def test_bilateral_fill_small_left_big_flush_right(self, db):
+        # 12 positions → rampe avant = positions 1..6. Petit feeder (8 mm) collé
+        # au bord GAUCHE (pos 1) ; gros feeder (12 mm, 2 pos) collé au bord DROIT
+        # (pos 5-6) ; creux au milieu (pos 2,3,4 libres).
+        machine = make_machine(db, positions=12)
+        production = make_production(db, machine)
+        revision = make_bom_revision(db)
+        small = Component(
+            reference="RS", value="SMALL", package="0805",
+            footprint_pnp="0805", feeder_type="CL8-4", is_fixed_feeder=False,
+        )
+        big = Component(
+            reference="RB", value="BIG", package="0805",
+            footprint_pnp="0805", feeder_type="CL12", is_fixed_feeder=False,
+        )
+        db.add_all([small, big])
+        db.flush()
+        db.add(BomItem(
+            bom_revision_id=revision.id, reference_item="R1", quantity=1,
+            footprint_pnp="0805", value_harmonized="SMALL", dnp=False,
+        ))
+        db.add(BomItem(
+            bom_revision_id=revision.id, reference_item="R2", quantity=1,
+            footprint_pnp="0805", value_harmonized="BIG", dnp=False,
+        ))
+        link_revision(db, production, revision, order=1, quantity=1)
+        db.commit()
+
+        plan = AssignmentPlanningMixin.get_machine_production_feeder_plan(
+            db=db, machine_id=machine.id, production_id=production.id,
+        )
+        positions_by_id = {a["component_id"]: a["slot_positions"] for a in plan["slot_assignments"]}
+        assert positions_by_id[small.id] == [1]          # bord gauche
+        assert positions_by_id[big.id] == [5, 6]         # collé au bord droit (front_cols=6)
+        occupied = {p for plist in positions_by_id.values() for p in plist}
+        assert occupied.isdisjoint({2, 3, 4})            # creux au milieu
+
+
+class TestNozzleClamping:
+    def test_0603_uses_smallest_available_nozzle(self, db):
+        # La machine n'a que des nozzles 503/504/505. Un 0603 (déduit 502) doit
+        # être ramené à 503 dans l'implantation (et donc à l'export).
+        machine = make_machine(db, positions=40)
+        machine.num_nozzles = 8
+        machine.nozzle_layout = json.dumps([503, 503, 504, 504, 504, 505, 505, 505])
+        db.flush()
+        production = make_production(db, machine)
+        revision = make_bom_revision(db)
+        comp = Component(
+            reference="R0603", value="10K0603", package="0603",
+            footprint_pnp="0603", feeder_type="CL8-4", is_fixed_feeder=False,
+        )
+        db.add(comp)
+        db.flush()
+        db.add(BomItem(
+            bom_revision_id=revision.id, reference_item="R1", quantity=1,
+            footprint_pnp="0603", value_harmonized="10K0603", dnp=False,
+        ))
+        link_revision(db, production, revision, order=1, quantity=1)
+        db.commit()
+
+        plan = AssignmentPlanningMixin.get_machine_production_feeder_plan(
+            db=db, machine_id=machine.id, production_id=production.id,
+        )
+        nozzles = {a["component_id"]: a["nozzle_type"] for a in plan["slot_assignments"]}
+        assert nozzles[comp.id] == 503

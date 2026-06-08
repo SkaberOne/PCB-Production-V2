@@ -19,6 +19,7 @@ from .assignment_planning import AssignmentPlanningMixin
 from .pnp_export_service import build_pnp_export
 from ..utils.nozzles import normalize_nozzle_layout
 from ..utils.pnp_export import (
+    normalize_back_order as normalize_feeder_back_order,
     normalize_columns as normalize_export_columns,
     normalize_format as normalize_export_format,
     normalize_separator as normalize_export_separator,
@@ -74,6 +75,7 @@ class AssignmentService(AssignmentFixedFeederMixin, AssignmentPlanningMixin):
         export_format: Optional[str] = None,
         export_columns: Optional[List[str]] = None,
         export_separator: Optional[str] = None,
+        feeder_back_order: Optional[str] = None,
         description: Optional[str] = None,
         notes: Optional[str] = None
     ) -> PnpMachine:
@@ -116,6 +118,7 @@ class AssignmentService(AssignmentFixedFeederMixin, AssignmentPlanningMixin):
                 if export_columns is not None else None
             ),
             export_separator=normalize_export_separator(export_separator) if export_separator else None,
+            feeder_back_order=normalize_feeder_back_order(feeder_back_order) if feeder_back_order else None,
             description=description.strip() if description else None,
             notes=notes.strip() if notes else None
         )
@@ -209,6 +212,7 @@ class AssignmentService(AssignmentFixedFeederMixin, AssignmentPlanningMixin):
         export_format: Optional[str] = None,
         export_columns: Optional[List[str]] = None,
         export_separator: Optional[str] = None,
+        feeder_back_order: Optional[str] = None,
         description: Optional[str] = None,
         notes: Optional[str] = None
     ) -> PnpMachine:
@@ -279,6 +283,9 @@ class AssignmentService(AssignmentFixedFeederMixin, AssignmentPlanningMixin):
 
         if export_separator is not None:
             machine.export_separator = normalize_export_separator(export_separator)
+
+        if feeder_back_order is not None:
+            machine.feeder_back_order = normalize_feeder_back_order(feeder_back_order)
 
         if description is not None:
             machine.description = description.strip() if description else None

@@ -36,6 +36,14 @@ VALID_FORMATS = ("CSV", "TXT")
 DEFAULT_SEPARATOR = ","
 VALID_SEPARATORS = (",", ";")
 
+# Numérotation physique du rail arrière (colonne « Feeder » de l'export).
+#   ASC  : continue — l'arrière prolonge l'avant, gauche→droite (ex. 80 pos →
+#          avant 1..40, arrière 41..80). Défaut ; correspond aux positions
+#          linéaires internes.
+#   DESC : inversée — l'arrière décroît de gauche à droite (ex. arrière 80..41).
+DEFAULT_BACK_ORDER = "ASC"
+VALID_BACK_ORDERS = ("ASC", "DESC")
+
 
 def normalize_format(value: Optional[str]) -> str:
     """Retourne un format valide ('CSV'/'TXT'), défaut 'CSV'."""
@@ -51,6 +59,45 @@ def normalize_separator(value: Optional[str]) -> str:
         return DEFAULT_SEPARATOR
     candidate = str(value).strip()
     return candidate if candidate in VALID_SEPARATORS else DEFAULT_SEPARATOR
+
+
+def normalize_back_order(value: Optional[str]) -> str:
+    """Retourne une numérotation arrière valide ('ASC'/'DESC'), défaut 'ASC'."""
+    if not value:
+        return DEFAULT_BACK_ORDER
+    upper = str(value).strip().upper()
+    return upper if upper in VALID_BACK_ORDERS else DEFAULT_BACK_ORDER
+
+
+def physical_feeder_number(
+    linear_pos: Optional[int],
+    num_positions: Optional[int],
+    back_order: Optional[str] = None,
+) -> Optional[int]:
+    """Convertit une position linéaire interne (1..num_positions) en numéro
+    physique de feeder pour l'export, selon la numérotation arrière de la machine.
+
+    Le banc = deux rampes ; l'avant occupe les positions 1..front_cols
+    (front_cols = (num_positions + 1) // 2), l'arrière front_cols+1..num_positions.
+    L'avant est toujours numéroté 1→front_cols (gauche→droite). L'arrière :
+      - 'ASC'  : front_cols+1 .. num_positions (inchangé vs position linéaire) ;
+      - 'DESC' : num_positions .. front_cols+1 (décroissant gauche→droite).
+
+    Renvoie ``linear_pos`` tel quel si les paramètres sont invalides.
+    """
+    if not linear_pos:
+        return linear_pos
+    n = int(num_positions or 0)
+    pos = int(linear_pos)
+    if n <= 0 or pos < 1 or pos > n:
+        return linear_pos
+    front_cols = (n + 1) // 2
+    if pos <= front_cols:
+        return pos
+    column = pos - front_cols  # 1..back_cols, gauche→droite
+    if normalize_back_order(back_order) == "DESC":
+        return n - column + 1
+    return front_cols + column
 
 
 def normalize_columns(columns: Optional[List[str]]) -> List[str]:

@@ -8,9 +8,11 @@ from types import SimpleNamespace
 
 from src.utils.pnp_export import (
     DEFAULT_COLUMN_IDS,
+    normalize_back_order,
     normalize_columns,
     normalize_format,
     normalize_separator,
+    physical_feeder_number,
 )
 from src.services.pnp_export_service import (
     _build_csv,
@@ -69,6 +71,68 @@ def test_normalize_format_and_separator():
     assert normalize_format("xml") == "CSV"
     assert normalize_separator(";") == ";"
     assert normalize_separator("foo") == ","
+
+
+# ── Numérotation rail arrière (physical_feeder_number) ──────────────────────
+
+def test_normalize_back_order():
+    assert normalize_back_order(None) == "ASC"
+    assert normalize_back_order("desc") == "DESC"
+    assert normalize_back_order("ASC") == "ASC"
+    assert normalize_back_order("bogus") == "ASC"
+
+
+def test_physical_feeder_number_front_unchanged():
+    # Avant (1..40) inchangé quel que soit le sens arrière.
+    assert physical_feeder_number(1, 80, "ASC") == 1
+    assert physical_feeder_number(40, 80, "DESC") == 40
+
+
+def test_physical_feeder_number_back_asc_is_linear():
+    assert physical_feeder_number(41, 80, "ASC") == 41
+    assert physical_feeder_number(80, 80, "ASC") == 80
+
+
+def test_physical_feeder_number_back_desc_reversed():
+    # Arrière inversé : colonne gauche (linéaire 41) = 80, colonne droite (80) = 41.
+    assert physical_feeder_number(41, 80, "DESC") == 80
+    assert physical_feeder_number(80, 80, "DESC") == 41
+    assert physical_feeder_number(60, 80, "DESC") == 61
+
+
+def test_physical_feeder_number_guards():
+    assert physical_feeder_number(None, 80, "ASC") is None
+    assert physical_feeder_number(5, 0, "ASC") == 5  # num_positions inconnu → inchangé
+
+
+def test_build_csv_back_order_desc_maps_feeder():
+    comp = _component(id=1, value="x", footprint_pnp="f")
+    rows = [(_bom_item(reference_item="U1", value_harmonized="x", footprint_pnp="f",
+                       x=0, y=0, rotation=0, placement_side="TOP"), comp)]
+    assignment_by_component = {1: {"slot_start": 41, "nozzle_type": 504}}
+    out = _build_csv(rows, ["position", "feeder"], ",", assignment_by_component,
+                     num_positions=80, back_order="DESC")
+    # Feeder arrière le plus à gauche (linéaire 41) → numéro physique 80.
+    assert out.strip().splitlines()[1] == "U1,80"
+
+
+def test_build_pnp_export_csv_applies_back_order(monkeypatch):
+    machine = SimpleNamespace(
+        name="M2", num_positions=80, feeder_back_order="DESC",
+        export_format="CSV", export_columns='["position", "feeder"]', export_separator=",",
+    )
+    production = SimpleNamespace(name="P", bom_links=[])
+    comp = _component(id=7)
+    rows = [(_bom_item(reference_item="U7", value_harmonized="x", footprint_pnp="f",
+                       x=0, y=0, rotation=0, placement_side="TOP"), comp)]
+    monkeypatch.setattr("src.services.pnp_export_service._iter_export_items", lambda db, prod, rev: rows)
+    _filename, _media, content = build_pnp_export(
+        db=None, machine=machine, production=production,
+        assignment_by_component={7: {"slot_start": 80, "nozzle_type": 505}},
+    )
+    # normalize_columns réinjecte les colonnes obligatoires en tête (name, footprint,
+    # x, y) avant position+feeder. Linéaire 80 (arrière droite) en DESC → 41.
+    assert content.strip().splitlines()[1].endswith("U7,41")
 
 
 # ── Normalisation face ──────────────────────────────────────────────────────

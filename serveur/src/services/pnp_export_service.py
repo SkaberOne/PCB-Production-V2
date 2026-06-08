@@ -26,9 +26,11 @@ from .assignment_helpers import sort_production_bom_links
 from .component_library_service import ComponentLibraryService
 from ..utils.pnp_export import (
     COLUMN_HEADERS,
+    normalize_back_order,
     normalize_columns,
     normalize_format,
     normalize_separator,
+    physical_feeder_number,
 )
 
 
@@ -138,7 +140,14 @@ def _fmt_number(value) -> str:
     return str(value)
 
 
-def _column_value(col_id: str, bom_item: BomItem, component: Optional[Component], assignment: Optional[Dict]) -> str:
+def _column_value(
+    col_id: str,
+    bom_item: BomItem,
+    component: Optional[Component],
+    assignment: Optional[Dict],
+    num_positions: int = 0,
+    back_order: str = "ASC",
+) -> str:
     if col_id == "position":
         return bom_item.reference_item or ""
     if col_id == "name":
@@ -159,7 +168,10 @@ def _column_value(col_id: str, bom_item: BomItem, component: Optional[Component]
     if col_id == "side":
         return _normalize_side(bom_item.placement_side)
     if col_id == "feeder":
-        return str(assignment["slot_start"]) if assignment and assignment.get("slot_start") else ""
+        slot_start = assignment.get("slot_start") if assignment else None
+        if not slot_start:
+            return ""
+        return str(physical_feeder_number(slot_start, num_positions, back_order))
     if col_id == "nozzle":
         return str(assignment["nozzle_type"]) if assignment and assignment.get("nozzle_type") else ""
     if col_id == "group":
@@ -203,13 +215,23 @@ def _iter_export_items(
     return rows
 
 
-def _build_csv(rows, column_ids: List[str], separator: str, assignment_by_component: Dict[int, Dict]) -> str:
+def _build_csv(
+    rows,
+    column_ids: List[str],
+    separator: str,
+    assignment_by_component: Dict[int, Dict],
+    num_positions: int = 0,
+    back_order: str = "ASC",
+) -> str:
     output = io.StringIO()
     writer = csv.writer(output, delimiter=separator, lineterminator="\n")
     writer.writerow([COLUMN_HEADERS[c] for c in column_ids])
     for bom_item, component in rows:
         assignment = assignment_by_component.get(component.id) if component else None
-        writer.writerow([_sanitize(_column_value(c, bom_item, component, assignment)) for c in column_ids])
+        writer.writerow([
+            _sanitize(_column_value(c, bom_item, component, assignment, num_positions, back_order))
+            for c in column_ids
+        ])
     return output.getvalue()
 
 
@@ -277,5 +299,9 @@ def build_pnp_export(
             stored_columns = None
     column_ids = normalize_columns(stored_columns)
     separator = normalize_separator(export_separator if export_separator is not None else machine.export_separator)
-    content = _build_csv(rows, column_ids, separator, assignment_by_component or {})
+    num_positions = int(getattr(machine, "num_positions", 0) or 0)
+    back_order = normalize_back_order(getattr(machine, "feeder_back_order", None))
+    content = _build_csv(
+        rows, column_ids, separator, assignment_by_component or {}, num_positions, back_order,
+    )
     return f"{base_name}.csv", "text/csv; charset=utf-8", content

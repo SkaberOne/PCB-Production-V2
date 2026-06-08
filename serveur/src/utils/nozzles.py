@@ -47,6 +47,36 @@ def deduce_nozzle_type(footprint: Optional[str], feeder_size_mm: Optional[int] =
     return None
 
 
+def available_nozzle_types(layout: Optional[List]) -> List[int]:
+    """Types de nozzles réellement présents sur la tête (set trié du layout).
+    Repli sur les types par défaut (503/504/505) si aucun layout exploitable.
+    """
+    types = sorted({
+        int(value)
+        for value in (layout or [])
+        if str(value).lstrip("-").isdigit() and int(value) in NOZZLE_TYPES
+    })
+    return types or list(DEFAULT_LAYOUT_TYPES)
+
+
+def clamp_nozzle_type(nozzle_type: Optional[int], available_types: Optional[List[int]]) -> Optional[int]:
+    """Borne un type de nozzle déduit aux types disponibles sur la machine.
+
+    Un boîtier qui déduit un type absent de la tête (ex. 0603 → 502 alors que la
+    machine n'a que 503/504/505) est ramené au plus petit type disponible ≥ au
+    type déduit, sinon au plus grand disponible. ``None`` reste ``None``.
+    """
+    if nozzle_type is None or not available_types:
+        return nozzle_type
+    avail = sorted({int(t) for t in available_types})
+    if nozzle_type in avail:
+        return nozzle_type
+    for candidate in avail:
+        if candidate >= nozzle_type:
+            return candidate
+    return avail[-1]
+
+
 def default_nozzle_layout(num_nozzles: Optional[int]) -> List[int]:
     """Pré-remplissage par défaut : nozzles rangés du plus PETIT au plus GRAND,
     de gauche à droite, en blocs croissants des types réellement utilisés
