@@ -42,17 +42,20 @@ def upgrade() -> None:
     op.add_column("COMPONENTS", sa.Column("is_fixed_feeder", sa.Boolean(), nullable=True))
     op.add_column("COMPONENTS", sa.Column("fixed_cart_id", sa.Integer(), nullable=True))
     op.create_index(op.f("ix_COMPONENTS_fixed_cart_id"), "COMPONENTS", ["fixed_cart_id"], unique=False)
-    op.create_foreign_key(
-        "fk_components_fixed_cart_id_pnp_carts",
-        "COMPONENTS",
-        "PNP_CARTS",
-        ["fixed_cart_id"],
-        ["id"],
-    )
+    # batch_alter_table : ALTER natif sur SQL Server (prod), copy-move sur SQLite
+    # — SQLite ne supporte pas ADD CONSTRAINT hors batch.
+    with op.batch_alter_table("COMPONENTS") as batch_op:
+        batch_op.create_foreign_key(
+            "fk_components_fixed_cart_id_pnp_carts",
+            "PNP_CARTS",
+            ["fixed_cart_id"],
+            ["id"],
+        )
 
 
 def downgrade() -> None:
-    op.drop_constraint("fk_components_fixed_cart_id_pnp_carts", "COMPONENTS", type_="foreignkey")
+    with op.batch_alter_table("COMPONENTS") as batch_op:
+        batch_op.drop_constraint("fk_components_fixed_cart_id_pnp_carts", type_="foreignkey")
     op.drop_index(op.f("ix_COMPONENTS_fixed_cart_id"), table_name="COMPONENTS")
     op.drop_column("COMPONENTS", "fixed_cart_id")
     op.drop_column("COMPONENTS", "is_fixed_feeder")

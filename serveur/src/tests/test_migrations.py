@@ -21,6 +21,7 @@ if str(PROJECT_ROOT) not in sys.path:
 
 from alembic.config import Config
 from alembic import command as alembic_command
+from alembic.operations import Operations
 from alembic.runtime.migration import MigrationContext
 from alembic.script import ScriptDirectory
 
@@ -37,6 +38,13 @@ REVISION_CHAIN = [
     "7b4a1c2e9f10",  # add_machine_link_to_productions
     "c4f7d9e21a8b",  # add_production_order_fields
     "e1a3b7c9d4f2",  # add_quantity_to_production_bom_revisions
+    "a2f9c3d7e1b5",  # add_erp_context_to_productions
+    "f2a8c1d4e6b0",  # add_reel_fields_to_components
+    "g1b2c3d4e5f6",  # add_supplier_offers
+    "h2c3d4e5f6a7",  # add_erp_defaults
+    "i3d4e5f6a7b8",  # add_command_receipts
+    "j4e5f6a7b8c9",  # add_num_nozzles_to_machines
+    "k5f6a7b8c9d0",  # add_nozzle_layout_to_machines
 ]
 
 HEAD_REVISION = REVISION_CHAIN[-1]
@@ -69,27 +77,36 @@ def make_alembic_config(engine) -> Config:
 def run_upgrade(cfg: Config, revision: str) -> None:
     """Run alembic upgrade to the given revision using the pre-opened connection."""
     conn = cfg.attributes["connection"]
-    mc = MigrationContext.configure(conn)
     script = ScriptDirectory.from_config(cfg)
 
     def do_upgrade(rev, ctx):
         return script._upgrade_revs(revision, rev)
 
+    # La fonction de migration doit être passée via opts à configure() :
+    # run_migrations(fn=...) est ignoré par Alembic >= 1.x (fn n'est lu que
+    # depuis _migrations_fn, lui-même alimenté par opts["fn"]).
+    mc = MigrationContext.configure(conn, opts={"fn": do_upgrade})
+
+    # Operations.context() installe le proxy `op` (utilisé par `from alembic
+    # import op` dans chaque script) ; sans lui, op.create_table lève NameError.
     with mc.begin_transaction():
-        mc.run_migrations(fn=do_upgrade)
+        with Operations.context(mc):
+            mc.run_migrations()
 
 
 def run_downgrade(cfg: Config, revision: str) -> None:
     """Run alembic downgrade to the given revision (or 'base') using the pre-opened connection."""
     conn = cfg.attributes["connection"]
-    mc = MigrationContext.configure(conn)
     script = ScriptDirectory.from_config(cfg)
 
     def do_downgrade(rev, ctx):
         return script._downgrade_revs(revision, rev)
 
+    mc = MigrationContext.configure(conn, opts={"fn": do_downgrade})
+
     with mc.begin_transaction():
-        mc.run_migrations(fn=do_downgrade)
+        with Operations.context(mc):
+            mc.run_migrations()
 
 
 def get_current_revision(conn) -> str | None:
