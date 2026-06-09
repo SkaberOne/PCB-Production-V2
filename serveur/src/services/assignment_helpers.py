@@ -107,6 +107,7 @@ def serialize_machine(machine: PnpMachine) -> Dict:
         "assigned_feeder_types": len(machine.feeders or []),
         "active_production_plans": len(machine.production_plans or []),
         "assigned_productions": len(machine.productions or []),
+        "production_names": [p.name for p in (machine.productions or []) if p and p.name],
     }
 
 

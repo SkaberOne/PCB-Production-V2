@@ -71,7 +71,19 @@ const MachineTableRow = React.memo(function MachineTableRow({
             </TableCell>
             <TableCell sx={compactCellSx}>{machine.num_positions}</TableCell>
             <TableCell sx={compactCellSx}>{machine.assigned_feeder_types || 0}</TableCell>
-            <TableCell sx={compactCellSx}>{machine.active_production_plans || 0}</TableCell>
+            <TableCell sx={compactWrapCellSx}>
+                {(machine.production_names && machine.production_names.length) ? (
+                    <Stack spacing={0.25}>
+                        {machine.production_names.map((name) => (
+                            <Typography key={name} variant="caption" sx={{ color: '#bbf7d0', lineHeight: 1.25 }}>
+                                {name}
+                            </Typography>
+                        ))}
+                    </Stack>
+                ) : (
+                    <Typography variant="caption" sx={{ color: '#71717a' }}>—</Typography>
+                )}
+            </TableCell>
             <TableCell sx={compactCellSx}>
                 <ExportFormatChip machine={machine} />
             </TableCell>
@@ -169,12 +181,12 @@ export const MachineTable = React.memo(function MachineTable({
             <Table sx={compactTableSx}>
                 <TableHead>
                     <TableRow>
-                        <TableCell sx={{ width: '20%' }}>Nom</TableCell>
-                        <TableCell sx={{ width: '9%' }}>Positions</TableCell>
-                        <TableCell sx={{ width: '9%' }}>Feeders</TableCell>
-                        <TableCell sx={{ width: '8%' }}>Plans</TableCell>
+                        <TableCell sx={{ width: '18%' }}>Nom</TableCell>
+                        <TableCell sx={{ width: '8%' }}>Positions</TableCell>
+                        <TableCell sx={{ width: '8%' }}>Feeders</TableCell>
+                        <TableCell sx={{ width: '16%' }}>Productions</TableCell>
                         <TableCell sx={{ width: '12%' }}>Format export</TableCell>
-                        <TableCell sx={{ width: '20%' }}>Description</TableCell>
+                        <TableCell sx={{ width: '16%' }}>Description</TableCell>
                         <TableCell sx={{ width: '12%' }}>Creee le</TableCell>
                         <TableCell sx={{ width: '10%' }}>Actions</TableCell>
                     </TableRow>
