@@ -132,4 +132,17 @@ def harmonize_bom_items(items: list) -> list:
     """
     Apply harmonization to a list of parsed BOM items.
     """
- 
+    harmonized_items = []
+
+    for item in items:
+        harmonized_item = item.copy()
+
+        if "value_raw" in item and "component_type" in item:
+            harmonized_item["value_harmonized"] = harmonize_value(
+                item["value_raw"],
+                item["component_type"],
+            )
+
+        harmonized_items.append(harmonized_item)
+
+    return harmonized_items

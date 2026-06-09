@@ -304,4 +304,19 @@ class TestRealWorldExamples:
                 "value_raw": "100nf",
                 "footprint": "0805",
                 "position_x": 15.0,
-                "position_y"
+                "position_y": 25.0,
+                "rotation": 90,
+                "component_type": "C",
+            },
+        ]
+        
+        harmonized = harmonize_bom_items(parsed_items)
+        
+        assert harmonized[0]["value_harmonized"] == "10R"
+        assert harmonized[1]["value_harmonized"] == "100nF"
+        assert harmonized[0]["position_x"] == 10.0  # Original data preserved
+        assert harmonized[1]["rotation"] == 90
+
+
+if __name__ == "__main__":
+    pytest.main([__file__, "-v"])

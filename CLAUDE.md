@@ -2,6 +2,8 @@
 # CLAUDE.md — Guide AI pour ECB Production Manager
 
 > **Lecture obligatoire avant toute action** : ce fichier, puis `STRUCTURE.md`, puis `docs/Projet.md`, puis `docs/CHANGELOG.md` (dernière entrée), puis le dernier audit en date dans `docs/audits/`.
+>
+> **Avant toute opération Git** : appliquer `docs/guides/Workflow_Git_GitHub.md` (le §10 ci-dessous en résume la loi).
 
 ---
 
@@ -192,7 +194,7 @@ URLs : API → `http://localhost:8000` · Swagger → `/docs` · Frontend → `h
 
 ## 9. Workflow pour nouvelle fonctionnalité
 
-1. `TaskCreate` la liste des étapes
+1. `TaskCreate` la liste des étapes **+ créer une branche courte** depuis `dev` à jour (`feat/...`, `fix/...` — cf §10)
 2. `engineering:system-design` ou `engineering:architecture` si choix d'archi
 3. `caveman:cavecrew-investigator` pour cartographier l'existant
 4. Coder (ou `caveman:cavecrew-builder` si fix < 2 fichiers)
@@ -200,5 +202,41 @@ URLs : API → `http://localhost:8000` · Swagger → `/docs` · Frontend → `h
 6. Lancer pytest + npm test
 7. `caveman:cavecrew-reviewer` ou `engineering:code-review` sur le diff
 8. `caveman:caveman-commit` pour le message de commit
-9. `engineering:deploy-checklist` avant merge
+9. **Pousser la branche + ouvrir une PR vers `dev`** ; attendre la **CI verte** (cf §10) ; `engineering:deploy-checklist` avant merge ; fusionner puis **supprimer la branche** (release = PR `dev → main`)
 10. Mettre à jour `docs/reports/` si audit/rapport produit
+
+---
+
+## 10. Workflow Git & GitHub (LOI)
+
+> Détail complet et pédagogique : `docs/guides/Workflow_Git_GitHub.md`. Plan de restructuration du dépôt : `docs/guides/Nettoyage_Git_Plan_Action.md`. Modèle = **`main` (stable) + `dev` (développement)** + branches courtes.
+
+**Branches permanentes :** `main` = stable/déployable (n'avance QUE par PR `dev → main`) · `dev` = développement quotidien (contient toutes les features).
+
+**Règles non négociables :**
+
+1. **Jamais de commit/push direct sur `main`.** `main` n'avance que par une PR `dev → main` (release) avec CI verte.
+2. **Développement au quotidien sur `dev`** (petits commits directs OK). `dev` doit rester verte.
+3. **Gros chantier = une branche courte** créée depuis `dev` à jour, fusionnée dans `dev` via **Pull Request** puis **supprimée**. Pas de branche qui vit des semaines.
+4. **Nommage des branches** = même préfixe que les commits : `feat/`, `fix/`, `refactor/`, `test/`, `docs/`, `chore/` + nom kebab-case (ex. `feat/prix-carte-production`).
+5. **Commits** = petits, fréquents, format **Conventional Commits** (`type(portée): description ≤50 car.`). Utiliser `caveman:caveman-commit`.
+6. **Avant de pousser** : `pytest serveur/src/tests/` + `npm test` (frontend) doivent être verts en local.
+7. **Fusion uniquement si la CI GitHub est verte** (`.github/workflows/ci.yml` lance pytest + npm test sur push/PR vers `main` et `dev`). Ne jamais fusionner une PR rouge.
+8. **Ne jamais commiter de parasites** : `*.db`, `*.bak*`, `exports/`, `*.db-journal`, scripts jetables `fix_*.py`. Vérifier qu'ils sont dans `.gitignore`.
+9. **Jamais de `git push --force` sur `main` ou `dev`.**
+
+**Cycle de référence :**
+```
+git switch dev && git pull             # partir à jour (atelier quotidien)
+git switch -c feat/ma-tache            # gros chantier -> branche courte (sinon commit direct sur dev)
+# ... coder, commits petits ...
+pytest serveur/src/tests/ ; (cd client/src/frontend && npm test)   # tests locaux verts
+git push -u origin feat/ma-tache       # pousser
+# -> ouvrir PR vers dev, attendre CI verte, merge, delete branche
+git switch dev && git pull && git branch -d feat/ma-tache
+# Release : PR  dev -> main  sur GitHub, CI verte, merge.
+```
+
+**Garde-fous (Cowork/sandbox)** : ne pas exécuter d'opérations Git destructives sur le mount sandbox (cf mémoire `sandbox-mount-coherence`). Les commandes de réécriture d'historique (merge de réconciliation, suppression de branches, `--ff-only`) sont **proposées à l'utilisateur** pour exécution sous PowerShell Windows, pas lancées automatiquement.
+
+**CI/CD** : la CI (tests auto) est en place. Le CD (build auto de l'`.exe`, Releases) est une étape **ultérieure** non encore implémentée — ne pas l'inventer.

@@ -1,0 +1,76 @@
+name: CI
+
+# Quand lancer la CI : à chaque push et à chaque Pull Request visant main ou dev.
+on:
+  push:
+    branches: ["main", "dev"]
+  pull_request:
+    branches: ["main", "dev"]
+
+# Si on pousse plusieurs fois d'affilée sur la même branche/PR,
+# on annule le run précédent (économise du temps machine).
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ----------------------------------------------------------------
+  # Job 1 : tests du serveur Python (FastAPI)
+  # ----------------------------------------------------------------
+  backend:
+    name: Tests backend (pytest)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Récupérer le code
+        uses: actions/checkout@v4
+
+      - name: Installer Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: serveur/requirements_flexible.txt
+
+      - name: Installer les dépendances
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r serveur/requirements_flexible.txt
+
+      - name: Lancer pytest
+        # Même commande que le développement local (cf CLAUDE.md §5),
+        # exécutée depuis la racine du dépôt.
+        run: pytest serveur/src/tests/ -v
+
+  # ----------------------------------------------------------------
+  # Job 2 : tests du frontend React
+  # ----------------------------------------------------------------
+  frontend:
+    name: Tests frontend (npm test)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: client/src/frontend
+    steps:
+      - name: Récupérer le code
+        uses: actions/checkout@v4
+
+      - name: Installer Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          # NB : le cache npm est désactivé tant que package-lock.json
+          # n'est pas versionné (il est ignoré par .gitignore aujourd'hui).
+          # Pour l'activer : versionner le lockfile puis ajouter
+          #   cache: npm
+          #   cache-dependency-path: client/src/frontend/package-lock.json
+          # et remplacer "npm install" par "npm ci" ci-dessous.
+
+      - name: Installer les dépendances
+        run: npm install --no-audit --no-fund
+
+      - name: Lancer les tests
+        # CI=true => react-scripts test tourne une seule fois puis s'arrête
+        # (sinon il reste en mode "watch" et bloquerait la CI).
+        env:
+          CI: "true"
+        run: npm test

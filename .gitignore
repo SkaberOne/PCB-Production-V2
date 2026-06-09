@@ -84,6 +84,11 @@ data/datasheets/pdf/*
 .cache/
 temp/
 *.bak
+*.bak_*
+/exports/
+*.db-journal
+*.db-wal
+*.db-shm
 */migrations/versions/__pycache__/
 
 # --- Obsidian vault ---
