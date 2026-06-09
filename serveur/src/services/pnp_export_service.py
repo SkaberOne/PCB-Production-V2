@@ -164,16 +164,23 @@ def _column_value(
     if col_id == "y":
         return _fmt_number(bom_item.y)
     if col_id == "angle":
-        return _fmt_number(bom_item.rotation)
+        # Le logiciel machine convertit l'angle en entier : une cellule vide
+        # (rotation absente) ferait planter l'import (ToInteger("")). Défaut 0.
+        return _fmt_number(bom_item.rotation) or "0"
     if col_id == "side":
         return _normalize_side(bom_item.placement_side)
     if col_id == "feeder":
         slot_start = assignment.get("slot_start") if assignment else None
         if not slot_start:
-            return ""
+            # Composant non affecté à un slot (posé à la main : connecteurs,
+            # boutons…). Colonne entière côté machine → 0 plutôt que vide
+            # (sinon ToInteger("") plante l'import).
+            return "0"
         return str(physical_feeder_number(slot_start, num_positions, back_order))
     if col_id == "nozzle":
-        return str(assignment["nozzle_type"]) if assignment and assignment.get("nozzle_type") else ""
+        # Même logique que Feeder : un composant sans affectation a aussi une
+        # nozzle vide ; la colonne est entière côté machine → défaut 0.
+        return str(assignment["nozzle_type"]) if assignment and assignment.get("nozzle_type") else "0"
     if col_id == "group":
         return (component.component_type if component and component.component_type else "") or ""
     if col_id == "quantity":
@@ -228,6 +235,12 @@ def _build_csv(
     writer.writerow([COLUMN_HEADERS[c] for c in column_ids])
     for bom_item, component in rows:
         assignment = assignment_by_component.get(component.id) if component else None
+        # Fichier PnP = uniquement les composants posés par la machine. Ceux sans
+        # slot feeder (connecteurs, boutons… posés à la main) sont exclus : ils
+        # n'ont pas leur place ici, et leur cellule Feeder/Nozzle vide faisait
+        # planter l'import machine (ToInteger("")).
+        if not (assignment and assignment.get("slot_start")):
+            continue
         writer.writerow([
             _sanitize(_column_value(c, bom_item, component, assignment, num_positions, back_order))
             for c in column_ids

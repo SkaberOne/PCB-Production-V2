@@ -168,22 +168,39 @@ def test_build_csv_headers_values_and_quoting():
     assert lines[2] == 'R1,10k,0603,-155.27,16.35,90,Bottom,2,502,Resistor,"a,b"'
 
 
-def test_build_csv_semicolon_separator_and_blank_feeder():
-    comp = _component(id=5, value="1k", footprint_pnp="0402")
-    rows = [(_bom_item(reference_item="R9", value_harmonized="1k", footprint_pnp="0402",
-                       x=1.0, y=2.0, rotation=0, placement_side="TOP"), comp)]
-    # Composant sans affectation feeder → colonnes Feeder/Nozzle vides.
-    out = _build_csv(rows, ["position", "feeder", "nozzle"], ";", {})
+def test_build_csv_excludes_manual_placement_components():
+    # Composant sans affectation feeder (posé à la main) → absent du fichier PnP.
+    manual = _component(id=5, value="CONN", footprint_pnp="CONNECTEUR")
+    placed = _component(id=6, value="1k", footprint_pnp="0402")
+    rows = [
+        (_bom_item(reference_item="J1", value_harmonized="CONN", footprint_pnp="CONNECTEUR",
+                   x=1.0, y=2.0, rotation=0, placement_side="TOP"), manual),
+        (_bom_item(reference_item="R9", value_harmonized="1k", footprint_pnp="0402",
+                   x=1.0, y=2.0, rotation=0, placement_side="TOP"), placed),
+    ]
+    assignment_by_component = {6: {"slot_start": 12, "nozzle_type": 503}}
+    out = _build_csv(rows, ["position", "feeder", "nozzle"], ";", assignment_by_component)
     lines = out.strip().splitlines()
     assert lines[0] == "Position;Feeder;Nozzle"
-    assert lines[1] == "R9;;"
+    # Seul R9 (affecté) est exporté ; J1 (manuel) est exclu.
+    assert lines[1:] == ["R9;12;503"]
+
+
+def test_build_csv_empty_angle_defaults_to_zero():
+    # rotation absente (None) sur un composant affecté → Angle "0" et non ""
+    # (sinon ToInteger("") plante l'import machine).
+    comp = _component(id=3, value="x", footprint_pnp="0603")
+    rows = [(_bom_item(reference_item="R5", value_harmonized="x", footprint_pnp="0603",
+                       x=1.0, y=2.0, rotation=None, placement_side="TOP"), comp)]
+    out = _build_csv(rows, ["position", "angle"], ",", {3: {"slot_start": 1, "nozzle_type": 503}})
+    assert out.strip().splitlines()[1] == "R5,0"
 
 
 def test_build_csv_number_formatting_no_float_artifact():
     comp = _component(id=1)
     rows = [(_bom_item(reference_item="C1", value_harmonized="x", footprint_pnp="f",
                        x=0.1 + 0.2, y=7.7, rotation=180, placement_side="TOP"), comp)]
-    out = _build_csv(rows, ["x", "y", "angle"], ",", {})
+    out = _build_csv(rows, ["x", "y", "angle"], ",", {1: {"slot_start": 1, "nozzle_type": 503}})
     # 0.1+0.2 ne doit pas fuir en 0.30000000000000004.
     assert out.strip().splitlines()[1] == "0.3,7.7,180"
 

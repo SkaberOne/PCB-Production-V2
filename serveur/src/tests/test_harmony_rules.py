@@ -91,6 +91,15 @@ class TestHarmonizeResistorValue:
         assert harmonize_resistor_value("") == ""
         assert harmonize_resistor_value(None) is None
 
+    def test_non_numeric_value_not_suffixed(self):
+        """Valeurs non ohmiques (NC, DNP...) : laissées intactes, pas de 'R'."""
+        assert harmonize_resistor_value("NC") == "NC"
+        assert harmonize_resistor_value("DNP") == "DNP"
+        assert harmonize_resistor_value("NP") == "NP"
+        assert harmonize_resistor_value("  NC  ") == "NC"
+        # Le dispatcher doit donner le même résultat pour une résistance.
+        assert harmonize_value("NC", "R") == "NC"
+
 
 class TestHarmonizeCapacitorValue:
     """Test capacitor value harmonization"""
@@ -125,7 +134,23 @@ class TestHarmonizeCapacitorValue:
         """Values with whitespace should be handled"""
         assert harmonize_capacitor_value("  100nf  ") == "100nF"
         assert harmonize_capacitor_value("100 nf") == "100 nF"
-    
+
+    def test_bare_prefix_gets_f_appended(self):
+        """Bare prefix without F (Eagle '100n') should become '100nF' so it
+        matches a '100nF' library component (and thus gets a feeder)."""
+        assert harmonize_capacitor_value("100n") == "100nF"
+        assert harmonize_capacitor_value("1u") == "1uF"
+        assert harmonize_capacitor_value("10p") == "10pF"
+        assert harmonize_capacitor_value("4.7u") == "4.7uF"
+        assert harmonize_capacitor_value("100n/50V") == "100nF/50V"
+
+    def test_bare_prefix_does_not_double_f(self):
+        """Already-suffixed values must not get a second F."""
+        assert harmonize_capacitor_value("100nF") == "100nF"
+        assert harmonize_capacitor_value("4.7uF/50V") == "4.7uF/50V"
+        # Notation « 4n7 » (chiffre après préfixe) laissée intacte.
+        assert harmonize_capacitor_value("4n7") == "4n7"
+
     def test_empty_value(self):
         """Empty/None values should be returned as-is"""
         assert harmonize_capacitor_value("") == ""
@@ -279,19 +304,4 @@ class TestRealWorldExamples:
                 "value_raw": "100nf",
                 "footprint": "0805",
                 "position_x": 15.0,
-                "position_y": 25.0,
-                "rotation": 90,
-                "component_type": "C",
-            },
-        ]
-        
-        harmonized = harmonize_bom_items(parsed_items)
-        
-        assert harmonized[0]["value_harmonized"] == "10R"
-        assert harmonized[1]["value_harmonized"] == "100nF"
-        assert harmonized[0]["position_x"] == 10.0  # Original data preserved
-        assert harmonized[1]["rotation"] == 90
-
-
-if __name__ == "__main__":
-    pytest.main([__file__, "-v"])
+                "position_y"
