@@ -22,6 +22,7 @@ function MachinePnpSlotStrip({
     visibleMachineAssignmentIndexes,
     machineProductionPlan,
     onSelectSlot,
+    onEditComponent,
 }) {
     const showInlineRef = slots.length <= INLINE_REF_MAX_SLOTS;
 
@@ -76,15 +77,23 @@ function MachinePnpSlotStrip({
                     ? String(refSource || '').slice(0, layout.fontSize === '0.43rem' ? 4 : 8)
                     : '';
 
+                // Clic sur un slot : sélectionne, et s'il est occupé, ouvre l'édition du composant.
+                const activateSlot = () => {
+                    onSelectSlot(slot);
+                    if (assignment && onEditComponent && assignment.component_id != null) {
+                        onEditComponent(assignment.component_id);
+                    }
+                };
+
                 return (
                     <Tooltip key={`slot-${slot}`} title={slotTitle} arrow>
                         <Box
-                            onClick={() => onSelectSlot(slot)}
+                            onClick={activateSlot}
                             role="button"
                             tabIndex={0}
                             aria-label={slotTitle}
                             aria-pressed={isSelected}
-                            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelectSlot(slot); } }}
+                            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); activateSlot(); } }}
                             sx={{
                                 ...machineSlotCellSx,
                                 minWidth: 0,

@@ -9,6 +9,7 @@ from typing import List, Optional
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, Response, UploadFile
 from fastapi.responses import StreamingResponse
+from pydantic import BaseModel
 from sqlalchemy import asc, desc, func, or_
 from sqlalchemy.orm import Session, joinedload
 
@@ -46,6 +47,22 @@ from .bom_support import (
 from ..utils.catalog_cache import invalidate_component_type_rules, invalidate_footprint_mappings
 
 router = APIRouter(tags=["bom"])
+
+
+class ComponentPatchSchema(BaseModel):
+    """Mise à jour partielle d'un composant : seuls les champs fournis sont modifiés.
+
+    Utilisé par le panneau d'édition rapide du plan d'implantation (nom/footprint/
+    feeder) sans avoir à renvoyer tout le composant (contrairement au PUT).
+    """
+
+    value: Optional[str] = None
+    mpn: Optional[str] = None
+    description: Optional[str] = None
+    footprint_pnp: Optional[str] = None
+    footprint_eagle: Optional[str] = None
+    feeder_type: Optional[str] = None
+    package: Optional[str] = None
 
 
 def _serialize_component_type_rule(rule: ComponentTypeRule) -> ComponentTypeRuleSchema:
@@ -286,6 +303,61 @@ def update_component(component_id: int, component: ComponentSchema, db: Session 
             bom_service.normalize_footprint_name(db_component.footprint_eagle),
             normalized_footprint_pnp,
         )
+    db.commit()
+    db.refresh(db_component)
+    return _serialize_component(db_component)
+
+
+@router.get("/components/{component_id}", response_model=ComponentSchema)
+def get_component(component_id: int, db: Session = Depends(get_db)):
+    """Récupère un composant par id (préremplissage du panneau d'édition rapide)."""
+    db_component = db.query(Component).filter(Component.id == component_id).first()
+    if not db_component:
+        raise HTTPException(status_code=404, detail="Component not found")
+    return _serialize_component(db_component)
+
+
+@router.patch("/components/{component_id}", response_model=ComponentSchema)
+def patch_component(component_id: int, patch: ComponentPatchSchema, db: Session = Depends(get_db)):
+    """Mise à jour partielle d'un composant (édition rapide depuis le plan PnP).
+
+    Seuls les champs explicitement fournis sont modifiés. Attention : modifier
+    `value` change la clé d'appariement BOM↔composant (côté UI on avertit l'utilisateur).
+    """
+    db_component = db.query(Component).filter(Component.id == component_id).first()
+    if not db_component:
+        raise HTTPException(status_code=404, detail="Component not found")
+
+    fields_set = getattr(patch, "model_fields_set", None)
+    if fields_set is None:
+        fields_set = getattr(patch, "__fields_set__", set())
+
+    if "value" in fields_set:
+        db_component.value = _clean_optional_text(patch.value)
+    if "mpn" in fields_set:
+        db_component.mpn = _clean_optional_text(patch.mpn)
+    if "description" in fields_set:
+        db_component.description = _clean_optional_text(patch.description)
+    if "feeder_type" in fields_set:
+        db_component.feeder_type = _normalize_component_feeder_type(patch.feeder_type)
+    if "footprint_eagle" in fields_set:
+        db_component.footprint_eagle = _clean_optional_text(patch.footprint_eagle)
+
+    if "footprint_pnp" in fields_set or "package" in fields_set:
+        effective_package = patch.package if "package" in fields_set else db_component.package
+        effective_footprint_pnp = patch.footprint_pnp if "footprint_pnp" in fields_set else db_component.footprint_pnp
+        normalized_package, normalized_footprint_pnp = _normalize_component_package_fields(
+            effective_package, effective_footprint_pnp,
+        )
+        db_component.package = normalized_package
+        db_component.footprint_pnp = normalized_footprint_pnp
+        if db_component.footprint_eagle and normalized_footprint_pnp:
+            _upsert_footprint_mapping(
+                db,
+                bom_service.normalize_footprint_name(db_component.footprint_eagle),
+                normalized_footprint_pnp,
+            )
+
     db.commit()
     db.refresh(db_component)
     return _serialize_component(db_component)

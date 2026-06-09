@@ -20,7 +20,7 @@ import {
     slotEmptyPalette,
 } from '../../utils/machinePnp';
 
-function MachineLane({ title, slots, layout, config }) {
+function MachineLane({ title, slots, layout, config, onEditComponent }) {
     if (!slots.length) return null;
     return (
         <Box sx={machineLaneSx}>
@@ -37,6 +37,7 @@ function MachineLane({ title, slots, layout, config }) {
                 visibleMachineAssignmentIndexes={config.visibleMachineAssignmentIndexes}
                 machineProductionPlan={config.machineProductionPlan}
                 onSelectSlot={config.handleSelectMachineSlot}
+                onEditComponent={onEditComponent}
             />
         </Box>
     );
@@ -150,7 +151,7 @@ function FeederSizeLegend() {
  * vue de dessus (rampe arrière → convoyeur PCB → rampe avant) colorée par groupe
  * de placement (fixe / mobile), table d'affectation et détail du slot sélectionné.
  */
-function MachineImplantationPanel({ config }) {
+function MachineImplantationPanel({ config, onEditComponent }) {
     const {
         machineProductionPlanLoading,
         machineProductionPlan,
@@ -161,7 +162,6 @@ function MachineImplantationPanel({ config }) {
         backSlotLayout,
         visibleMachineAssignments,
         selectedMachineSlotPosition,
-        selectedMachineSlot,
         selectedMachineProduction,
         handleSelectMachineSlot,
     } = config;
@@ -199,14 +199,14 @@ function MachineImplantationPanel({ config }) {
 
             {/* Vue machine vue de dessus : rampe arrière → convoyeur PCB → rampe avant */}
             <Stack spacing={0.75}>
-                <MachineLane title="Rampe arrière" slots={machineTopView.backSlots} layout={backSlotLayout} config={config} />
+                <MachineLane title="Rampe arrière" slots={machineTopView.backSlots} layout={backSlotLayout} config={config} onEditComponent={onEditComponent} />
                 <NozzleHead
                     count={machineProductionPlan?.num_nozzles || config.machineNumNozzles}
                     layout={machineProductionPlan?.nozzle_layout}
                     redPositions={machineProductionPlan?.nozzle_red_positions}
                 />
                 <ConveyorBand />
-                <MachineLane title="Rampe avant" slots={machineTopView.frontSlots} layout={frontSlotLayout} config={config} />
+                <MachineLane title="Rampe avant" slots={machineTopView.frontSlots} layout={frontSlotLayout} config={config} onEditComponent={onEditComponent} />
             </Stack>
             <FeederSizeLegend />
 
@@ -217,19 +217,12 @@ function MachineImplantationPanel({ config }) {
                     assignments={visibleMachineAssignments}
                     selectedSlot={selectedMachineSlotPosition}
                     onSelectSlot={handleSelectMachineSlot}
+                    onEditComponent={onEditComponent}
                     selectedMachineBomPlannedBoardQuantity={null}
                     selectedMachineBomRevision={selectedMachineBomRevision}
                 />
             </TableContainer>
 
-            {selectedMachineSlot?.assignment ? (
-                <Alert severity="info" variant="outlined" sx={{ mt: 1.5 }}>
-                    Slot {selectedMachineSlot.assignment.slot_start}
-                    {selectedMachineSlot.assignment.slot_end !== selectedMachineSlot.assignment.slot_start ? `-${selectedMachineSlot.assignment.slot_end}` : ''}
-                    {' · '}{selectedMachineSlot.assignment.component_label}
-                    {selectedMachineSlot.assignment.feeder_type ? ` · ${selectedMachineSlot.assignment.feeder_type}` : ''}
-                </Alert>
-            ) : null}
         </Box>
     );
 }

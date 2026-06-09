@@ -59,11 +59,17 @@ export function useMachineConfigActions(deps) {
         if (mountedRef.current) setMachineProductionPlanLoading(true);
         try {
             const parsedRevisionId = Number(bomRevisionId);
-            const faceQuery = Number.isInteger(parsedRevisionId) && parsedRevisionId > 0
-                ? `?bom_revision_id=${parsedRevisionId}`
-                : '';
+            const params = new URLSearchParams();
+            if (Number.isInteger(parsedRevisionId) && parsedRevisionId > 0) {
+                params.set('bom_revision_id', String(parsedRevisionId));
+            }
+            // Cache-bust : le plan dépend de données serveur qui changent (tailles de
+            // feeder complétées, ordre BOM…). Sans cela, le GET peut être servi depuis
+            // le cache navigateur et « Recalculer » renverrait un plan périmé.
+            params.set('_ts', String(Date.now()));
             const response = await apiClient.get(
-                `/marketplace/machines/${machineId}/productions/${productionId}/feeder-plan${faceQuery}`,
+                `/marketplace/machines/${machineId}/productions/${productionId}/feeder-plan?${params.toString()}`,
+                { headers: { 'Cache-Control': 'no-cache' } },
             );
             if (!mountedRef.current || requestId !== latestPlanRef.current) return null;
             setMachineProductionPlan(response.data || null);

@@ -6,6 +6,7 @@ from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import Response
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from ..database import get_db
@@ -17,6 +18,20 @@ from ..schemas.marketplace import (
 from ..services.assignment_service import AssignmentService
 
 router = APIRouter(prefix="/machines")
+
+
+class SetSlotPinRequest(BaseModel):
+    """Corps de requête pour épingler un composant à un slot (épinglage global)."""
+
+    component_id: int
+    slot_position: int
+
+
+class SetManualPlacementRequest(BaseModel):
+    """Corps de requête pour forcer (ou retirer) un composant en pose à la main."""
+
+    component_id: int
+    manual: bool
 
 
 @router.post("")
@@ -140,6 +155,76 @@ def get_machine_production_feeder_plan(
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error calculating feeder plan: {str(e)}")
+
+
+@router.post("/{machine_id}/productions/{production_id}/slot-pins")
+def set_machine_slot_pin(
+    machine_id: int,
+    production_id: int,
+    request: SetSlotPinRequest,
+    db: Session = Depends(get_db),
+):
+    """Épingle un composant à un slot précis (global, toutes faces).
+
+    Refuse (400) en cas de conflit : hors plage, chevauchement de rampe, slot déjà
+    pris par un autre épinglage, ou incompatibilité nozzle. Renvoie le plan recalculé.
+    """
+    try:
+        return AssignmentService.set_slot_pin(
+            db=db,
+            machine_id=machine_id,
+            production_id=production_id,
+            component_id=request.component_id,
+            slot_position=request.slot_position,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error pinning slot: {str(e)}")
+
+
+@router.delete("/{machine_id}/productions/{production_id}/slot-pins/{component_id}")
+def clear_machine_slot_pin(
+    machine_id: int,
+    production_id: int,
+    component_id: int,
+    db: Session = Depends(get_db),
+):
+    """Retire l'épinglage d'un composant. Renvoie le plan recalculé."""
+    try:
+        return AssignmentService.clear_slot_pin(
+            db=db,
+            machine_id=machine_id,
+            production_id=production_id,
+            component_id=component_id,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error clearing slot pin: {str(e)}")
+
+
+@router.post("/{machine_id}/productions/{production_id}/manual-placements")
+def set_machine_manual_placement(
+    machine_id: int,
+    production_id: int,
+    request: SetManualPlacementRequest,
+    db: Session = Depends(get_db),
+):
+    """Force (manual=true) ou retire (manual=false) un composant de la pose à la main.
+    Renvoie le plan recalculé."""
+    try:
+        return AssignmentService.set_manual_placement(
+            db=db,
+            machine_id=machine_id,
+            production_id=production_id,
+            component_id=request.component_id,
+            manual=request.manual,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error setting manual placement: {str(e)}")
 
 
 @router.get("/{machine_id}/productions/{production_id}/export")

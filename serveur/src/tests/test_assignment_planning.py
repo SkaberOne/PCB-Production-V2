@@ -538,6 +538,210 @@ class TestQueueReuseRetention:
         assert shared.id in assigned_ids
 
 
+# ── Tests: composant sans taille de feeder → pose manuelle auto ───────────────
+
+class TestMissingFeederSizeManual:
+    def test_component_without_feeder_size_is_routed_to_manual(self, db):
+        # Capacité large : rien ne déborde. Un composant sans taille de feeder ne
+        # doit PAS être installé sur la PnP, mais basculé en pose manuelle avec le
+        # drapeau needs_feeder_size (à compléter), tandis qu'un composant dimensionné
+        # est placé normalement.
+        machine = make_machine(db, positions=40)
+        production = make_production(db, machine)
+        revision = make_bom_revision(db)
+
+        sized = make_component(db, reference="R1", value="10K", footprint="R0805")  # CL8-4
+        no_size = Component(
+            reference="U1", value="DRV-XYZ", package="QFN",
+            footprint_pnp="QFN", feeder_type=None, is_fixed_feeder=False,
+        )
+        db.add(no_size)
+        db.flush()
+
+        db.add(BomItem(
+            bom_revision_id=revision.id, reference_item="R1", quantity=1,
+            footprint_pnp=sized.footprint_pnp, value_harmonized=sized.value, dnp=False,
+        ))
+        db.add(BomItem(
+            bom_revision_id=revision.id, reference_item="U1", quantity=1,
+            footprint_pnp=no_size.footprint_pnp, value_harmonized=no_size.value, dnp=False,
+        ))
+        link_revision(db, production, revision, order=1, quantity=1)
+        db.commit()
+
+        plan = AssignmentPlanningMixin.get_machine_production_feeder_plan(
+            db=db, machine_id=machine.id, production_id=production.id,
+        )
+
+        assigned_ids = {a["component_id"] for a in plan["slot_assignments"]}
+        manual = {m["component_id"]: m for m in plan["manual_placement_components"]}
+
+        # Le composant sans taille n'est pas installé sur la PnP.
+        assert no_size.id not in assigned_ids
+        # Il est en pose manuelle, signalé à compléter.
+        assert no_size.id in manual
+        assert manual[no_size.id]["needs_feeder_size"] is True
+        assert manual[no_size.id]["manual_placement"] is True
+        # Le composant dimensionné est placé normalement.
+        assert sized.id in assigned_ids
+        # Compteur dédié + il ne consomme aucun slot ni "slot savings" capacitaire.
+        assert plan["missing_feeder_size_count"] == 1
+        assert plan["manual_placement_slot_savings"] == 0
+
+
+# ── Tests: épinglage manuel de slot ──────────────────────────────────────────
+
+class TestSlotPins:
+    def _setup(self, db, components):
+        machine = make_machine(db, positions=40)
+        production = make_production(db, machine)
+        revision = make_bom_revision(db)
+        for index, comp in enumerate(components, start=1):
+            db.add(BomItem(
+                bom_revision_id=revision.id, reference_item=f"R{index}", quantity=1,
+                footprint_pnp=comp.footprint_pnp, value_harmonized=comp.value, dnp=False,
+            ))
+        link_revision(db, production, revision, order=1, quantity=1)
+        db.commit()
+        return machine, production
+
+    def test_pin_places_component_at_slot(self, db):
+        comp = make_component(db, reference="RP", value="VP", footprint="R0805")
+        machine, production = self._setup(db, [comp])
+        plan = AssignmentPlanningMixin.set_slot_pin(
+            db=db, machine_id=machine.id, production_id=production.id,
+            component_id=comp.id, slot_position=5,
+        )
+        assignment = next(a for a in plan["slot_assignments"] if a["component_id"] == comp.id)
+        assert assignment["slot_start"] == 5
+        assert assignment.get("is_pinned") is True
+
+    def test_pin_conflict_rejected(self, db):
+        c1 = make_component(db, reference="C1", value="V1", footprint="R0805")
+        c2 = make_component(db, reference="C2", value="V2", footprint="R0603")
+        machine, production = self._setup(db, [c1, c2])
+        AssignmentPlanningMixin.set_slot_pin(
+            db=db, machine_id=machine.id, production_id=production.id,
+            component_id=c1.id, slot_position=5,
+        )
+        with pytest.raises(ValueError):
+            AssignmentPlanningMixin.set_slot_pin(
+                db=db, machine_id=machine.id, production_id=production.id,
+                component_id=c2.id, slot_position=5,
+            )
+
+    def test_pin_out_of_range_rejected(self, db):
+        comp = make_component(db, reference="RP2", value="VP2", footprint="R0805")
+        machine, production = self._setup(db, [comp])
+        with pytest.raises(ValueError):
+            AssignmentPlanningMixin.set_slot_pin(
+                db=db, machine_id=machine.id, production_id=production.id,
+                component_id=comp.id, slot_position=999,
+            )
+
+    def test_clear_pin(self, db):
+        comp = make_component(db, reference="RP3", value="VP3", footprint="R0805")
+        machine, production = self._setup(db, [comp])
+        AssignmentPlanningMixin.set_slot_pin(
+            db=db, machine_id=machine.id, production_id=production.id,
+            component_id=comp.id, slot_position=7,
+        )
+        plan = AssignmentPlanningMixin.clear_slot_pin(
+            db=db, machine_id=machine.id, production_id=production.id, component_id=comp.id,
+        )
+        assignment = next(a for a in plan["slot_assignments"] if a["component_id"] == comp.id)
+        assert not assignment.get("is_pinned")
+
+
+# ── Tests: pose à la main forcée ─────────────────────────────────────────────
+
+class TestForcedManualPlacement:
+    def _setup(self, db, comp):
+        machine = make_machine(db, positions=40)
+        production = make_production(db, machine)
+        revision = make_bom_revision(db)
+        db.add(BomItem(
+            bom_revision_id=revision.id, reference_item="R1", quantity=1,
+            footprint_pnp=comp.footprint_pnp, value_harmonized=comp.value, dnp=False,
+        ))
+        link_revision(db, production, revision, order=1, quantity=1)
+        db.commit()
+        return machine, production
+
+    def test_force_manual_excludes_from_pnp(self, db):
+        comp = make_component(db, reference="FM", value="VFM", footprint="R0805")
+        machine, production = self._setup(db, comp)
+        plan = AssignmentPlanningMixin.set_manual_placement(
+            db=db, machine_id=machine.id, production_id=production.id,
+            component_id=comp.id, manual=True,
+        )
+        assigned = {a["component_id"] for a in plan["slot_assignments"]}
+        manual = {m["component_id"]: m for m in plan["manual_placement_components"]}
+        assert comp.id not in assigned
+        assert comp.id in manual
+        assert manual[comp.id]["forced_manual"] is True
+        assert plan["forced_manual_count"] == 1
+
+    def test_unset_manual_returns_to_pnp(self, db):
+        comp = make_component(db, reference="FM2", value="VFM2", footprint="R0805")
+        machine, production = self._setup(db, comp)
+        AssignmentPlanningMixin.set_manual_placement(
+            db=db, machine_id=machine.id, production_id=production.id,
+            component_id=comp.id, manual=True,
+        )
+        plan = AssignmentPlanningMixin.set_manual_placement(
+            db=db, machine_id=machine.id, production_id=production.id,
+            component_id=comp.id, manual=False,
+        )
+        assigned = {a["component_id"] for a in plan["slot_assignments"]}
+        assert comp.id in assigned
+        assert plan["forced_manual_count"] == 0
+
+    def test_force_manual_clears_pin(self, db):
+        comp = make_component(db, reference="FM3", value="VFM3", footprint="R0805")
+        machine, production = self._setup(db, comp)
+        AssignmentPlanningMixin.set_slot_pin(
+            db=db, machine_id=machine.id, production_id=production.id,
+            component_id=comp.id, slot_position=9,
+        )
+        plan = AssignmentPlanningMixin.set_manual_placement(
+            db=db, machine_id=machine.id, production_id=production.id,
+            component_id=comp.id, manual=True,
+        )
+        # Le composant est en manuel, et n'apparaît plus comme épinglé/assigné.
+        assigned = {a["component_id"] for a in plan["slot_assignments"]}
+        assert comp.id not in assigned
+        assert plan["forced_manual_count"] == 1
+
+    def test_force_manual_on_component_without_feeder_size(self, db):
+        # Connecteur/bouton SANS taille de feeder : par défaut dans « à compléter ».
+        comp = Component(
+            reference="CONN1", value="VCONN", package="CONNECTEUR",
+            footprint_pnp="CONNECTEUR", feeder_type=None, is_fixed_feeder=False,
+        )
+        db.add(comp)
+        db.flush()
+        machine, production = self._setup(db, comp)
+
+        plan0 = AssignmentPlanningMixin.get_machine_production_feeder_plan(
+            db=db, machine_id=machine.id, production_id=production.id,
+        )
+        before = {m["component_id"]: m for m in plan0["manual_placement_components"]}
+        assert before[comp.id].get("needs_feeder_size") is True
+
+        # Forcer en pose à la main → passe en « à placer à la main » (forcé), plus
+        # en « à compléter », même sans taille de feeder.
+        plan = AssignmentPlanningMixin.set_manual_placement(
+            db=db, machine_id=machine.id, production_id=production.id,
+            component_id=comp.id, manual=True,
+        )
+        after = {m["component_id"]: m for m in plan["manual_placement_components"]}
+        assert after[comp.id].get("forced_manual") is True
+        assert not after[comp.id].get("needs_feeder_size")
+        assert plan["forced_manual_count"] == 1
+        assert plan["missing_feeder_size_count"] == 0
+
+
 # ── Tests: placement auto dynamiques→avant / fixés→arrière ───────────────────
 
 class TestRampSegregation:

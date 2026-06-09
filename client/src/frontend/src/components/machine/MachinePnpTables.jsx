@@ -2,6 +2,7 @@ import React from 'react';
 import DeleteOutlineRoundedIcon from '@mui/icons-material/DeleteOutlineRounded';
 import EditRoundedIcon from '@mui/icons-material/EditRounded';
 import MoreVertRoundedIcon from '@mui/icons-material/MoreVertRounded';
+import PushPinRoundedIcon from '@mui/icons-material/PushPinRounded';
 import TuneRoundedIcon from '@mui/icons-material/TuneRounded';
 import {
     Box,
@@ -15,6 +16,7 @@ import {
     TableContainer,
     TableHead,
     TableRow,
+    TableSortLabel,
     Tooltip,
     Typography,
 } from '@mui/material';
@@ -427,6 +429,7 @@ const MachineAssignmentTableRow = React.memo(function MachineAssignmentTableRow(
     assignment,
     isSelected,
     onSelectSlot,
+    onEditComponent,
     selectedMachineBomPlannedBoardQuantity,
     selectedMachineBomRevision,
 }) {
@@ -437,15 +440,23 @@ const MachineAssignmentTableRow = React.memo(function MachineAssignmentTableRow(
         selectedMachineBomPlannedBoardQuantity,
     );
 
+    // Clic sur une ligne : sélectionne le slot ET ouvre l'édition du composant.
+    const handleActivate = () => {
+        onSelectSlot(assignment.slot_start);
+        if (onEditComponent && assignment.component_id != null) {
+            onEditComponent(assignment.component_id);
+        }
+    };
+
     return (
         <TableRow
             hover
             selected={isSelected}
-            onClick={() => onSelectSlot(assignment.slot_start)}
+            onClick={handleActivate}
             role="button"
             tabIndex={0}
             aria-pressed={isSelected}
-            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelectSlot(assignment.slot_start); } }}
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleActivate(); } }}
             sx={{
                 cursor: 'pointer',
                 backgroundColor: assignmentPalette.rowBackground,
@@ -458,8 +469,17 @@ const MachineAssignmentTableRow = React.memo(function MachineAssignmentTableRow(
             }}
         >
             <TableCell sx={compactCellSx}>
-                {assignment.slot_start}
-                {assignment.slot_end !== assignment.slot_start ? ' (2 pos.)' : ''}
+                <Stack direction="row" spacing={0.4} alignItems="center">
+                    {assignment.is_pinned ? (
+                        <Tooltip title={`Épinglé au slot ${assignment.pinned_slot ?? assignment.slot_start}`}>
+                            <PushPinRoundedIcon sx={{ fontSize: 13, color: '#a78bfa' }} />
+                        </Tooltip>
+                    ) : null}
+                    <span>
+                        {assignment.slot_start}
+                        {assignment.slot_end !== assignment.slot_start ? ' (2 pos.)' : ''}
+                    </span>
+                </Stack>
             </TableCell>
             <TableCell sx={compactWrapCellSx}>{assignment.component_label}</TableCell>
             <TableCell sx={compactCellSx}>{assignment.footprint_pnp || '--'}</TableCell>
@@ -502,34 +522,85 @@ const MachineAssignmentTableRow = React.memo(function MachineAssignmentTableRow(
     );
 });
 
+// Colonnes triables du tableau d'implantation. `get` = valeur de tri ; `numeric`
+// distingue tri numérique (slot, feeder mm, BOM, quantités) du tri alpha.
+const ASSIGNMENT_SORT_COLUMNS = [
+    { key: 'slot', label: 'Slot', numeric: true, get: (a) => a.slot_start ?? 0 },
+    { key: 'component', label: 'Composant', numeric: false, get: (a) => a.component_label || '' },
+    { key: 'footprint', label: 'Footprint', numeric: false, get: (a) => a.footprint_pnp || '' },
+    { key: 'feeder', label: 'Feeder', numeric: true, get: (a) => (a.feeder_size_mm ?? -1) },
+    { key: 'type', label: 'Type', numeric: false, get: (a) => getMachineAssignmentTypeLabel(a) || '' },
+    { key: 'bom', label: 'BOM', numeric: true, get: (a) => a.bom_presence_count || 0 },
+    { key: 'total', label: 'Qté totale', numeric: true, get: (a) => a.total_board_quantity || 0 },
+    { key: 'perBoard', label: 'Qté/carte', numeric: true, get: (a) => a.average_board_quantity || 0 },
+];
+
 export const MachineAssignmentTable = React.memo(function MachineAssignmentTable({
     assignments,
     selectedSlot,
     onSelectSlot,
+    onEditComponent,
     selectedMachineBomPlannedBoardQuantity,
     selectedMachineBomRevision,
 }) {
+    const [sortBy, setSortBy] = React.useState('slot');
+    const [sortDir, setSortDir] = React.useState('asc');
+
+    const handleSort = (key) => {
+        if (key === sortBy) {
+            setSortDir((dir) => (dir === 'asc' ? 'desc' : 'asc'));
+        } else {
+            setSortBy(key);
+            setSortDir('asc');
+        }
+    };
+
+    const sortedAssignments = React.useMemo(() => {
+        const column = ASSIGNMENT_SORT_COLUMNS.find((col) => col.key === sortBy) || ASSIGNMENT_SORT_COLUMNS[0];
+        const factor = sortDir === 'asc' ? 1 : -1;
+        return [...(assignments || [])].sort((a, b) => {
+            const va = column.get(a);
+            const vb = column.get(b);
+            let cmp;
+            if (column.numeric) {
+                cmp = (Number(va) || 0) - (Number(vb) || 0);
+            } else {
+                cmp = String(va).localeCompare(String(vb), 'fr', { numeric: true, sensitivity: 'base' });
+            }
+            // Départage stable par slot pour un ordre déterministe.
+            if (cmp === 0) cmp = (a.slot_start ?? 0) - (b.slot_start ?? 0);
+            return cmp * factor;
+        });
+    }, [assignments, sortBy, sortDir]);
+
     return (
         <Table size="small" stickyHeader>
             <TableHead>
                 <TableRow>
-                    <TableCell>Slot</TableCell>
-                    <TableCell>Composant</TableCell>
-                    <TableCell>Footprint</TableCell>
-                    <TableCell>Feeder</TableCell>
-                    <TableCell>Type</TableCell>
-                    <TableCell>BOM</TableCell>
-                    <TableCell>Qté totale</TableCell>
-                    <TableCell>Qté/carte</TableCell>
+                    {ASSIGNMENT_SORT_COLUMNS.map((col) => (
+                        <TableCell
+                            key={col.key}
+                            sortDirection={sortBy === col.key ? sortDir : false}
+                        >
+                            <TableSortLabel
+                                active={sortBy === col.key}
+                                direction={sortBy === col.key ? sortDir : 'asc'}
+                                onClick={() => handleSort(col.key)}
+                            >
+                                {col.label}
+                            </TableSortLabel>
+                        </TableCell>
+                    ))}
                 </TableRow>
             </TableHead>
             <TableBody>
-                {(assignments || []).map((assignment) => (
+                {sortedAssignments.map((assignment) => (
                     <MachineAssignmentTableRow
                         key={assignment.slot_start}
                         assignment={assignment}
                         isSelected={selectedSlot === assignment.slot_start}
                         onSelectSlot={onSelectSlot}
+                        onEditComponent={onEditComponent}
                         selectedMachineBomPlannedBoardQuantity={selectedMachineBomPlannedBoardQuantity}
                         selectedMachineBomRevision={selectedMachineBomRevision}
                     />

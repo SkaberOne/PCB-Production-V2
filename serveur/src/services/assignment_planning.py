@@ -3,14 +3,14 @@
 import json
 import logging
 from datetime import datetime
-from typing import Dict, List, Tuple
+from typing import Dict, List, Optional, Tuple
 
 from sqlalchemy.orm import Session, joinedload
 
 from ..database import utcnow
 from ..models.bom import BomItem, BomRevision, Component
 from ..models.commands import ProductionPlan
-from ..models.machines import PnpCart, PnpMachine
+from ..models.machines import PnpCart, PnpMachine, PnpManualPlacement, PnpSlotPin
 from ..models.production import Production, ProductionBomRevision
 from .assignment_helpers import (
     build_assignment_payload,
@@ -32,6 +32,7 @@ from ..utils.nozzles import (
     deduce_nozzle_type,
     normalize_nozzle_layout,
     nozzle_layout_red_positions,
+    nozzle_reach_columns,
 )
 
 logger = logging.getLogger(__name__)
@@ -378,6 +379,67 @@ class AssignmentPlanningMixin:
         slot_assignments: List[Dict] = []
         unassigned_components: List[Dict] = []
 
+        # Buckets de pose manuelle (init ici : alimentés en étape 0 puis étape 2).
+        manual_placement_components: List[Dict] = []
+        manual_placement_ids: set = set()
+        manual_placement_slot_savings = 0
+
+        # 0) Composants FORCÉS en pose à la main (choix utilisateur) → PRIORITAIRES :
+        #    exclus de la PnP et listés en « à placer à la main » (forced_manual), même
+        #    s'ils n'ont PAS de taille de feeder (connecteurs, boutons...). Doit passer
+        #    AVANT le routage « taille manquante » sinon un composant sans taille serait
+        #    happé par « à compléter » et le forçage resterait sans effet visible.
+        forced_manual_ids = cls._load_forced_manual(db, machine_id, production_id)
+
+        def _route_forced_manual(entries: List[Dict], placement_group: str) -> List[Dict]:
+            placeable_entries: List[Dict] = []
+            for entry in entries:
+                if entry["component"].id in forced_manual_ids:
+                    payload = build_unassigned_payload(
+                        entry, "Pose à la main (forcée)", placement_group, machine_available_nozzles,
+                    )
+                    payload["manual_placement"] = True
+                    payload["forced_manual"] = True
+                    manual_placement_components.append(payload)
+                    manual_placement_ids.add(entry["component"].id)
+                else:
+                    placeable_entries.append(entry)
+            return placeable_entries
+
+        fixed_entries = _route_forced_manual(fixed_entries, "FIXED")
+        dynamic_entries = _route_forced_manual(dynamic_entries, "DYNAMIC")
+
+        # 0bis) Composants SANS taille de feeder exploitable (et NON forcés) → jamais
+        #       installés sur la PnP : bascule auto en pose manuelle, signalés
+        #       (needs_feeder_size) pour proposer de compléter la taille puis recalculer.
+        def _route_missing_feeder_size(entries: List[Dict], placement_group: str) -> List[Dict]:
+            placeable_entries: List[Dict] = []
+            for entry in entries:
+                if entry["feeder_size_mm"] is None:
+                    payload = build_unassigned_payload(
+                        entry,
+                        "Taille de feeder manquante - a completer dans la Base de donnees",
+                        placement_group,
+                        machine_available_nozzles,
+                    )
+                    payload["manual_placement"] = True
+                    payload["needs_feeder_size"] = True
+                    manual_placement_components.append(payload)
+                    manual_placement_ids.add(entry["component"].id)
+                else:
+                    placeable_entries.append(entry)
+            return placeable_entries
+
+        fixed_entries = _route_missing_feeder_size(fixed_entries, "FIXED")
+        dynamic_entries = _route_missing_feeder_size(dynamic_entries, "DYNAMIC")
+
+        missing_feeder_size_count = sum(
+            1 for component in manual_placement_components if component.get("needs_feeder_size")
+        )
+        forced_manual_count = sum(
+            1 for component in manual_placement_components if component.get("forced_manual")
+        )
+
         total_positions = int(machine.num_positions or 0)
         # Le banc = deux rampes (avant/arrière), chacune de `front_cols` colonnes
         # numérotées de GAUCHE (1) à DROITE. Position linéaire : avant = colonne,
@@ -386,6 +448,9 @@ class AssignmentPlanningMixin:
         back_cols = total_positions - front_cols
         ramp_cols = {"front": front_cols, "back": back_cols}
         ramp_base = {"front": 0, "back": front_cols}
+
+        # Épinglages manuels (globaux) : {component_id: slot_position}.
+        pins_by_component = cls._load_slot_pins(db, machine_id, production_id)
 
         def _entry_nozzle_type(entry: Dict) -> int:
             component = entry["component"]
@@ -422,9 +487,6 @@ class AssignmentPlanningMixin:
 
         # 2) Débordement capacité → sélection « à placer à la main » (dynamiques
         #    seulement ; les fixes restent prioritairement montés). Logique inchangée.
-        manual_placement_components: List[Dict] = []
-        manual_placement_slot_savings = 0
-        manual_placement_ids: set = set()
         fixed_slot_demand = sum(int(entry["slot_usage"]) for entry in placeable_fixed)
         remaining_capacity = max(total_positions - fixed_slot_demand, 0)
         dynamic_slot_demand = sum(int(entry["slot_usage"]) for entry in placeable_dynamic)
@@ -493,17 +555,23 @@ class AssignmentPlanningMixin:
                 entry["component"].id,
             )
 
-        # Petits : ordre croissant → remplis du bord GAUCHE vers l'intérieur.
-        small_entries = sorted((e for e in to_place if not _is_big(e)), key=_placement_sort_key)
-        # Gros : ordre DÉcroissant → le plus gros nozzle atterrit tout à DROITE,
-        # puis on remplit vers l'intérieur ; le bloc reste croissant gauche→droite.
-        big_entries = sorted((e for e in to_place if _is_big(e)), key=_placement_sort_key, reverse=True)
+        occupied: set = set()
 
-        left_next = {"front": 1, "back": 1}
-        right_next = {"front": ramp_cols["front"], "back": ramp_cols["back"]}
+        def _ramp_of(position: int) -> str:
+            return "front" if position <= front_cols else "back"
 
-        def _commit(entry: Dict, ramp: str, cols: List[int], placement_group: str) -> None:
-            slot_positions = [ramp_base[ramp] + col for col in cols]
+        def _pin_positions(slot: int, required: int):
+            """Positions linéaires d'un épinglage (même rampe + dans les bornes), ou None."""
+            if slot < 1 or slot > total_positions:
+                return None
+            ramp = _ramp_of(slot)
+            block = [slot + offset for offset in range(required)]
+            for position in block:
+                if position < 1 or position > total_positions or _ramp_of(position) != ramp:
+                    return None
+            return block
+
+        def _commit(entry: Dict, slot_positions: List[int], placement_group: str) -> Dict:
             assignment = build_assignment_payload(
                 entry=entry,
                 slot_positions=slot_positions,
@@ -515,23 +583,80 @@ class AssignmentPlanningMixin:
             slot_assignments.append(assignment)
             for position in slot_positions:
                 positions[position] = assignment
+                occupied.add(position)
+            return assignment
+
+        # 3.0) Épinglages : placer d'abord les composants épinglés à leur slot.
+        pinned_ids: set = set()
+        for entry in to_place:
+            component_id = entry["component"].id
+            slot = pins_by_component.get(component_id)
+            if slot is None:
+                continue
+            pinned_ids.add(component_id)
+            placement_group = placement_group_by_id[component_id]
+            block = _pin_positions(int(slot), int(entry["slot_usage"]))
+            if block is None or any(position in occupied for position in block):
+                # Défensif : épinglage devenu invalide (la création est validée en amont).
+                payload = build_unassigned_payload(
+                    entry,
+                    f"Épinglage au slot {slot} invalide (conflit ou hors rampe)",
+                    placement_group,
+                    machine_available_nozzles,
+                )
+                payload["pin_conflict"] = True
+                unassigned_components.append(payload)
+                continue
+            assignment = _commit(entry, block, placement_group)
+            assignment["is_pinned"] = True
+            assignment["pinned_slot"] = int(slot)
+
+        # 3) Placement BILATÉRAL auto des composants NON épinglés, en contournant les
+        #    positions déjà occupées par les épinglages.
+        #    - PETITS feeders (1 position) collés au BORD GAUCHE, remplis vers l'intérieur ;
+        #    - GROS feeders (2 positions) collés au BORD DROIT, remplis vers l'intérieur ;
+        #    - rampe préférée : fixé→ARRIÈRE, dynamique→AVANT (repli sur l'autre).
+        small_entries = sorted(
+            (e for e in to_place if not _is_big(e) and e["component"].id not in pinned_ids),
+            key=_placement_sort_key,
+        )
+        big_entries = sorted(
+            (e for e in to_place if _is_big(e) and e["component"].id not in pinned_ids),
+            key=_placement_sort_key, reverse=True,
+        )
+
+        left_frontier = {"front": 1, "back": 1}
+        right_frontier = {"front": ramp_cols["front"], "back": ramp_cols["back"]}
+
+        def _find_free_block(ramp: str, required: int, side: str):
+            cols = ramp_cols[ramp]
+            base = ramp_base[ramp]
+            if side == "left":
+                col = left_frontier[ramp]
+                while col + required - 1 <= cols:
+                    block = [base + (col + offset) for offset in range(required)]
+                    if all(position not in occupied for position in block):
+                        return col, block
+                    col += 1
+            else:
+                col = right_frontier[ramp] - required + 1
+                while col >= 1:
+                    block = [base + (col + offset) for offset in range(required)]
+                    if all(position not in occupied for position in block):
+                        return col, block
+                    col -= 1
+            return None, None
 
         def _try_side(entry: Dict, ramp: str, side: str, placement_group: str) -> bool:
             required = int(entry["slot_usage"])
-            if side == "right":
-                end = right_next[ramp]
-                start = end - required + 1
-                if start < left_next[ramp]:
-                    return False  # collision avec le bloc gauche / plus de place
-                _commit(entry, ramp, list(range(start, end + 1)), placement_group)
-                right_next[ramp] = start - 1
+            col, block = _find_free_block(ramp, required, side)
+            if block is None:
+                return False
+            _commit(entry, block, placement_group)
+            if side == "left":
+                left_frontier[ramp] = col + required
             else:
-                start = left_next[ramp]
-                end = start + required - 1
-                if end > right_next[ramp]:
-                    return False  # collision avec le bloc droit / plus de place
-                _commit(entry, ramp, list(range(start, end + 1)), placement_group)
-                left_next[ramp] = end + 1
+                right_frontier[ramp] = col - 1
             return True
 
         def place_entry(entry: Dict, side: str) -> None:
@@ -624,8 +749,234 @@ class AssignmentPlanningMixin:
             "manual_placement_components": manual_placement_components,
             "manual_placement_count": len(manual_placement_components),
             "manual_placement_slot_savings": manual_placement_slot_savings,
+            "missing_feeder_size_count": missing_feeder_size_count,
+            "forced_manual_count": forced_manual_count,
             "unmatched_bom_item_count": unmatched_bom_items,
         }
+
+    @classmethod
+    def _load_slot_pins(cls, db: Session, machine_id: int, production_id: int) -> Dict[int, int]:
+        """Épinglages {component_id: slot_position} pour cette machine+production."""
+        rows = (
+            db.query(PnpSlotPin)
+            .filter(
+                PnpSlotPin.machine_id == machine_id,
+                PnpSlotPin.production_id == production_id,
+            )
+            .all()
+        )
+        return {int(row.component_id): int(row.slot_position) for row in rows}
+
+    @classmethod
+    def list_slot_pins(cls, db: Session, machine_id: int, production_id: int) -> List[Dict]:
+        rows = (
+            db.query(PnpSlotPin)
+            .filter(
+                PnpSlotPin.machine_id == machine_id,
+                PnpSlotPin.production_id == production_id,
+            )
+            .all()
+        )
+        return [
+            {"component_id": int(row.component_id), "slot_position": int(row.slot_position)}
+            for row in rows
+        ]
+
+    @classmethod
+    def set_slot_pin(
+        cls,
+        db: Session,
+        machine_id: int,
+        production_id: int,
+        component_id: int,
+        slot_position: int,
+    ) -> Dict:
+        """Épingle un composant à un slot. Refuse (ValueError) en cas de conflit :
+        hors plage, chevauchement de rampe (gros feeder au bord), slot déjà pris par
+        un autre épinglage, ou incompatibilité nozzle. Renvoie le plan recalculé."""
+        machine, _production = cls._get_machine_and_production_context(
+            db=db, machine_id=machine_id, production_id=production_id, include_items=False,
+        )
+        component = db.query(Component).filter(Component.id == component_id).first()
+        if not component:
+            raise ValueError(f"Composant {component_id} introuvable.")
+
+        total_positions = int(machine.num_positions or 0)
+        slot = int(slot_position)
+        if slot < 1 or slot > total_positions:
+            raise ValueError(f"Slot {slot} hors plage (1..{total_positions}).")
+
+        front_cols = (total_positions + 1) // 2
+
+        def ramp_of(position: int) -> str:
+            return "front" if position <= front_cols else "back"
+
+        required = component_slot_usage(component)
+        block = [slot + offset for offset in range(required)]
+        for position in block:
+            if position < 1 or position > total_positions or ramp_of(position) != ramp_of(slot):
+                raise ValueError(
+                    f"Le slot {slot} ne peut pas accueillir ce feeder de {required} position(s) : "
+                    f"trop proche du bord de la rampe (chevauchement)."
+                )
+
+        # Conflit avec un autre composant déjà épinglé.
+        existing_pins = (
+            db.query(PnpSlotPin)
+            .filter(
+                PnpSlotPin.machine_id == machine_id,
+                PnpSlotPin.production_id == production_id,
+                PnpSlotPin.component_id != component_id,
+            )
+            .all()
+        )
+        occupied_by: Dict[int, int] = {}
+        for pin in existing_pins:
+            other = db.query(Component).filter(Component.id == pin.component_id).first()
+            other_usage = component_slot_usage(other) if other else 1
+            for offset in range(other_usage):
+                occupied_by[int(pin.slot_position) + offset] = int(pin.component_id)
+        for position in block:
+            if position in occupied_by:
+                raise ValueError(f"Slot {position} déjà pris par un autre composant épinglé.")
+
+        # Compatibilité nozzle (uniquement si la tête est configurée).
+        num_nozzles = int(machine.num_nozzles or 0)
+        if num_nozzles > 0:
+            columns_per_ramp = (total_positions + 1) // 2
+            raw_layout = None
+            if machine.nozzle_layout:
+                try:
+                    raw_layout = json.loads(machine.nozzle_layout)
+                except (TypeError, ValueError):
+                    raw_layout = None
+            layout = normalize_nozzle_layout(
+                raw_layout if isinstance(raw_layout, list) else None, num_nozzles,
+            )
+            available = available_nozzle_types(layout)
+            nozzle_type = clamp_nozzle_type(
+                deduce_nozzle_type(
+                    component.footprint_pnp or component.package,
+                    extract_feeder_size_mm(component.feeder_type),
+                ),
+                available,
+            )
+            if nozzle_type:
+                column = slot if slot <= columns_per_ramp else slot - columns_per_ramp
+                positions_of_type = [
+                    index for index, value in enumerate(layout[:num_nozzles], start=1)
+                    if int(value) == int(nozzle_type)
+                ]
+                reachable = False
+                for index in positions_of_type:
+                    span = nozzle_reach_columns(index, num_nozzles, columns_per_ramp)
+                    if span and span[0] <= column <= span[1]:
+                        reachable = True
+                        break
+                if not positions_of_type or not reachable:
+                    raise ValueError(
+                        f"Slot {slot} incompatible avec l'emplacement nozzle "
+                        f"(nozzle type {nozzle_type} indisponible ou hors de portée pour cette colonne)."
+                    )
+
+        pin = (
+            db.query(PnpSlotPin)
+            .filter(
+                PnpSlotPin.machine_id == machine_id,
+                PnpSlotPin.production_id == production_id,
+                PnpSlotPin.component_id == component_id,
+            )
+            .first()
+        )
+        if pin:
+            pin.slot_position = slot
+        else:
+            db.add(PnpSlotPin(
+                machine_id=machine_id,
+                production_id=production_id,
+                component_id=component_id,
+                slot_position=slot,
+            ))
+        db.commit()
+        return cls.get_machine_production_feeder_plan(
+            db=db, machine_id=machine_id, production_id=production_id,
+        )
+
+    @classmethod
+    def clear_slot_pin(
+        cls,
+        db: Session,
+        machine_id: int,
+        production_id: int,
+        component_id: int,
+    ) -> Dict:
+        db.query(PnpSlotPin).filter(
+            PnpSlotPin.machine_id == machine_id,
+            PnpSlotPin.production_id == production_id,
+            PnpSlotPin.component_id == component_id,
+        ).delete()
+        db.commit()
+        return cls.get_machine_production_feeder_plan(
+            db=db, machine_id=machine_id, production_id=production_id,
+        )
+
+    @classmethod
+    def _load_forced_manual(cls, db: Session, machine_id: int, production_id: int) -> set:
+        """Ensemble des component_id forcés en pose à la main pour cette machine+production."""
+        rows = (
+            db.query(PnpManualPlacement)
+            .filter(
+                PnpManualPlacement.machine_id == machine_id,
+                PnpManualPlacement.production_id == production_id,
+            )
+            .all()
+        )
+        return {int(row.component_id) for row in rows}
+
+    @classmethod
+    def set_manual_placement(
+        cls,
+        db: Session,
+        machine_id: int,
+        production_id: int,
+        component_id: int,
+        manual: bool,
+    ) -> Dict:
+        """Force (manual=True) ou retire (manual=False) un composant de la pose à la main.
+        Forcer un composant à la main retire un éventuel épinglage (incohérent). Renvoie
+        le plan recalculé."""
+        cls._get_machine_and_production_context(
+            db=db, machine_id=machine_id, production_id=production_id, include_items=False,
+        )
+        existing = (
+            db.query(PnpManualPlacement)
+            .filter(
+                PnpManualPlacement.machine_id == machine_id,
+                PnpManualPlacement.production_id == production_id,
+                PnpManualPlacement.component_id == component_id,
+            )
+            .first()
+        )
+        if manual and not existing:
+            db.add(PnpManualPlacement(
+                machine_id=machine_id, production_id=production_id, component_id=component_id,
+            ))
+            # Un composant à la main ne peut pas être épinglé à un slot.
+            db.query(PnpSlotPin).filter(
+                PnpSlotPin.machine_id == machine_id,
+                PnpSlotPin.production_id == production_id,
+                PnpSlotPin.component_id == component_id,
+            ).delete()
+        elif not manual and existing:
+            db.query(PnpManualPlacement).filter(
+                PnpManualPlacement.machine_id == machine_id,
+                PnpManualPlacement.production_id == production_id,
+                PnpManualPlacement.component_id == component_id,
+            ).delete()
+        db.commit()
+        return cls.get_machine_production_feeder_plan(
+            db=db, machine_id=machine_id, production_id=production_id,
+        )
 
     @classmethod
     def validate_machine_production_order(

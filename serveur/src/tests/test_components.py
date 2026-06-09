@@ -71,6 +71,45 @@ def test_create_duplicate_component_fails():
     assert response2.status_code == 409  # Conflict
 
 
+def test_patch_component_partial_update():
+    """PATCH ne modifie que les champs fournis, sans écraser les autres."""
+    created = client.post("/api/bom/components", json={
+        "reference": "LIB-PATCH-1", "value": "OLDVAL", "package": "0805",
+        "footprint_pnp": "0805", "description": "ancienne", "mpn": "MPN-1",
+    })
+    assert created.status_code == 200
+    cid = created.json()["id"]
+
+    resp = client.patch(f"/api/bom/components/{cid}", json={
+        "feeder_type": "12", "footprint_pnp": "SOIC-8", "description": "nouvelle",
+    })
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["feeder_type"] == "CL12"  # normalisé
+    assert data["footprint_pnp"] == "SOIC-8"
+    assert data["description"] == "nouvelle"
+    # Champs non fournis inchangés
+    assert data["value"] == "OLDVAL"
+    assert data["mpn"] == "MPN-1"
+    assert data["reference"] == "LIB-PATCH-1"
+
+
+def test_patch_component_can_change_value_matching_key():
+    """value (clé de matching) est modifiable via PATCH (avertissement côté UI)."""
+    created = client.post("/api/bom/components", json={
+        "reference": "LIB-PATCH-2", "value": "100nF", "package": "0603",
+    })
+    cid = created.json()["id"]
+    resp = client.patch(f"/api/bom/components/{cid}", json={"value": "220nF"})
+    assert resp.status_code == 200
+    assert resp.json()["value"] == "220nF"
+
+
+def test_patch_component_not_found():
+    resp = client.patch("/api/bom/components/99999999", json={"feeder_type": "8"})
+    assert resp.status_code == 404
+
+
 def test_list_components():
     """Test listing components"""
     # Create a component first

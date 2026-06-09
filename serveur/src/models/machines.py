@@ -2,7 +2,7 @@
 
 import enum
 
-from sqlalchemy import Column, DateTime, Enum, ForeignKey, Integer, String, Table, Text
+from sqlalchemy import Column, DateTime, Enum, ForeignKey, Integer, String, Table, Text, UniqueConstraint
 from sqlalchemy.orm import relationship
 
 from ..database import Base, utcnow
@@ -77,6 +77,55 @@ class PnpFeeder(Base):
     
     def __repr__(self):
         return f"<PnpFeeder {self.size_mm}mm>"
+
+
+class PnpSlotPin(Base):
+    """Épinglage manuel d'un composant à un slot précis pour une production donnée.
+
+    Portée GLOBALE (par machine + production, toutes faces). Le moteur de placement
+    pose ces composants à leur slot avant le remplissage automatique. Les conflits
+    (slot pris, chevauchement gros feeder, nozzle incompatible) sont refusés au moment
+    de la création (validation côté service).
+    """
+
+    __tablename__ = "PNP_SLOT_PINS"
+
+    id = Column(Integer, primary_key=True, index=True)
+    machine_id = Column(Integer, ForeignKey("PNP_MACHINES.id"), nullable=False, index=True)
+    production_id = Column(Integer, ForeignKey("PRODUCTIONS.id"), nullable=False, index=True)
+    component_id = Column(Integer, ForeignKey("COMPONENTS.id"), nullable=False, index=True)
+    slot_position = Column(Integer, nullable=False)
+    created_at = Column(DateTime, default=utcnow)
+    updated_at = Column(DateTime, default=utcnow, onupdate=utcnow)
+
+    __table_args__ = (
+        UniqueConstraint("machine_id", "production_id", "component_id", name="uq_slot_pin_component"),
+    )
+
+    def __repr__(self):
+        return f"<PnpSlotPin m{self.machine_id} p{self.production_id} c{self.component_id} -> slot {self.slot_position}>"
+
+
+class PnpManualPlacement(Base):
+    """Composant forcé en « pose à la main » pour une production donnée (global,
+    toutes faces). Présent ⇒ le composant est exclu du placement PnP et listé dans
+    « à placer à la main », quel que soit l'état de la capacité.
+    """
+
+    __tablename__ = "PNP_MANUAL_PLACEMENTS"
+
+    id = Column(Integer, primary_key=True, index=True)
+    machine_id = Column(Integer, ForeignKey("PNP_MACHINES.id"), nullable=False, index=True)
+    production_id = Column(Integer, ForeignKey("PRODUCTIONS.id"), nullable=False, index=True)
+    component_id = Column(Integer, ForeignKey("COMPONENTS.id"), nullable=False, index=True)
+    created_at = Column(DateTime, default=utcnow)
+
+    __table_args__ = (
+        UniqueConstraint("machine_id", "production_id", "component_id", name="uq_manual_placement_component"),
+    )
+
+    def __repr__(self):
+        return f"<PnpManualPlacement m{self.machine_id} p{self.production_id} c{self.component_id}>"
 
 
 class PnpCart(Base):
