@@ -17,9 +17,9 @@ import { NavLink, useLocation } from 'react-router-dom';
 import { useBomSession } from '../../context/BomSessionContext';
 import { computeWorkflowProgress } from '../../utils/workflowProgress';
 
-const SIDEBAR_WIDTH = 224;
-const TOPBAR_HEIGHT = 54;
-const STEPPER_HEIGHT = 46;
+const SIDEBAR_WIDTH = 200;
+const TOPBAR_HEIGHT = 44;
+const STEPPER_HEIGHT = 36;
 
 // ─── Sidebar nav group ────────────────────────────────────────────────────────
 function NavGroup({ label, pages, location }) {
@@ -52,8 +52,8 @@ function NavGroup({ label, pages, location }) {
                                 borderRadius: 1.5,
                                 mb: 0.25,
                                 px: 1.5,
-                                py: 0.75,
-                                minHeight: 36,
+                                py: 0.5,
+                                minHeight: 32,
                                 '&.Mui-selected': {
                                     backgroundColor: '#059669',
                                     color: '#ffffff',
@@ -98,7 +98,7 @@ function WorkflowStrip({ pages, currentPath, progress = [] }) {
                 borderBottom: '1px solid #27272a',
                 display: 'flex',
                 alignItems: 'center',
-                px: 3,
+                px: 2,
                 gap: 0,
                 overflowX: 'auto'
             }}
@@ -263,7 +263,7 @@ function AppShell({ pages, children }) {
                 <Box
                     sx={{
                         px: 2.5,
-                        py: 2,
+                        py: 1.25,
                         borderBottom: '1px solid #27272a',
                         flexShrink: 0
                     }}
@@ -293,7 +293,7 @@ function AppShell({ pages, children }) {
                 </Box>
 
                 {/* Nav */}
-                <Box sx={{ flex: 1, overflow: 'auto', py: 1.5 }}>
+                <Box sx={{ flex: 1, overflow: 'auto', py: 1 }}>
                     <NavGroup label="Workflow" pages={workflowPages} location={location} />
 
                     {libraryPages.length > 0 && (
@@ -312,11 +312,11 @@ function AppShell({ pages, children }) {
                 </Box>
 
                 {/* Production badge */}
-                <Box sx={{ px: 1.5, py: 1.5, borderTop: '1px solid #27272a', flexShrink: 0 }}>
+                <Box sx={{ px: 1.5, py: 1, borderTop: '1px solid #27272a', flexShrink: 0 }}>
                     <Box
                         sx={{
                             px: 1.5,
-                            py: 1,
+                            py: 0.75,
                             borderRadius: 2,
                             backgroundColor: activeProduction
                                 ? 'rgba(5, 150, 105, 0.08)'
@@ -367,7 +367,7 @@ function AppShell({ pages, children }) {
                         borderBottom: '1px solid #27272a',
                         display: 'flex',
                         alignItems: 'center',
-                        px: 3,
+                        px: 2,
                         gap: 2
                     }}
                 >
@@ -433,8 +433,8 @@ function AppShell({ pages, children }) {
                     sx={{
                         flex: 1,
                         overflow: 'auto',
-                        px: 3,
-                        py: 3,
+                        px: 2,
+                        py: 2,
                     }}
                 >
                     {children}

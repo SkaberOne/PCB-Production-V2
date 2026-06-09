@@ -675,7 +675,6 @@ function CommandPage() {
             <PageHeader
                 eyebrow="Préparation achat"
                 title="Préparation commande composants"
-                description="Le module préparera une liste de composants à commander depuis une ou plusieurs BOM, avec export ERP généré par le backend."
                 actions={(
                     <Stack direction="row" spacing={1}>
                         <Button

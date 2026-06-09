@@ -119,8 +119,11 @@ class Settings(BaseSettings):
     ]
 
     # Supplier APIs
+    # Farnell / element14 Product Search API (REST). Inactive until api_key is set.
     farnell_api_url: Optional[str] = None
     farnell_api_key: Optional[str] = None
+    farnell_store_id: str = "fr.farnell.com"
+    farnell_currency: str = "EUR"
 
     # DigiKey — OAuth2 2-legged (client credentials). Inactive until id+secret set.
     digikey_api_url: Optional[str] = None

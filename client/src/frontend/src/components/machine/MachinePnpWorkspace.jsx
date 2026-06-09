@@ -171,7 +171,6 @@ function MachinePnpWorkspace() {
             <PageHeader
                 eyebrow="Machine PnP"
                 title="Plan d'implantation"
-                description="Affectez vos productions aux machines PnP, optimisez l'implantation des feeders et organisez la séquence de fabrication."
             />
 
             {feedback?.message ? (
