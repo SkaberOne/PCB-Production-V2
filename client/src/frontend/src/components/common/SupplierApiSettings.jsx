@@ -26,6 +26,7 @@ const STATUS_URL = '/marketplace/supplier-offers/status';
 const PROVIDERS = [
     { key: 'mouser', label: 'Mouser', defaultAuth: 'api_key' },
     { key: 'digikey', label: 'DigiKey', defaultAuth: 'client_credentials' },
+    { key: 'farnell', label: 'Farnell', defaultAuth: 'api_key' },
 ];
 
 const AUTH_OPTIONS = [
@@ -36,6 +37,7 @@ const AUTH_OPTIONS = [
 const emptyForm = {
     mouser: { auth_type: 'api_key', api_key: '', client_id: '', client_secret: '' },
     digikey: { auth_type: 'client_credentials', api_key: '', client_id: '', client_secret: '' },
+    farnell: { auth_type: 'api_key', api_key: '', client_id: '', client_secret: '' },
 };
 
 function buildFormFromMeta(meta) {
