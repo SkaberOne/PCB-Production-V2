@@ -2,6 +2,7 @@ import React from 'react';
 import DashboardRoundedIcon from '@mui/icons-material/DashboardRounded';
 import FolderRoundedIcon from '@mui/icons-material/FolderRounded';
 import PrecisionManufacturingRoundedIcon from '@mui/icons-material/PrecisionManufacturingRounded';
+import PriceChangeRoundedIcon from '@mui/icons-material/PriceChangeRounded';
 import SettingsRoundedIcon from '@mui/icons-material/SettingsRounded';
 import ShoppingCartRoundedIcon from '@mui/icons-material/ShoppingCartRounded';
 import StorageRoundedIcon from '@mui/icons-material/StorageRounded';
@@ -16,6 +17,7 @@ import CommandPage from './pages/CommandPage';
 import DashboardPage from './pages/DashboardPage';
 import ErpDefaultsPage from './pages/ErpDefaultsPage';
 import ImportBomPage from './pages/ImportBomPage';
+import CostingPage from './pages/CostingPage';
 import MachinePnpPage from './pages/MachinePnpPage';
 import BaseDeDonneesPage from './pages/BaseDeDonneesPage';
 import SettingsPage from './pages/SettingsPage';
@@ -70,6 +72,15 @@ const pages = [
         step: 5
     },
     {
+        path: '/prix-carte',
+        label: 'Prix carte',
+        title: 'Prix carte à la production',
+        description: 'Coût de revient HT/TTC d\'une carte produite et prix de référence par carte.',
+        icon: PriceChangeRoundedIcon,
+        group: 'library',
+        step: null
+    },
+    {
         path: '/fichier-bom',
         label: 'BOM enregistrées',
         title: 'BOM enregistrées',
@@ -110,6 +121,7 @@ function App() {
                 <Route path="/visualisation-bom" element={<Navigate to="/bom" replace />} />
                 <Route path="/commande-composant" element={<ErrorBoundary context="Commande"><CommandPage /></ErrorBoundary>} />
                 <Route path="/machine-pnp" element={<ErrorBoundary context="Machine PnP"><MachinePnpPage /></ErrorBoundary>} />
+                <Route path="/prix-carte" element={<ErrorBoundary context="Prix carte"><CostingPage /></ErrorBoundary>} />
                 <Route path="/base-donnees" element={<ErrorBoundary context="Base de donnees"><BaseDeDonneesPage /></ErrorBoundary>} />
                 <Route path="/parametre" element={<ErrorBoundary context="Parametres"><SettingsPage /></ErrorBoundary>} />
                 <Route path="/parametre-erp" element={<ErrorBoundary context="Defauts ERP"><ErpDefaultsPage /></ErrorBoundary>} />

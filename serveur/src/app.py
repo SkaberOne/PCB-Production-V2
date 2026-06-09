@@ -11,7 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from .auth import require_api_key
 from .config import settings
 from .database import ensure_sqlite_schema as ensure_sqlite_dev_schema
-from .routes import bom, marketplace, reports
+from .routes import bom, costing, marketplace, reports
 
 
 API_TITLE = "ECB Production Manager API"
@@ -47,6 +47,7 @@ def register_routes(app: FastAPI) -> None:
     app.include_router(bom.router, prefix="/api", tags=["BOM"], dependencies=auth)
     app.include_router(marketplace.router, prefix="/api", tags=["Marketplace"], dependencies=auth)
     app.include_router(reports.router, prefix="/api", tags=["Reports"], dependencies=auth)
+    app.include_router(costing.router, prefix="/api", tags=["Costing"], dependencies=auth)
 
 
 @asynccontextmanager

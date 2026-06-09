@@ -56,6 +56,9 @@ from src.models.commands import (  # noqa: F401
 )
 from src.models.machines import PnpCart, PnpFeeder, PnpMachine  # noqa: F401
 from src.models.production import Production, ProductionBomRevision  # noqa: F401
+from src.models.costing import (  # noqa: F401
+    CostParameters, ProductionCostInput, ProductionCosting,
+)
 
 SQLALCHEMY_TEST_DATABASE_URL = "sqlite:///:memory:"
 
