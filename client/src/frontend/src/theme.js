@@ -194,17 +194,17 @@ const theme = createTheme({
                 root: {
                     borderColor: '#27272a',
                     color: '#f4f4f5',
-                    fontSize: '0.875rem',
-                    lineHeight: 1.4,
-                    padding: '8px 12px',
+                    fontSize: '0.8rem',
+                    lineHeight: 1.35,
+                    padding: '4px 10px',
                     verticalAlign: 'middle'
                 },
                 head: {
                     backgroundColor: '#09090b',
                     fontWeight: 600,
                     color: '#a1a1aa',
-                    fontSize: '0.75rem',
-                    letterSpacing: '0.05em',
+                    fontSize: '0.72rem',
+                    letterSpacing: '0.02em',
                     textTransform: 'uppercase',
                     whiteSpace: 'nowrap'
                 }

@@ -471,7 +471,6 @@ function ImportBomPage() {
             <PageHeader
                 eyebrow="Flux principal"
                 title="Import et pré-traitement BOM"
-                description="Charge une ou plusieurs BOM, corrige les informations utiles, puis sauvegarde la session avant de poursuivre vers la BOM."
             />
 
             {reviewAsync.state.message ? (

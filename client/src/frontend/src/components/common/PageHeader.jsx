@@ -8,40 +8,43 @@ function PageHeader({ eyebrow, title, description, actions = null }) {
             spacing={2}
             justifyContent="space-between"
             alignItems={{ xs: 'flex-start', md: 'flex-end' }}
-            sx={{ mb: 3 }}
+            sx={{ mb: 1.5 }}
         >
             <Box>
                 {eyebrow ? (
-                    <Typography 
-                        variant="overline" 
+                    <Typography
+                        variant="overline"
                         sx={{
                             color: 'text.secondary',
                             letterSpacing: '0.08em',
-                            fontSize: '0.65rem',
-                            fontWeight: 500
+                            fontSize: '0.62rem',
+                            fontWeight: 500,
+                            lineHeight: 1.4
                         }}
                     >
                         {eyebrow}
                     </Typography>
                 ) : null}
                 <Typography
-                    variant="h4"
                     component="h2"
                     sx={{
-                        mb: 1,
+                        mb: description ? 0.5 : 0,
                         color: '#f4f4f5',
-                        fontWeight: 700
+                        fontWeight: 700,
+                        fontSize: '1.05rem',
+                        letterSpacing: '-0.01em'
                     }}
                 >
                     {title}
                 </Typography>
                 {description ? (
-                    <Typography 
-                        variant="body1" 
-                        sx={{ 
+                    <Typography
+                        variant="body2"
+                        sx={{
                             color: '#a1a1aa',
-                            maxWidth: 760,
-                            lineHeight: 1.6
+                            maxWidth: 640,
+                            fontSize: '0.8rem',
+                            lineHeight: 1.45
                         }}
                     >
                         {description}
