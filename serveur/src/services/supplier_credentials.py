@@ -25,8 +25,11 @@ from typing import Any, Dict
 
 logger = logging.getLogger(__name__)
 
-SUPPORTED_PROVIDERS = ("mouser", "digikey")
+SUPPORTED_PROVIDERS = ("mouser", "digikey", "farnell")
 SECRET_FIELDS = ("api_key", "client_secret")
+# Providers authenticating with a client_id + client_secret pair (OAuth2);
+# every other provider defaults to a single API key.
+CLIENT_CREDENTIALS_PROVIDERS = ("digikey",)
 
 # serveur/src/services/supplier_credentials.py -> parents[2] == serveur/
 _SERVER_ROOT = Path(__file__).resolve().parents[2]
@@ -100,7 +103,7 @@ def masked_credentials(data: Dict[str, Dict[str, Any]] | None = None) -> Dict[st
         values = dict(data.get(provider) or {})
         api_key = values.get("api_key") or ""
         client_secret = values.get("client_secret") or ""
-        default_auth = "api_key" if provider == "mouser" else "client_credentials"
+        default_auth = "client_credentials" if provider in CLIENT_CREDENTIALS_PROVIDERS else "api_key"
         result[provider] = {
             "auth_type": values.get("auth_type") or default_auth,
             "client_id": values.get("client_id") or "",

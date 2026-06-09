@@ -14,7 +14,7 @@ from ..database import get_db
 from ..schemas.marketplace import SupplierOfferRefreshRequest
 from ..services import supplier_credentials
 from ..services.supplier_offer_service import SupplierOfferService
-from ..services.suppliers import MouserConnector, DigiKeyConnector
+from ..services.suppliers import MouserConnector, DigiKeyConnector, FarnellConnector
 
 router = APIRouter(prefix="/supplier-offers", tags=["supplier-offers"])
 
@@ -24,6 +24,8 @@ def _build_connector(name: str, stored: dict):
     creds = stored.get(name) or {}
     if name == "mouser":
         return MouserConnector(api_key=(creds.get("api_key") or None))
+    if name == "farnell":
+        return FarnellConnector(api_key=(creds.get("api_key") or None))
     return DigiKeyConnector(
         client_id=(creds.get("client_id") or None),
         client_secret=(creds.get("client_secret") or None),
@@ -40,6 +42,7 @@ class SupplierCredentialUpdate(BaseModel):
 class SupplierCredentialsUpdateRequest(BaseModel):
     mouser: Optional[SupplierCredentialUpdate] = None
     digikey: Optional[SupplierCredentialUpdate] = None
+    farnell: Optional[SupplierCredentialUpdate] = None
 
 
 class ApplyMpnRequest(BaseModel):
@@ -68,7 +71,11 @@ def connectors_status(
     """
     stored = supplier_credentials.load_credentials()
     result = []
-    for connector in (_build_connector("mouser", stored), _build_connector("digikey", stored)):
+    for connector in (
+        _build_connector("mouser", stored),
+        _build_connector("digikey", stored),
+        _build_connector("farnell", stored),
+    ):
         entry = {"supplier": connector.name, "configured": connector.is_configured}
         if test and connector.is_configured:
             try:
