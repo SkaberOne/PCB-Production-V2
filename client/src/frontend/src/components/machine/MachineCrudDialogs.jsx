@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import FileDownloadOutlinedIcon from '@mui/icons-material/FileDownloadOutlined';
 import {
     Alert,
+    Autocomplete,
     Box,
     Button,
     Chip,
@@ -254,6 +255,24 @@ export function CreateMachineDialog({ open, onClose, onCreated }) {
 
 function CartFormFields({ form, setForm, error }) {
     const update = (patch) => setForm((current) => ({ ...current, ...patch }));
+    const [categoryOptions, setCategoryOptions] = useState([]);
+
+    // Catégories déjà créées (catalogue BOM + catégories réellement utilisées),
+    // proposées dans le menu déroulant « Catégorie cible ».
+    useEffect(() => {
+        let active = true;
+        apiClient.get('/bom/categories')
+            .then((res) => {
+                if (!active) return;
+                const names = (res?.data?.items || [])
+                    .map((item) => item?.name)
+                    .filter((name) => typeof name === 'string' && name.trim());
+                setCategoryOptions(Array.from(new Set(names)).sort((a, b) => a.localeCompare(b)));
+            })
+            .catch(() => { if (active) setCategoryOptions([]); });
+        return () => { active = false; };
+    }, []);
+
     return (
         <Stack spacing={2}>
             {error ? <Alert severity="error">{error}</Alert> : null}
@@ -271,7 +290,22 @@ function CartFormFields({ form, setForm, error }) {
                 ))}
             </TextField>
             {form.kind === 'CATEGORY' ? (
-                <TextField label="Catégorie cible" value={form.target_category} onChange={(e) => update({ target_category: e.target.value })} fullWidth size="small" placeholder="Carrier Board" />
+                <Autocomplete
+                    freeSolo
+                    options={categoryOptions}
+                    value={form.target_category || ''}
+                    onChange={(_event, next) => update({ target_category: next || '' })}
+                    onInputChange={(_event, next) => update({ target_category: next || '' })}
+                    renderInput={(params) => (
+                        <TextField
+                            {...params}
+                            label="Catégorie cible"
+                            size="small"
+                            placeholder="Carrier Board"
+                            helperText="Choisir une catégorie existante ou en saisir une nouvelle."
+                        />
+                    )}
+                />
             ) : null}
             <TextField label="Capacité (positions)" type="number" value={form.capacity_positions} onChange={(e) => update({ capacity_positions: e.target.value })} fullWidth size="small" inputProps={{ min: 1, max: 500 }} helperText="Entier entre 1 et 500." />
             <TextField label="Description (optionnel)" value={form.description} onChange={(e) => update({ description: e.target.value })} fullWidth size="small" multiline minRows={2} />
