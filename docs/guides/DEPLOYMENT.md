@@ -88,26 +88,20 @@ Une `API_KEY` d'environnement polluée (`${...}`) est neutralisée automatiqueme
 
 ## Construire l'installeur (NSIS + portable)
 
-`electron-builder` extrait le cache `winCodeSign` qui contient des liens
-symboliques macOS → échoue avec « Cannot create symbolic link : Le client ne
-dispose pas d'un privilège nécessaire » si le **Mode Développeur Windows** est
-désactivé. Activez-le **une fois** (PowerShell **administrateur**) :
-
-```powershell
-# Mode Développeur (octroie le privilège de lien symbolique), admin requis :
-reg add "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\AppModelUnlock" /t REG_DWORD /f /v "AllowDevelopmentWithoutDevLicense" /d "1"
-# Alternative : Paramètres > Confidentialité et sécurité > Pour les développeurs > Mode développeur = Activé
-```
-
-Puis (session normale) :
-
 ```powershell
 .\serveur\CONSTRUIRE_SERVEUR.bat          # backend → dist\ecb-server
-cd client\src\desktop ; npm run dist      # NSIS + portable → client\dist
+cd client\src\desktop ; npm run dist      # NSIS + portable → dist\
 ```
 
-> Le *runtime* packagé (spawn backend, auth, CSP, durcissement) est entièrement
-> validé via `ECB_FORCE_PROD=1` ; seule la fabrique de l'`.exe` attend ce réglage.
+**Pas besoin d'administrateur.** Les scripts `dist` / `dist:portable` / `publish`
+posent `CSC_IDENTITY_AUTO_DISCOVERY=false`, ce qui fait sauter l'extraction du
+cache `winCodeSign` (liens symboliques macOS) — la cause de l'erreur « Cannot
+create symbolic link : Le client ne dispose pas d'un privilège nécessaire » sur
+les sessions sans Mode Développeur. L'installeur est par‑utilisateur
+(`perMachine: false`) : son installation ne demande pas non plus d'élévation.
+
+> Sortie dans `client/src/desktop/dist/` (relatif au dossier desktop) :
+> `PCB Flow Production Suite Setup x.y.z.exe` (NSIS) + `PCB Flow Production Suite x.y.z.exe` (portable).
 
 ## Migrations & reprise des données (Phase E — fait)
 
@@ -148,13 +142,14 @@ inactif (le bouton affiche un message).
 # 1. Bumper la version (SemVer) dans client/src/desktop/package.json
 # 2. Jeton GitHub (PAT scope "repo") dans l'environnement :
 $env:GH_TOKEN = "<votre_PAT_github>"
-# 3. Backend à jour (shell ADMIN pour winCodeSign) :
+# 3. Backend à jour :
 .\serveur\CONSTRUIRE_SERVEUR.bat
 # 4. Publier (installeurs + latest.yml poussés vers GitHub Releases) :
 cd client\src\desktop ; npm run publish
 ```
 
-`npm run publish` = `electron-builder --publish always`. Les postes installés
+`npm run publish` = `electron-builder --publish always` (avec
+`CSC_IDENTITY_AUTO_DISCOVERY=false`, pas d'admin requis). Les postes installés
 détectent alors la nouvelle Release. **Canal beta** : suffixez la version
 (`1.1.0-beta`) et ajoutez `"generateUpdatesFilesForAllChannels": true` au bloc
 `build` pour tester avant promotion en `latest`.

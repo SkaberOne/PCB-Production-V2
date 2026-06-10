@@ -27,11 +27,10 @@
 
 ## À faire par Eric avant/pour la mise en service
 
-1. [ ] **Git** : committer la branche `feat/deploiement-phase-a`, ouvrir la PR
-   vers `dev`, attendre la **CI verte**, merger (cf. CLAUDE.md §10).
-2. [ ] **Mode Développeur Windows persistant** : se déconnecter/reconnecter une
-   fois (ou builder en shell **administrateur**) pour que `npm run dist` passe
-   sans l'erreur winCodeSign.
+1. [x] **Git** : PR #5 mergée dans `dev` (CI verte), branche supprimée. ✅
+2. [x] **App installée en solo SQLite** sur le poste (raccourci Bureau, données
+   chargées). Le build d'installeur ne demande **pas** d'admin (les scripts
+   posent `CSC_IDENTITY_AUTO_DISCOVERY=false`). ✅
 3. [ ] **SQL Server central** : provisionner l'instance + base `ECB_Production`,
    installer **ODBC Driver 17** sur chaque poste.
 4. [ ] **Config par poste** : renseigner `%APPDATA%\PCB Flow Production Suite\server\.env`
