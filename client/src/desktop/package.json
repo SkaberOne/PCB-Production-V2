@@ -1,6 +1,6 @@
 {
   "name": "ecb-production-desktop",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "PCB Flow Production Suite - Desktop App",
   "author": "ECB",
   "main": "src/main.js",

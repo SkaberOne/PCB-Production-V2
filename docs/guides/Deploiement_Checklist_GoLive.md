@@ -38,12 +38,22 @@
 5. [ ] **Reprise des données** : démarrer le backend une fois (schéma créé) puis
    `python import_data.py "<ancienne dev.db>"` ; valider les comptes (BOM,
    composants, machines) dans l'app.
-6. [ ] **Première Release** : bump version, `$env:GH_TOKEN=<PAT repo>`,
-   `npm run publish` (shell admin) → installeurs + `latest.yml` sur GitHub.
-7. [ ] **Cycle complet** : installer → utiliser → publier un patch → vérifier
-   l'auto-update + « Redémarrer pour installer » sur un poste.
+6. [x] **Releases publiées** : v1.0.0 + v1.0.1 sur GitHub (dépôt rendu **public**
+   → auto-update fonctionnel sans jeton côté postes). ✅
+7. [x] **Auto-update testé** : l'app installée est passée seule de 1.0.0 → 1.0.1
+   (détection + téléchargement + installation). ✅
 8. [ ] (Optionnel) **Signature** OV/EV pour supprimer l'avertissement SmartScreen.
-9. [ ] **Rollback** documenté : réinstaller l'installeur de la version précédente.
+9. [ ] **Rollback** : réinstaller l'installeur de la version précédente (Releases).
+
+## À reprendre plus tard (note dev — 2026-06-10)
+
+> **Redémarrage automatique après mise à jour.** Le correctif est commité
+> (`main.js` → `quitAndInstall(false, true)`, commit `b1fdee7`), mais il n'entrera
+> en vigueur qu'à partir de la version **qui exécute** la mise à jour. L'app
+> installée (1.0.1) garde l'ancien comportement : la prochaine MAJ (vers 1.0.2)
+> s'installera mais demandera une relance manuelle ; **à partir de 1.0.2, les MAJ
+> se relanceront seules**. → Publier une **v1.0.2** quand on reprendra ce point
+> (bump version + `npm run publish` + publier le brouillon Release).
 
 ## Rappels de discipline (durée)
 
