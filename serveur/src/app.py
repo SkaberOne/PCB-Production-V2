@@ -2,19 +2,24 @@
 ECB Production Manager backend application.
 """
 
+import logging
 import os
 from contextlib import asynccontextmanager
 
-from fastapi import Depends, FastAPI
+from fastapi import Depends, FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 from .auth import require_api_key
 from .config import settings
 from .database import ensure_sqlite_schema as ensure_sqlite_dev_schema
+from .database import init_or_upgrade_schema, verify_connection_or_raise
 from .routes import bom, costing, marketplace, reports
 
 
-API_TITLE = "ECB Production Manager API"
+logger = logging.getLogger(__name__)
+
+API_TITLE = "PCB Flow Production Suite API"
 API_DESCRIPTION = "API for PCB production management (BOM, Marketplace, PnP, Database)"
 API_VERSION = "1.0.0"
 
@@ -30,6 +35,10 @@ def build_allowed_origins():
         "http://127.0.0.1:3001",
         "http://127.0.0.1:5173",
         "http://127.0.0.1:7071",
+        # Renderer Electron packagé : chargé en file:// → le navigateur envoie
+        # Origin "null". Backend lié à 127.0.0.1 (local), donc accepter cette
+        # origine permet à l'app packagée d'appeler son propre backend (écart D6).
+        "null",
     ]
     configured = list(getattr(settings, "cors_origins", []))
     return sorted({*defaults, *configured})
@@ -55,20 +64,44 @@ async def lifespan(app: FastAPI):
     """Application lifespan: run startup logic, then yield, then teardown."""
     if settings.database_url.startswith("sqlite"):
         ensure_sqlite_dev_schema()
+    else:
+        # Base partagée SQL Server : fail-fast si injoignable (écart D7) plutôt
+        # qu'une bascule SQLite silencieuse. Stoppe le boot avec un message clair.
+        verify_connection_or_raise()
+        # Met le schéma à niveau au démarrage (écart D14) : create_all + stamp
+        # sur base neuve, upgrade head sur base existante.
+        init_or_upgrade_schema()
     yield
     # teardown hooks can go here if needed
 
 
 def create_app() -> FastAPI:
     """Build and configure the FastAPI application."""
+    # En production (api_env=production, posé par Electron pour le backend
+    # packagé), on n'expose pas /docs ni /redoc (cartographie API — écart D10).
+    docs_enabled = settings.api_env.lower() != "production"
     app = FastAPI(
         title=API_TITLE,
         description=API_DESCRIPTION,
         version=API_VERSION,
-        docs_url="/docs",
-        redoc_url="/redoc",
+        docs_url="/docs" if docs_enabled else None,
+        redoc_url="/redoc" if docs_enabled else None,
         lifespan=lifespan,
     )
+
+    @app.exception_handler(Exception)
+    async def _unhandled_exception_handler(request: Request, exc: Exception):
+        """Renvoie un message générique au client et logge le détail côté serveur.
+
+        Évite de fuiter ``str(exc)`` (stack/SQL/chemins) dans les réponses 500
+        (écart D8). Les HTTPException et erreurs de validation gardent leur
+        comportement détaillé (gérés en amont par FastAPI).
+        """
+        logger.exception("Unhandled error on %s %s", request.method, request.url.path)
+        return JSONResponse(
+            status_code=500,
+            content={"detail": "Erreur interne du serveur."},
+        )
 
     app.add_middleware(
         CORSMiddleware,

@@ -15,6 +15,7 @@ from sqlalchemy.orm import Session, joinedload
 
 from ..database import utcnow
 from ..models.bom import Component, ComponentTypeRule, FootprintMapping, MachineFootprintRule
+from ..utils.uploads import read_upload_capped
 from ..schemas.bom import (
     ComponentLibraryImportResponse,
     ComponentTypeRefreshResponse,
@@ -665,7 +666,7 @@ async def import_component_type_rules(
         raise HTTPException(status_code=422, detail="Only .json files are supported for component-type rule import")
 
     try:
-        payload = json.loads((await file.read()).decode("utf-8-sig"))
+        payload = json.loads((await read_upload_capped(file)).decode("utf-8-sig"))
     except Exception as exc:
         raise HTTPException(status_code=422, detail=f"Invalid JSON file: {exc}")
 
@@ -781,7 +782,7 @@ def list_machine_footprints(
 async def import_machine_footprints(file: UploadFile = File(...), db: Session = Depends(get_db)):
     """Import or update the machine-footprint catalog from a semicolon-delimited text file."""
     try:
-        result = machine_footprint_catalog_service.import_delimited_text(await file.read(), db)
+        result = machine_footprint_catalog_service.import_delimited_text(await read_upload_capped(file), db)
         return MachineFootprintCatalogImportResponse(
             success=not result.errors,
             message=f"Imported {result.item_count} machine footprint rows",
@@ -810,7 +811,7 @@ async def import_component_library(file: UploadFile = File(...), db: Session = D
 
     try:
         with tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx") as tmp_file:
-            tmp_file.write(await file.read())
+            tmp_file.write(await read_upload_capped(file))
             tmp_path = tmp_file.name
 
         result = component_library_service.import_workbook(tmp_path, db)
