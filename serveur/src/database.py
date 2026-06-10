@@ -1,10 +1,17 @@
 """SQLAlchemy database configuration."""
 
 import logging
+import sys
 from datetime import datetime, timezone
+from pathlib import Path
 
 from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.orm import declarative_base, sessionmaker
+
+# Importé ici (code analysé par PyInstaller) pour garantir l'embarquement
+# d'Alembic dans l'exe gelé (migrations au boot — D14).
+from alembic import command as _alembic_command
+from alembic.config import Config as _AlembicConfig
 
 from .config import settings
 
@@ -83,6 +90,69 @@ def ensure_sqlite_schema() -> None:
                     text(f'ALTER TABLE "{table.name}" ADD COLUMN "{column.name}" {column_type}{nullable_sql}')
                 )
                 logger.info("SQLite schema auto-sync applied: %s.%s", table.name, column.name)
+
+
+def verify_connection_or_raise() -> None:
+    """Fail-fast : vérifie la connexion DB au démarrage, lève si injoignable.
+
+    Appelé au boot pour les bases non-SQLite (SQL Server prod, écart D7). En cas
+    d'échec on lève une RuntimeError explicite plutôt que de retomber
+    silencieusement en SQLite — un poste mal configuré doit refuser de démarrer
+    avec un message clair, pas tourner sur une base locale fantôme.
+    """
+    try:
+        with engine.connect() as conn:
+            conn.execute(text("SELECT 1"))
+        logger.info("Database connection successful (%s)", engine.url.host or engine.url.database)
+    except Exception as exc:
+        raise RuntimeError(
+            "Connexion à la base de données impossible. Vérifiez la configuration "
+            f"SQL Server (hôte, identifiants, pilote ODBC 17) dans .env. Détail : {exc}"
+        ) from exc
+
+
+def _src_dir() -> Path:
+    """Dossier ``src`` contenant alembic.ini + alembic/ (gelé ou non)."""
+    if getattr(sys, "frozen", False):
+        return Path(getattr(sys, "_MEIPASS", ".")) / "src"
+    return Path(__file__).resolve().parent  # database.py vit dans src/
+
+
+def _alembic_config() -> "_AlembicConfig":
+    src = _src_dir()
+    cfg = _AlembicConfig(str(src / "alembic.ini"))
+    cfg.set_main_option("script_location", str(src / "alembic"))
+    cfg.set_main_option("sqlalchemy.url", settings.database_url)
+    return cfg
+
+
+def init_or_upgrade_schema() -> None:
+    """Met le schéma à niveau au démarrage (D14), de façon idempotente.
+
+    * Base **neuve** (ou pré-Alembic, sans table ``alembic_version``) : on
+      construit le schéma courant complet depuis les modèles ORM
+      (``create_all`` — source de vérité, contourne une chaîne de migrations
+      historique incomplète) puis on **stampe** la révision ``head``.
+    * Base **existante** (gérée par Alembic) : on applique les migrations en
+      attente (``upgrade head``), additives et rétro-compatibles (cf. ADR 0008).
+
+    Les évolutions futures passent donc par des migrations Alembic normales,
+    tout en permettant un déploiement fiable sur une base SQL Server vierge.
+    """
+    # S'assurer que tous les modèles sont enregistrés sur Base.metadata.
+    from . import models  # noqa: F401  (enregistre les tables)
+
+    inspector = inspect(engine)
+    has_alembic = "alembic_version" in inspector.get_table_names()
+    cfg = _alembic_config()
+
+    if not has_alembic:
+        logger.info("Schéma : base neuve → create_all + stamp head")
+        Base.metadata.create_all(bind=engine)
+        _alembic_command.stamp(cfg, "head")
+    else:
+        logger.info("Schéma : base existante → alembic upgrade head")
+        _alembic_command.upgrade(cfg, "head")
 
 
 def get_db():

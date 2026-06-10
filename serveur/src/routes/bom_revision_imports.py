@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 from ..database import utcnow
 from ..models.bom import BomReference, BomRevision
 from ..schemas.bom import BomImportResponse
+from ..utils.uploads import read_upload_capped
 from .bom import get_db
 from .bom_support import (
     _build_revision_session_payload,
@@ -44,7 +45,7 @@ async def import_bom_file(
 
     try:
         with tempfile.NamedTemporaryFile(delete=False, suffix=".txt") as tmp_file:
-            tmp_file.write(await file.read())
+            tmp_file.write(await read_upload_capped(file))
             tmp_path = tmp_file.name
 
         footprint_lookup = _get_footprint_lookup(db)

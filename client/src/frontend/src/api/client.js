@@ -5,20 +5,47 @@
  *   import apiClient from '../api/client';
  *   const res = await apiClient.get('/bom/references');
  *
- * All requests are automatically prefixed with REACT_APP_API_URL.
+ * Base URL resolution (ADR 0006), in priority order:
+ *   1. window.electronAPI.getBackendUrl() — URL/port injectés par Electron au
+ *      runtime quand l'app tourne packagée (backend sur un port libre dynamique).
+ *   2. process.env.REACT_APP_API_URL — dev navigateur / build configuré.
+ *   3. http://localhost:8000/api — repli dev par défaut.
+ *
  * Errors are intercepted globally: network failures log to console,
  * HTTP errors expose response.data.detail when available.
  */
 
 import axios from 'axios';
 
-const BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000/api';
+function resolveBaseUrl() {
+    // Electron injecte l'URL backend (port dynamique) via le preload.
+    if (typeof window !== 'undefined' && window.electronAPI
+        && typeof window.electronAPI.getBackendUrl === 'function') {
+        const injected = window.electronAPI.getBackendUrl();
+        if (injected) return injected;
+    }
+    return process.env.REACT_APP_API_URL || 'http://localhost:8000/api';
+}
+
+function resolveApiKey() {
+    // Clé X-API-Key injectée par Electron en mode packagé (auth obligatoire).
+    if (typeof window !== 'undefined' && window.electronAPI
+        && typeof window.electronAPI.getApiKey === 'function') {
+        return window.electronAPI.getApiKey() || null;
+    }
+    return null;
+}
+
+const BASE_URL = resolveBaseUrl();
+const API_KEY = resolveApiKey();
 
 const apiClient = axios.create({
     baseURL: BASE_URL,
     timeout: 30000,
     headers: {
         'Content-Type': 'application/json',
+        // En mode packagé, toutes les requêtes portent la clé de session.
+        ...(API_KEY ? { 'X-API-Key': API_KEY } : {}),
     },
 });
 
