@@ -1,4 +1,4 @@
-# STRUCTURE DU PROJET — ECB Production Manager
+# STRUCTURE DU PROJET — PCB Flow Production Suite
 > **LOI : Claude doit respecter cette structure sans déroger.**
 > Tout nouveau fichier créé doit être placé dans le bon dossier selon ce document.
 

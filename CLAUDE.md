@@ -1,5 +1,5 @@
 /caveman FULL
-# CLAUDE.md — Guide AI pour ECB Production Manager
+# CLAUDE.md — Guide AI pour PCB Flow Production Suite
 
 > **Lecture obligatoire avant toute action** : ce fichier, puis `STRUCTURE.md`, puis `docs/Projet.md`, puis `docs/CHANGELOG.md` (dernière entrée), puis le dernier audit en date dans `docs/audits/`.
 >
@@ -142,7 +142,7 @@ Détail complet : `STRUCTURE.md`. Règles critiques :
 
 ### Electron (desktop)
 - `main.js` = process principal · `preload.js` = bridge main↔renderer
-- Build : `client/dist/ECB Production Manager.exe`
+- Build : `client/dist/PCB Flow Production Suite.exe`
 
 ---
 
@@ -162,7 +162,7 @@ cd client\src\frontend; npm start                 # React seul (port 3000)
 cd client\src\frontend; npm test
 
 # --- Build ---
-.\client\CONSTRUIRE_CLIENT.bat                    # produit dist/ECB Production Manager.exe
+.\client\CONSTRUIRE_CLIENT.bat                    # produit dist/PCB Flow Production Suite.exe
 ```
 
 URLs : API → `http://localhost:8000` · Swagger → `/docs` · Frontend → `http://localhost:3000`

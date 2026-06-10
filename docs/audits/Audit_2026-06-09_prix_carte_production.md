@@ -2,7 +2,7 @@
 
 ## Contexte
 
-Objectif : ajouter à ECB Production Manager un onglet de **chiffrage du prix d'une
+Objectif : ajouter à PCB Flow Production Suite un onglet de **chiffrage du prix d'une
 carte produite** (coût de revient, voire prix de vente). Cet audit cadre la
 fonctionnalité avant implémentation. Il croise trois sources :
 

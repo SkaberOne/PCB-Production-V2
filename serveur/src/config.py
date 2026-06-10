@@ -1,4 +1,4 @@
-"""Configuration settings for ECB Production Manager."""
+"""Configuration settings for PCB Flow Production Suite."""
 
 import logging
 import os

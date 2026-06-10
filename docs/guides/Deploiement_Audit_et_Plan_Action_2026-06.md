@@ -28,7 +28,7 @@ Mono-application de bureau Windows distribuée en exécutable, **chaque poste** 
 
 ```
 ┌──────────────── Poste utilisateur (Windows) ────────────────┐
-│  ECB Production Manager.exe (Electron)                       │
+│  PCB Flow Production Suite.exe (Electron)                       │
 │   ├─ Fenêtre = build React (chargé en local, file://)       │
 │   └─ spawn → ecb-server.exe (FastAPI packagé PyInstaller)   │
 │        écoute 127.0.0.1:<port libre>                         │

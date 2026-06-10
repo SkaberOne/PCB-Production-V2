@@ -1,6 +1,6 @@
 # Frontend
 
-Frontend React du projet ECB Production Manager.
+Frontend React du projet PCB Flow Production Suite.
 
 ## Lancer
 

@@ -4,7 +4,7 @@
 
 ## Contexte
 
-Objectif : relier **ECB Production Manager** (PCB Production V2) à la machine **Pick & Place SMT1010** (Kayo / K8Pro, logiciel .NET propriétaire).
+Objectif : relier **PCB Flow Production Suite** (PCB Production V2) à la machine **Pick & Place SMT1010** (Kayo / K8Pro, logiciel .NET propriétaire).
 
 Conclusion de l'audit machine (cf. `docs/audits/Audit_2026-06-05_integration_pnp_smt1010.md`) : le SMT1010 a un **import CSV/coordonnées offline avec auto-mapping de colonnes** → pas besoin de générer le format binaire `.ky`. V2 exporte un CSV (ou un TXT = BOM) que la machine importe.
 
@@ -64,7 +64,7 @@ Conventions Eric, appliquées à chaque cellule exportée (CSV et TXT) :
 ## Prompt de reprise (à coller dans un nouveau chat)
 
 ```
-Projet : ECB Production Manager / PCB Production V2 (dossier C:\Users\Eric\Documents\Projet\PCB-Production-V2), branche audit-restructure-2026-05. Lis d'abord CLAUDE.md, STRUCTURE.md, et docs/guides/MachinePnP_Export_Session_2026-06-08.md.
+Projet : PCB Flow Production Suite / PCB Production V2 (dossier C:\Users\Eric\Documents\Projet\PCB-Production-V2), branche audit-restructure-2026-05. Lis d'abord CLAUDE.md, STRUCTURE.md, et docs/guides/MachinePnP_Export_Session_2026-06-08.md.
 
 Contexte : je viens d'implémenter l'export PnP vers ma machine SMT1010 (CSV/TXT par machine, export par face avec suffixe _top/_bot, sanitisation des valeurs en ASCII µ→u/Ω→R/kΩ→K, nozzles rangés petit→grand, et placement des feeders aligné sur les nozzles). Tout est commité et les tests passent.
 

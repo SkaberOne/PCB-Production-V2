@@ -1,1 +1,1 @@
-"""Backend package for ECB Production Manager."""
+"""Backend package for PCB Flow Production Suite."""

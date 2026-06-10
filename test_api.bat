@@ -6,7 +6,7 @@ REM ============================================================
 
 setlocal enabledelayedexpansion
 
-echo === Smoke test API ECB Production Manager ===
+echo === Smoke test API PCB Flow Production Suite ===
 echo.
 
 set ENDPOINTS=^

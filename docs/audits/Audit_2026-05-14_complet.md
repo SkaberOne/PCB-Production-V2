@@ -1,4 +1,4 @@
-# Audit Technique — ECB Production Manager
+# Audit Technique — PCB Flow Production Suite
 **Date** : 14 mai 2026  
 **Version testée** : 1.0.0  
 **Environnement** : Dev local — Python 3.7.9 / pydantic 1.10.12 / SQLite / React 18 / MUI

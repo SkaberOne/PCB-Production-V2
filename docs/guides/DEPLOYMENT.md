@@ -182,6 +182,6 @@ Une version défaillante se règle en **réinstallant la version précédente**
 version installée. Garder les migrations DB **additives** garantit qu'un retour
 arrière applicatif ne casse pas la base partagée (ADR 0008).
 
-> ⚠️ L'installeur déjà construit porte l'ancien nom « ECB Production Manager ».
+> ⚠️ L'installeur déjà construit porte l'ancien nom « PCB Flow Production Suite ».
 > Le renommage en **« PCB Flow Production Suite »** (productName, fenêtre, À
 > propos, titre, API) prendra effet au prochain `npm run dist`.

@@ -1,10 +1,10 @@
 @echo off
-title ECB Production Manager - Client
+title PCB Flow Production Suite - Client
 cd /d "%~dp0"
 
 echo.
 echo ========================================
-echo   ECB Production Manager - CLIENT
+echo   PCB Flow Production Suite - CLIENT
 echo ========================================
 echo.
 
@@ -19,10 +19,10 @@ echo [INFO] Serveur cible : %REACT_APP_API_URL%
 echo.
 
 :: Verifier si app Electron packagee existe
-if exist "dist\\ECB Production Manager.exe" (
+if exist "dist\\PCB Flow Production Suite.exe" (
     echo [MODE] Application packagee detectee
     echo Lancement...
-    start "" "dist\\ECB Production Manager.exe"
+    start "" "dist\\PCB Flow Production Suite.exe"
     goto end
 )
 

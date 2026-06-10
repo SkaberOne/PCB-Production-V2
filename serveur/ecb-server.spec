@@ -1,5 +1,5 @@
 # -*- mode: python ; coding: utf-8 -*-
-"""Spec PyInstaller du backend ECB Production Manager (cf. ADR 0006).
+"""Spec PyInstaller du backend PCB Flow Production Suite (cf. ADR 0006).
 
 Build (depuis serveur/, venv activé) :
     pyinstaller ecb-server.spec --noconfirm
