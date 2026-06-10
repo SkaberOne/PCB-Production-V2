@@ -1,10 +1,10 @@
 @echo off
-title ECB Production Manager - Installation Serveur
+title PCB Flow Production Suite - Installation Serveur
 cd /d "%~dp0.."
 
 echo.
 echo ========================================
-echo   ECB Production Manager - INSTALLATION
+echo   PCB Flow Production Suite - INSTALLATION
 echo ========================================
 echo.
 

@@ -1,5 +1,5 @@
 @echo off
-title ECB Production Manager - Serveur API
+title PCB Flow Production Suite - Serveur API
 cd /d "%~dp0"
 
 :: Neutraliser une variable d'environnement API_KEY polluee (ex: gabarit
@@ -9,7 +9,7 @@ set "API_KEY="
 
 echo.
 echo ========================================
-echo   ECB Production Manager - SERVEUR
+echo   PCB Flow Production Suite - SERVEUR
 echo ========================================
 echo.
 

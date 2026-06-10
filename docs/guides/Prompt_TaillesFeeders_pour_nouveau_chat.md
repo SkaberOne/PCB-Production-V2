@@ -7,7 +7,7 @@
 ---
 
 ```
-Projet : ECB Production Manager / PCB Production V2 (dossier C:\Users\Eric\Documents\Projet\PCB-Production-V2), branche audit-restructure-2026-05. Lis d'abord CLAUDE.md, STRUCTURE.md, docs/CHANGELOG.md (dernière entrée), et le guide docs/guides/MachinePnP_Export_Session_2026-06-08.md.
+Projet : PCB Flow Production Suite / PCB Production V2 (dossier C:\Users\Eric\Documents\Projet\PCB-Production-V2), branche audit-restructure-2026-05. Lis d'abord CLAUDE.md, STRUCTURE.md, docs/CHANGELOG.md (dernière entrée), et le guide docs/guides/MachinePnP_Export_Session_2026-06-08.md.
 
 Contexte : l'export PnP (SMT1010), le placement des feeders (dynamiques→avant / fixés→arrière, remplissage bilatéral petits-à-gauche / gros-à-droite) et le bornage des nozzles aux types montés (503/504/505) sont faits et commités (commit 1824f3b).
 

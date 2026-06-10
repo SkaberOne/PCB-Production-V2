@@ -1,4 +1,4 @@
-# Plan de Déploiement — ECB Production Manager
+# Plan de Déploiement — PCB Flow Production Suite
 
 > Mis à jour : 2026-05-29 — Session 1 (audit + restructure profonde)
 
@@ -122,7 +122,7 @@ cd ..\..\..
 # ou : cd client\src\frontend ; npm start
 
 # Build Electron portable
-.\client\CONSTRUIRE_CLIENT.bat       # → client\dist\ECB Production Manager.exe
+.\client\CONSTRUIRE_CLIENT.bat       # → client\dist\PCB Flow Production Suite.exe
 ```
 
 ### URLs

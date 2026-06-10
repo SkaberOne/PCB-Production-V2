@@ -1,4 +1,4 @@
-# CHANGELOG — ECB Production Manager
+# CHANGELOG — PCB Flow Production Suite
 
 > Historique des sessions de développement, commits et corrections de bugs.
 > Format : `## YYYY-MM-DD — Session N : titre`

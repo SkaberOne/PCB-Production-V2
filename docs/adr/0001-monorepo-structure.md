@@ -8,7 +8,7 @@
 
 ## Contexte
 
-Le projet ECB Production Manager est composé de :
+Le projet PCB Flow Production Suite est composé de :
 - Un backend Python (FastAPI + SQLAlchemy)
 - Un frontend React (SPA MUI v5)
 - Un shell desktop Electron

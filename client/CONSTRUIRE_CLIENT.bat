@@ -1,10 +1,10 @@
 @echo off
-title ECB Production Manager - Build Client
+title PCB Flow Production Suite - Build Client
 cd /d "%~dp0"
 
 echo.
 echo ========================================
-echo   ECB Production Manager - BUILD CLIENT
+echo   PCB Flow Production Suite - BUILD CLIENT
 echo ========================================
 echo.
 

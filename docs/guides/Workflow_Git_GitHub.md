@@ -1,4 +1,4 @@
-# Workflow Git & GitHub — ECB Production Manager
+# Workflow Git & GitHub — PCB Flow Production Suite
 
 > **But du document** : expliquer en clair comment bien utiliser Git et GitHub sur ce projet, et fixer le processus que **toi (Eric) ET Claude** suivez avant/pendant/après chaque modification de code.
 >
@@ -192,7 +192,7 @@ Résultat : même si tu fais `git push origin main` par erreur, GitHub refuse. T
 
 - **CI = Continuous Integration (Intégration Continue)** : à chaque fois que tu pousses du code ou ouvres une PR, un robot (ici **GitHub Actions**) installe le projet sur une machine neuve et **lance les tests tout seul**. Si un test casse, tu le sais en quelques minutes, dans la PR, avant de fusionner. C'est un **garde-fou automatique**.
 
-- **CD = Continuous Delivery/Deployment (Livraison/Déploiement Continu)** : étape d'après — une fois les tests verts, un robot **fabrique et/ou déploie** automatiquement le produit (par ex. construire `ECB Production Manager.exe`, ou publier le serveur). 
+- **CD = Continuous Delivery/Deployment (Livraison/Déploiement Continu)** : étape d'après — une fois les tests verts, un robot **fabrique et/ou déploie** automatiquement le produit (par ex. construire `PCB Flow Production Suite.exe`, ou publier le serveur). 
 
 > Pour ce projet, on met en place la **CI maintenant** (lancer les tests automatiquement). Le **CD** (build automatique de l'`.exe` / déploiement serveur) est une étape **ultérieure** — on pose les fondations d'abord. Voir §6.4.
 
@@ -221,7 +221,7 @@ Tu continues à lancer `pytest` et `npm test` en local pendant que tu codes (plu
 
 Quand la CI sera rodée, on pourra ajouter un workflow qui, à chaque **tag de version** (`v1.2.0`) :
 
-- construit `client/dist/ECB Production Manager.exe` (workflow sur runner Windows) ;
+- construit `client/dist/PCB Flow Production Suite.exe` (workflow sur runner Windows) ;
 - attache l'`.exe` à une **Release** GitHub téléchargeable.
 
 Ce sera un document/itération séparé — pas besoin maintenant.

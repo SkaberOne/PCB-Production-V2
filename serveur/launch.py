@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""Lanceur du serveur ECB Production Manager.
+"""Lanceur du serveur PCB Flow Production Suite.
 
 Lancer depuis le dossier serveur/ :
     ..\\.venv\\Scripts\\python.exe launch.py
@@ -31,7 +31,7 @@ def parse_args() -> argparse.Namespace:
     reload_env = os.getenv("API_RELOAD", "")
     default_reload = reload_env.strip().lower() in {"1", "true", "yes", "on"}
 
-    parser = argparse.ArgumentParser(description="Lance le serveur ECB Production Manager.")
+    parser = argparse.ArgumentParser(description="Lance le serveur PCB Flow Production Suite.")
     parser.add_argument("--host", default=settings.api_host, help="Adresse bind (défaut: 0.0.0.0)")
     parser.add_argument("--port", type=int, default=settings.api_port, help="Port API (défaut: 8000)")
 
@@ -46,7 +46,7 @@ def main() -> None:
     args = parse_args()
 
     print("=" * 55)
-    print("  ECB Production Manager - Serveur API")
+    print("  PCB Flow Production Suite - Serveur API")
     print("=" * 55)
     print(f"  Dossier  : {SERVEUR_DIR}")
     print(f"  API      : http://{args.host}:{args.port}")

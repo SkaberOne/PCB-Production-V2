@@ -1,4 +1,4 @@
-# ECB Production Manager — Description Technique
+# PCB Flow Production Suite — Description Technique
 
 > Mis à jour : 2026-05-29 · Version courante : v1.0.0
 > Vision & priorisation détaillées : voir [[Roadmap]].

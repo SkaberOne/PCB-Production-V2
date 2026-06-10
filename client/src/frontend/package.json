@@ -1,7 +1,7 @@
 {
   "name": "ecb-production-frontend",
   "version": "1.0.0",
-  "description": "ECB Production Manager - React Frontend",
+  "description": "PCB Flow Production Suite - React Frontend",
   "private": true,
   "homepage": ".",
   "proxy": "http://localhost:8000",

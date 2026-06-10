@@ -1,4 +1,4 @@
-# Audit Complet — ECB Production Manager
+# Audit Complet — PCB Flow Production Suite
 **Date** : 29 mai 2026
 **Auteur** : Claude (audit autonome via Cowork mode)
 **Environnement testé** : Windows 11, Python 3.14.5, Node v24.16, FastAPI 0.136, React 18, Pydantic 2.13.4

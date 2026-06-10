@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""Point d'entrée du backend ECB Production Manager packagé (PyInstaller).
+"""Point d'entrée du backend PCB Flow Production Suite packagé (PyInstaller).
 
 Ce module est l'entrée gelée en ``ecb-server.exe`` (cf. ADR 0006). Il diffère de
 ``launch.py`` (entrée dev) sur trois points :
@@ -38,7 +38,7 @@ def _base_dir() -> Path:
 
 
 def _parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Backend packagé ECB Production Manager.")
+    parser = argparse.ArgumentParser(description="Backend packagé PCB Flow Production Suite.")
     parser.add_argument(
         "--host",
         default=os.getenv("ECB_SERVER_HOST", "127.0.0.1"),

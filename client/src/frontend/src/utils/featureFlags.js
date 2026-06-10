@@ -1,5 +1,5 @@
 /**
- * Feature flags runtime — ECB Production Manager.
+ * Feature flags runtime — PCB Flow Production Suite.
  *
  * Les flags sont lus à l'exécution (jamais bakés dans le bundle) afin d'être
  * modifiables après installation sans rebuild, conformément au plan de

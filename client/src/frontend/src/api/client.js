@@ -1,5 +1,5 @@
 /**
- * Centralized axios client for ECB Production Manager API.
+ * Centralized axios client for PCB Flow Production Suite API.
  *
  * Usage:
  *   import apiClient from '../api/client';

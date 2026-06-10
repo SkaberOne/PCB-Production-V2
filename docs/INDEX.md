@@ -1,4 +1,4 @@
-# 🏠 ECB Production Manager — Vault de suivi
+# 🏠 PCB Flow Production Suite — Vault de suivi
 
 > Dernière mise à jour : **2026-05-29** · Version courante : **v1.0.0**
 

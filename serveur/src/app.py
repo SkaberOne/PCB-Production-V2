@@ -1,5 +1,5 @@
 """
-ECB Production Manager backend application.
+PCB Flow Production Suite backend application.
 """
 
 import logging

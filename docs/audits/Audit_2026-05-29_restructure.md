@@ -1,4 +1,4 @@
-# Audit & restructuration — ECB Production Manager
+# Audit & restructuration — PCB Flow Production Suite
 **Date :** 29 mai 2026
 **Branche git :** `audit-restructure-2026-05`
 **Auteur :** Audit Claude (autorisé par Eric)

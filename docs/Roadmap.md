@@ -1,4 +1,4 @@
-# Roadmap & Axes d'amélioration — ECB Production Manager
+# Roadmap & Axes d'amélioration — PCB Flow Production Suite
 
 > Créé le 2026-05-29. Document stratégique vivant : vision, priorités, backlog.
 > À lire avant tout audit/dev pour aligner l'effort. Compléter au fil des sessions.

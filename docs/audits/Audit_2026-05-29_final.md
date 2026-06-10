@@ -2,7 +2,7 @@
 
 **Date** : 29 mai 2026
 **Auteur** : Claude (Cowork autonome)
-**Périmètre** : Audit complet + remediation profonde de l'application ECB Production Manager
+**Périmètre** : Audit complet + remediation profonde de l'application PCB Flow Production Suite
 **Environnement** : Windows 11, Python 3.14.5, Node v24.16, FastAPI 0.136, React 18, Pydantic 2.13.4
 
 ---

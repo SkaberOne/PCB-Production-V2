@@ -1,5 +1,5 @@
 @echo off
-title ECB Production Manager - Build backend (ecb-server.exe)
+title PCB Flow Production Suite - Build backend (ecb-server.exe)
 cd /d "%~dp0"
 
 echo.
