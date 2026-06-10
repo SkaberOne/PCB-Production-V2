@@ -1,4 +1,4 @@
-# SPÉCIFICATIONS - ECB Production Manager
+# SPÉCIFICATIONS - PCB Flow Production Suite
 
 **Date** : 18/03/2026  
 **Version** : 1.0 MVP  

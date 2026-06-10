@@ -6,12 +6,12 @@
  * déploiement (docs/guides/Deploiement_Audit_et_Plan_Action_2026-06.md §6).
  *
  * Ordre de résolution pour chaque flag :
- *   1. window.__ECB_CONFIG__.featureFlags[name]  (injecté par Electron au runtime)
+ *   1. window.__PCBFLOW_CONFIG__.featureFlags[name]  (injecté par Electron au runtime)
  *   2. variable d'env REACT_APP_FEATURE_*         (dev / build)
  *   3. valeur par défaut                          (demi-fini ⇒ false)
  */
 
-const RUNTIME_CONFIG = (typeof window !== 'undefined' && window.__ECB_CONFIG__) || {};
+const RUNTIME_CONFIG = (typeof window !== 'undefined' && window.__PCBFLOW_CONFIG__) || {};
 
 function readBooleanEnv(envValue) {
     if (envValue === undefined || envValue === null || envValue === '') {

@@ -25,9 +25,9 @@ let backendUrl = null; // ex: http://127.0.0.1:54321/api  (null en dev → fallb
 let backendPort = null;
 let apiKey = null; // clé X-API-Key de session (générée au lancement packagé, ADR 0007/Phase B)
 
-// ECB_FORCE_PROD=1 force le comportement « packagé » (spawn backend + build
+// PCBFLOW_FORCE_PROD=1 force le comportement « packagé » (spawn backend + build
 // React local) même hors installeur — utile pour valider le runtime sans signer.
-const isDev = !app.isPackaged && process.env.ECB_FORCE_PROD !== '1';
+const isDev = !app.isPackaged && process.env.PCBFLOW_FORCE_PROD !== '1';
 const devServerUrl = 'http://localhost:3000';
 const appVersion = app.getVersion() || desktopPackage.version || '0.0.0';
 
@@ -45,14 +45,14 @@ const findFreePort = () =>
         });
     });
 
-/** Localise ecb-server.exe : embarqué (extraResources) ou build local de test. */
+/** Localise pcb-flow-server.exe : embarqué (extraResources) ou build local de test. */
 const resolveBackendExe = () => {
-    const packaged = path.join(process.resourcesPath, 'ecb-server', 'ecb-server.exe');
+    const packaged = path.join(process.resourcesPath, 'pcb-flow-server', 'pcb-flow-server.exe');
     if (existsSync(packaged)) return packaged;
 
-    // Repli : build local depuis les sources (serveur/dist/ecb-server/) pour tester
+    // Repli : build local depuis les sources (serveur/dist/pcb-flow-server/) pour tester
     // un lancement « façon packagé » sans installer l'app.
-    const local = path.join(__dirname, '../../../../serveur/dist/ecb-server/ecb-server.exe');
+    const local = path.join(__dirname, '../../../../serveur/dist/pcb-flow-server/pcb-flow-server.exe');
     if (existsSync(local)) return local;
 
     return null;
@@ -95,15 +95,15 @@ const startBackend = (port) => {
     const exe = resolveBackendExe();
     if (!exe) {
         throw new Error(
-            'ecb-server.exe introuvable. Construisez-le via serveur\\CONSTRUIRE_SERVEUR.bat '
+            'pcb-flow-server.exe introuvable. Construisez-le via serveur\\CONSTRUIRE_SERVEUR.bat '
             + 'ou vérifiez l\'embarquement extraResources.',
         );
     }
 
     const childEnv = {
         ...process.env,
-        ECB_SERVER_HOST: '127.0.0.1',
-        ECB_SERVER_PORT: String(port),
+        PCBFLOW_SERVER_HOST: '127.0.0.1',
+        PCBFLOW_SERVER_PORT: String(port),
         // Mode production : /docs et /redoc désactivés côté backend (D10).
         API_ENV: 'production',
         // Auth obligatoire (D5) : on impose NOTRE clé de session, ce qui écrase
@@ -119,7 +119,7 @@ const startBackend = (port) => {
         try {
             fs.mkdirSync(dataDir, { recursive: true });
             seedDefaultConfig(dataDir);
-            childEnv.ECB_DATA_DIR = dataDir;
+            childEnv.PCBFLOW_DATA_DIR = dataDir;
         } catch (err) {
             console.error('Préparation du dossier de données échouée:', err);
         }

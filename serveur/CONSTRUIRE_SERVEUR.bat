@@ -1,5 +1,5 @@
 @echo off
-title PCB Flow Production Suite - Build backend (ecb-server.exe)
+title PCB Flow Production Suite - Build backend (pcb-flow-server.exe)
 cd /d "%~dp0"
 
 echo.
@@ -33,12 +33,12 @@ echo [OK] PyInstaller disponible
 
 :: === Nettoyage build precedent ===
 if exist "build" rmdir /s /q "build"
-if exist "dist\ecb-server" rmdir /s /q "dist\ecb-server"
+if exist "dist\pcb-flow-server" rmdir /s /q "dist\pcb-flow-server"
 
 :: === Build via la spec (mode onedir) ===
 echo.
-echo Construction de ecb-server.exe ...
-%PYTHON_EXE% -m PyInstaller ecb-server.spec --noconfirm
+echo Construction de pcb-flow-server.exe ...
+%PYTHON_EXE% -m PyInstaller pcb-flow-server.spec --noconfirm
 if errorlevel 1 (
     echo [ERREUR] Build PyInstaller echoue.
     pause
@@ -46,10 +46,10 @@ if errorlevel 1 (
 )
 
 echo.
-echo [OK] Backend construit : serveur\dist\ecb-server\ecb-server.exe
+echo [OK] Backend construit : serveur\dist\pcb-flow-server\pcb-flow-server.exe
 echo.
 echo Test rapide (Ctrl+C pour arreter) :
-echo   dist\ecb-server\ecb-server.exe --port 8123
+echo   dist\pcb-flow-server\pcb-flow-server.exe --port 8123
 echo   puis http://127.0.0.1:8123/api/health
 echo.
 pause

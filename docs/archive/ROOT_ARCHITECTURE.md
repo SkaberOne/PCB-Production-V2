@@ -1,4 +1,4 @@
-# ARCHITECTURE TECHNIQUE - ECB Production Manager
+# ARCHITECTURE TECHNIQUE - PCB Flow Production Suite
 
 **Version** : 1.0  
 **Date** : 18/03/2026  
@@ -9,7 +9,7 @@
 
 ```
 ┌─────────────────────────────────────────────────────────┐
-│                    ECB Production Manager               │
+│                    PCB Flow Production Suite               │
 ├─────────────────────────────────────────────────────────┤
 │                                                          │
 │  ┌──────────────────┐         ┌──────────────────┐     │

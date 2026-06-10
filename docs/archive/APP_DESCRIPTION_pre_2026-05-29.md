@@ -1,8 +1,8 @@
-# ECB Production Manager - Description Application
+# PCB Flow Production Suite - Description Application
 
 ## Vue d'ensemble
 
-**ECB Production Manager** est une application de gestion de production PCB orientée Windows desktop.
+**PCB Flow Production Suite** est une application de gestion de production PCB orientée Windows desktop.
 Elle couvre l'import BOM, la revue et harmonisation, la préparation de commandes composants, et la gestion machines PnP (Pick & Place).
 
 ---

@@ -1,5 +1,5 @@
 {
-  "name": "ecb-production-desktop",
+  "name": "pcb-flow-production-suite",
   "version": "1.0.1",
   "description": "PCB Flow Production Suite - Desktop App",
   "author": "ECB",
@@ -47,8 +47,8 @@
         ]
       },
       {
-        "from": "../../../serveur/dist/ecb-server",
-        "to": "ecb-server",
+        "from": "../../../serveur/dist/pcb-flow-server",
+        "to": "pcb-flow-server",
         "filter": [
           "**/*"
         ]

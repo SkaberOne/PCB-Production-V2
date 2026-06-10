@@ -174,7 +174,7 @@ cd client\src\frontend ; npm test
 ### Construire & publier
 
 ```powershell
-.\serveur\CONSTRUIRE_SERVEUR.bat          # backend → dist\ecb-server
+.\serveur\CONSTRUIRE_SERVEUR.bat          # backend → dist\pcb-flow-server
 cd client\src\desktop ; npm run dist      # installeur (NSIS + portable)
 cd client\src\desktop ; npm run publish   # publie une Release (GH_TOKEN requis)
 ```

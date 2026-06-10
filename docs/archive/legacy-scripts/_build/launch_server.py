@@ -1,5 +1,5 @@
 """
-LANCER_SERVEUR.exe - Lanceur du serveur FastAPI ECB Production Manager
+LANCER_SERVEUR.exe - Lanceur du serveur FastAPI PCB Flow Production Suite
 Compile avec : pyinstaller --onefile --console --name LANCER_SERVEUR launch_server.py
 """
 import sys
@@ -22,7 +22,7 @@ def main():
     launch_script = os.path.join(serveur_dir, "launch.py")
 
     print("=" * 52)
-    print("   ECB Production Manager  -  SERVEUR API")
+    print("   PCB Flow Production Suite  -  SERVEUR API")
     print("=" * 52)
     print("Projet  : {}".format(project_root))
     print("Python  : {}".format(python_exe))

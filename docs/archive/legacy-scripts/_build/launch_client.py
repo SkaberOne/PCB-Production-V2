@@ -1,5 +1,5 @@
 """
-LANCER_CLIENT.exe - Lanceur du client React ECB Production Manager
+LANCER_CLIENT.exe - Lanceur du client React PCB Flow Production Suite
 Compile avec : pyinstaller --onefile --console --name LANCER_CLIENT launch_client.py
 """
 import sys
@@ -37,7 +37,7 @@ def main():
     node_modules = os.path.join(frontend_dir, "node_modules")
 
     print("=" * 52)
-    print("   ECB Production Manager  -  CLIENT REACT")
+    print("   PCB Flow Production Suite  -  CLIENT REACT")
     print("=" * 52)
     print("Projet   : {}".format(project_root))
     print("Frontend : {}".format(frontend_dir))

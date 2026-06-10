@@ -227,7 +227,7 @@ Points **positifs** : ORM SQLAlchemy paramétré (pas d'injection SQL), `context
 Aujourd'hui, l'exe Electron **n'embarque pas le backend** : il charge le build React et tape une URL backend **figée au build** (`REACT_APP_API_URL=http://localhost:8000/api`). Pour un déploiement « double-clic », il faut qu'**Electron démarre lui-même le backend Python** et attende qu'il réponde avant d'afficher l'UI.
 
 ### 7.2 Architecture cible recommandée (mono-poste Windows)
-1. **Backend packagé avec PyInstaller** en `ecb-server.exe` (onefile ou onedir), embarquant Python + FastAPI + dépendances. Plus de `pip install` chez l'utilisateur.
+1. **Backend packagé avec PyInstaller** en `pcb-flow-server.exe` (onefile ou onedir), embarquant Python + FastAPI + dépendances. Plus de `pip install` chez l'utilisateur.
 2. **Electron lance le backend en sous-processus** (`child_process.spawn`) au démarrage (`app.whenReady`), sur `127.0.0.1` avec un **port libre détecté dynamiquement** (passé au renderer via `preload`), puis **health-check `/api/health`** avant d'afficher la fenêtre. À la fermeture (`app.on('quit')`), tuer le process backend.
 3. **Base de données** : trancher explicitement. Pour un poste isolé, SQLite packagé + dossier de données utilisateur (`app.getPath('userData')`) ; pour un usage partagé/multi-postes, SQL Server avec fail-fast si injoignable et mot de passe URL-encodé.
 4. **Auth activée** : `API_KEY` obligatoire en prod, générée/stockée localement, comparée en constant-time. Retirer `set API_KEY=` du `.bat`.
@@ -250,7 +250,7 @@ Approche standard 2026 confirmée : **`electron-updater` + `electron-builder` + 
 - Versionner un `client.env.example` (le `client.env` actuel est absent du repo → build non reproductible).
 
 ### 7.5 Séquence de mise en œuvre suggérée (plus tard)
-1. PyInstaller backend → `ecb-server.exe` + test manuel.
+1. PyInstaller backend → `pcb-flow-server.exe` + test manuel.
 2. Electron : spawn backend + health-check + teardown + port dynamique.
 3. Auth activée + DB tranchée + migrations au boot.
 4. `electron-builder` publish GitHub + `electron-updater` (auto + bouton manuel).

@@ -4,7 +4,7 @@ cd /d "%~dp0\.."
 
 echo.
 echo ====================================================
-echo   ECB Production Manager - BUILD DES LANCEURS
+echo   PCB Flow Production Suite - BUILD DES LANCEURS
 echo ====================================================
 echo   Projet : %CD%
 echo ====================================================

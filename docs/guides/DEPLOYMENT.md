@@ -6,30 +6,30 @@
 ## Architecture cible
 
 Chaque poste exécute son frontend React + son backend FastAPI **packagé**
-(`ecb-server.exe`), lancé automatiquement par Electron, tous connectés à un
+(`pcb-flow-server.exe`), lancé automatiquement par Electron, tous connectés à un
 **SQL Server central** (ADR 0008). Mise à jour par `electron-updater` (ADR 0007).
 
 ## Chaîne de build (Windows)
 
 ```powershell
-# 1. Backend → ecb-server.exe  (PyInstaller, mode onedir)
+# 1. Backend → pcb-flow-server.exe  (PyInstaller, mode onedir)
 .\serveur\CONSTRUIRE_SERVEUR.bat
-#   produit : serveur\dist\ecb-server\ecb-server.exe
+#   produit : serveur\dist\pcb-flow-server\pcb-flow-server.exe
 
-# 2. App desktop (embarque le build React + ecb-server.exe via extraResources)
+# 2. App desktop (embarque le build React + pcb-flow-server.exe via extraResources)
 .\client\CONSTRUIRE_CLIENT.bat
 #   ou : cd client\src\desktop ; npm run dist        (NSIS + portable)
 #        cd client\src\desktop ; npm run dist:portable
 ```
 
 > L'étape 2 suppose l'étape 1 faite : `extraResources` copie
-> `serveur/dist/ecb-server/` dans l'app. Reconstruire le backend après toute
+> `serveur/dist/pcb-flow-server/` dans l'app. Reconstruire le backend après toute
 > modif serveur.
 
 ## Comment l'app démarre (ADR 0006)
 
 1. Electron détecte un **port libre** sur `127.0.0.1`.
-2. Il **spawn** `ecb-server.exe --host 127.0.0.1 --port <libre>`.
+2. Il **spawn** `pcb-flow-server.exe --host 127.0.0.1 --port <libre>`.
 3. Écran d'attente jusqu'à ce que `GET /api/health` réponde **200** (timeout 30 s).
 4. L'URL/port est injectée au renderer (`window.electronAPI.getBackendUrl()`) ;
    `api/client.js` la lit au runtime (plus de port 8000 figé).
@@ -44,9 +44,9 @@ Pour valider le critère « double-clic démarre sans Python » avec une base lo
 
 ```powershell
 # Mettre un .env SQLite à côté de l'exe :
-echo DATABASE_URL=sqlite:///./database/dev.db > serveur\dist\ecb-server\.env
+echo DATABASE_URL=sqlite:///./database/dev.db > serveur\dist\pcb-flow-server\.env
 # (copier serveur\database\dev.db à côté de l'exe pour charger des données)
-serveur\dist\ecb-server\ecb-server.exe --port 8123
+serveur\dist\pcb-flow-server\pcb-flow-server.exe --port 8123
 #   → http://127.0.0.1:8123/api/health doit répondre {"status":"ok"}
 ```
 
@@ -81,7 +81,7 @@ Une `API_KEY` d'environnement polluée (`${...}`) est neutralisée automatiqueme
 - **Menu durci en prod** : retrait de `reload` / `forceReload` / `toggleDevTools`
   (DevTools inaccessibles, validé : `Ctrl+Shift+I` sans effet).
 - **Config runtime post-install** : une fois installé (Program Files = lecture
-  seule), Electron pose `ECB_DATA_DIR` = `%APPDATA%\…\userData\server`
+  seule), Electron pose `PCBFLOW_DATA_DIR` = `%APPDATA%\…\userData\server`
   (inscriptible) et y **sème un `.env` par défaut** + dossiers runtime au 1er
   lancement. L'utilisateur édite ce `.env` (SQL Server, MAX_UPLOAD_MB, flags).
 - `client.env.example` versionné (modèle de config dev).
@@ -89,7 +89,7 @@ Une `API_KEY` d'environnement polluée (`${...}`) est neutralisée automatiqueme
 ## Construire l'installeur (NSIS + portable)
 
 ```powershell
-.\serveur\CONSTRUIRE_SERVEUR.bat          # backend → dist\ecb-server
+.\serveur\CONSTRUIRE_SERVEUR.bat          # backend → dist\pcb-flow-server
 cd client\src\desktop ; npm run dist      # NSIS + portable → dist\
 ```
 

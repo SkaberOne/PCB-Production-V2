@@ -27,7 +27,7 @@ composants, productions et configurations machine soient communs à tous les pos
 ### 1. SQL Server central, backend local par poste
 
 Une instance **SQL Server** héberge la base unique `ECB_Production`. Chaque
-`ecb-server.exe` s'y connecte en **ODBC Driver 17** (`mssql+pyodbc`). Aucun serveur
+`pcb-flow-server.exe` s'y connecte en **ODBC Driver 17** (`mssql+pyodbc`). Aucun serveur
 applicatif central : seule la **donnée** est centralisée.
 
 ### 2. Fail-fast en production (lève D7)
