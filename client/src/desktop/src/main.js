@@ -408,7 +408,9 @@ const setupAutoUpdater = () => {
             defaultId: 0,
             cancelId: 1,
         }).then(({ response }) => {
-            if (response === 0) autoUpdater.quitAndInstall();
+            // (isSilent=false, isForceRunAfter=true) : relance l'app après
+            // l'installation de la MAJ (sinon elle s'installe mais ne redémarre pas).
+            if (response === 0) autoUpdater.quitAndInstall(false, true);
         });
     });
 
