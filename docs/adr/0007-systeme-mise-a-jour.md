@@ -34,7 +34,7 @@ automatiquement les **installeurs** (NSIS) **et** le fichier de métadonnées
 
 ### 2. Ce qui est mis à jour = frontend + backend d'un bloc
 
-L'app Electron embarque le build React **et** `ecb-server.exe` (ADR 0006). Une mise
+L'app Electron embarque le build React **et** `pcb-flow-server.exe` (ADR 0006). Une mise
 à jour pousse donc **les deux ensemble** → cohérence frontend/backend garantie, pas
 de désynchronisation de contrat API entre couches d'un même poste.
 

@@ -30,7 +30,7 @@ Mono-application de bureau Windows distribuée en exécutable, **chaque poste** 
 ┌──────────────── Poste utilisateur (Windows) ────────────────┐
 │  PCB Flow Production Suite.exe (Electron)                       │
 │   ├─ Fenêtre = build React (chargé en local, file://)       │
-│   └─ spawn → ecb-server.exe (FastAPI packagé PyInstaller)   │
+│   └─ spawn → pcb-flow-server.exe (FastAPI packagé PyInstaller)   │
 │        écoute 127.0.0.1:<port libre>                         │
 └───────────────────────────┬─────────────────────────────────┘
                             │ ODBC Driver 17
@@ -72,8 +72,8 @@ Justification : chaque poste reste autonome côté UI/API (pas de serveur applic
 Ordre conçu pour livrer un exécutable **fonctionnel d'abord**, **sûr ensuite**, **auto-updatable enfin**.
 
 ### Phase A — Rendre l'app autonome (lève D1, D2, D4) · ~1,5 j
-1. **Packager le backend** avec PyInstaller → `ecb-server.exe` (onedir recommandé pour le démarrage rapide + drivers ODBC). Inclure les fichiers de migration Alembic.
-2. **Electron démarre le backend** : dans `app.whenReady`, `child_process.spawn(ecb-server.exe)` sur `127.0.0.1` + **port libre détecté dynamiquement**, transmis au renderer via `preload` (`contextBridge`).
+1. **Packager le backend** avec PyInstaller → `pcb-flow-server.exe` (onedir recommandé pour le démarrage rapide + drivers ODBC). Inclure les fichiers de migration Alembic.
+2. **Electron démarre le backend** : dans `app.whenReady`, `child_process.spawn(pcb-flow-server.exe)` sur `127.0.0.1` + **port libre détecté dynamiquement**, transmis au renderer via `preload` (`contextBridge`).
 3. **Health-check** : attendre `GET /api/health` 200 (avec timeout + écran d'attente) avant d'afficher la fenêtre principale.
 4. **Teardown** : `app.on('before-quit')` → tuer le process backend (et nettoyer en cas de crash).
 5. **URL backend runtime** : le renderer lit l'URL/port injecté par Electron au lieu de `REACT_APP_API_URL` baké.
@@ -90,7 +90,7 @@ Ordre conçu pour livrer un exécutable **fonctionnel d'abord**, **sûr ensuite*
 12. **Build prod propre** : retirer `DANGEROUSLY_DISABLE_HOST_CHECK` et tout flag dev du bundle de production.
 
 ### Phase C — Packaging exécutable (lève D12, D13) · ~1 j
-13. `electron-builder` cible **NSIS** (installeur avec raccourcis — déjà configuré) **et** portable. Embarquer `ecb-server.exe` via `extraResources`.
+13. `electron-builder` cible **NSIS** (installeur avec raccourcis — déjà configuré) **et** portable. Embarquer `pcb-flow-server.exe` via `extraResources`.
 14. **Durcir Electron** : retirer `toggleDevTools`/`reload` du menu prod, ajouter `setWindowOpenHandler` (refuser les fenêtres externes), `will-navigate` (bloquer la navigation hors app), une CSP.
 15. **Versionner `client.env.example`** ; documenter la config runtime (URL/port backend, connexion DB) éditable **après** installation sans rebuild.
 
@@ -113,7 +113,7 @@ Ordre conçu pour livrer un exécutable **fonctionnel d'abord**, **sûr ensuite*
 ## 5. Système de mise à jour — détail
 
 - **Approche** (confirmée à jour 2026) : `electron-updater` + `electron-builder` + **GitHub Releases**. À chaque release, `electron-builder` publie automatiquement installeurs **et** `latest.yml` (métadonnées requises par l'updater).
-- **Ce qui est mis à jour** : l'app Electron embarque frontend **et** `ecb-server.exe` → une mise à jour pousse **les deux d'un bloc** (cohérence frontend/backend garantie).
+- **Ce qui est mis à jour** : l'app Electron embarque frontend **et** `pcb-flow-server.exe` → une mise à jour pousse **les deux d'un bloc** (cohérence frontend/backend garantie).
 - **Migrations** : jouées au boot du backend packagé après mise à jour (Phase E). Toujours **rétro-compatibles** tant que des postes peuvent être sur l'ancienne version.
 - **Versionnage** : SemVer. `MAJOR` = rupture (schéma/contrat), `MINOR` = fonctionnalité, `PATCH` = correctif. Aujourd'hui `1.0.0`.
 - **Hébergement** : GitHub Releases (simple) ; alternative serveur HTTP générique / S3 pour du privé.

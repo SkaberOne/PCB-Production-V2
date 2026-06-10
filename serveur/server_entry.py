@@ -1,14 +1,14 @@
 #!/usr/bin/env python
 """Point d'entrée du backend PCB Flow Production Suite packagé (PyInstaller).
 
-Ce module est l'entrée gelée en ``ecb-server.exe`` (cf. ADR 0006). Il diffère de
+Ce module est l'entrée gelée en ``pcb-flow-server.exe`` (cf. ADR 0006). Il diffère de
 ``launch.py`` (entrée dev) sur trois points :
 
 * **Robuste en mode ``frozen``** : résout le dossier de données via
   ``sys.executable`` (pas ``__file__``, qui pointe vers le bundle temporaire).
 * **Bind 127.0.0.1 par défaut** : le backend ne sert que le renderer local du
   même poste (jamais exposé au réseau).
-* **Port reçu d'Electron** : ``--port`` / ``ECB_SERVER_PORT`` (port libre détecté
+* **Port reçu d'Electron** : ``--port`` / ``PCBFLOW_SERVER_PORT`` (port libre détecté
   par le process Electron), au lieu d'un 8000 figé.
 
 En dev (non gelé) il reste lançable directement :
@@ -24,12 +24,12 @@ from pathlib import Path
 def _base_dir() -> Path:
     """Dossier de travail (où vivent .env, database/, logs/, uploads/...).
 
-    * Gelé (PyInstaller) : dossier de l'exécutable, ou ``ECB_DATA_DIR`` si défini
+    * Gelé (PyInstaller) : dossier de l'exécutable, ou ``PCBFLOW_DATA_DIR`` si défini
       (utile quand l'exe est installé dans un emplacement non inscriptible type
       Program Files — la config runtime pointe alors vers un dossier inscriptible).
     * Dev : le dossier ``serveur/`` qui contient ce fichier.
     """
-    override = os.getenv("ECB_DATA_DIR")
+    override = os.getenv("PCBFLOW_DATA_DIR")
     if override:
         return Path(override).resolve()
     if getattr(sys, "frozen", False):
@@ -41,13 +41,13 @@ def _parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Backend packagé PCB Flow Production Suite.")
     parser.add_argument(
         "--host",
-        default=os.getenv("ECB_SERVER_HOST", "127.0.0.1"),
+        default=os.getenv("PCBFLOW_SERVER_HOST", "127.0.0.1"),
         help="Adresse de bind (défaut: 127.0.0.1 — local uniquement).",
     )
     parser.add_argument(
         "--port",
         type=int,
-        default=int(os.getenv("ECB_SERVER_PORT", "8000")),
+        default=int(os.getenv("PCBFLOW_SERVER_PORT", "8000")),
         help="Port d'écoute (injecté par Electron).",
     )
     return parser.parse_args()

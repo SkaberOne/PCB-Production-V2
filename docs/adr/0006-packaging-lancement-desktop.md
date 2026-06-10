@@ -26,14 +26,14 @@ central** (cf. ADR 0008). Un déploiement « double-clic » exige donc qu'Electr
 
 ### 1. Backend packagé en exécutable autonome avec PyInstaller
 
-Le backend FastAPI est gelé en `ecb-server.exe` via **PyInstaller en mode `onedir`**
+Le backend FastAPI est gelé en `pcb-flow-server.exe` via **PyInstaller en mode `onedir`**
 (et non `onefile`) : démarrage plus rapide, et surtout compatibilité avec les
-drivers ODBC et les binaires natifs (pyodbc). Le dossier `ecb-server/` est embarqué
+drivers ODBC et les binaires natifs (pyodbc). Le dossier `pcb-flow-server/` est embarqué
 dans l'app Electron via `extraResources` (cf. ADR 0006 / Phase C).
 
 - Point d'entrée gelé dédié : `serveur/server_entry.py` (robuste quand `frozen`,
   résout les chemins via `sys._MEIPASS` / `sys.executable`, pas via `__file__`).
-- Spec PyInstaller : `serveur/ecb-server.spec` — déclare les `hiddenimports`
+- Spec PyInstaller : `serveur/pcb-flow-server.spec` — déclare les `hiddenimports`
   (uvicorn workers, pyodbc, dialectes SQLAlchemy) et embarque en `datas` les
   fichiers de migration Alembic (`src/alembic/`) + `alembic.ini`.
 - Le backend gelé **bind `127.0.0.1` uniquement** (jamais `0.0.0.0`) : il ne sert
@@ -45,7 +45,7 @@ Dans `client/src/desktop/src/main.js`, séquence au `app.whenReady` :
 
 1. **Détecter un port TCP libre** sur `127.0.0.1` (pas de port 8000 en dur →
    lève D4 et évite les collisions multi-instances).
-2. **`child_process.spawn`** de `ecb-server.exe` avec le port choisi passé en
+2. **`child_process.spawn`** de `pcb-flow-server.exe` avec le port choisi passé en
    argument/env. En dev (non packagé), spawn de `python launch.py` à la place.
 3. **Health-check** : poller `GET http://127.0.0.1:<port>/api/health` jusqu'à `200`
    (timeout borné, ex. 30 s) en affichant un **écran d'attente** ; n'afficher la
@@ -96,7 +96,7 @@ Le port n'est donc plus figé au build.
 
 ## Références
 - Plan : `docs/guides/Deploiement_Audit_et_Plan_Action_2026-06.md` (Phase A, §9.1)
-- Fichiers : `serveur/server_entry.py`, `serveur/ecb-server.spec`,
+- Fichiers : `serveur/server_entry.py`, `serveur/pcb-flow-server.spec`,
   `client/src/desktop/src/main.js`, `client/src/desktop/src/preload.js`,
   `client/src/frontend/src/api/client.js`
 - ADR liés : `0001-monorepo-structure.md`, `0007-systeme-mise-a-jour.md`,

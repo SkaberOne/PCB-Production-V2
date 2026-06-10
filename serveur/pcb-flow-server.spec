@@ -2,10 +2,10 @@
 """Spec PyInstaller du backend PCB Flow Production Suite (cf. ADR 0006).
 
 Build (depuis serveur/, venv activé) :
-    pyinstaller ecb-server.spec --noconfirm
+    pyinstaller pcb-flow-server.spec --noconfirm
 
-Produit  dist/ecb-server/ecb-server.exe  (mode onedir : démarrage rapide +
-compatibilité pyodbc / ODBC). Le dossier dist/ecb-server est ensuite embarqué
+Produit  dist/pcb-flow-server/pcb-flow-server.exe  (mode onedir : démarrage rapide +
+compatibilité pyodbc / ODBC). Le dossier dist/pcb-flow-server est ensuite embarqué
 dans l'app Electron via extraResources (Phase C).
 
 Mode onedir choisi (pas onefile) : évite l'extraction temporaire à chaque
@@ -62,7 +62,7 @@ exe = EXE(
     a.scripts,
     [],
     exclude_binaries=True,
-    name='ecb-server',
+    name='pcb-flow-server',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
@@ -83,5 +83,5 @@ coll = COLLECT(
     strip=False,
     upx=False,
     upx_exclude=[],
-    name='ecb-server',
+    name='pcb-flow-server',
 )
