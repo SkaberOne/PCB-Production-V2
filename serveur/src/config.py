@@ -4,6 +4,7 @@ import logging
 import os
 from pathlib import Path
 from typing import List, Optional
+from urllib.parse import quote_plus
 
 
 def _load_env_file(path: str = ".env") -> None:
@@ -16,16 +17,25 @@ def _load_env_file(path: str = ".env") -> None:
     env_path = Path(path)
     if not env_path.exists():
         return
-    with open(env_path, encoding="utf-8") as f:
-        for line in f:
-            line = line.strip()
-            if not line or line.startswith("#") or "=" not in line:
-                continue
-            key, _, value = line.partition("=")
-            key = key.strip()
-            value = value.strip().strip('"').strip("'")
-            if key and key not in os.environ:
-                os.environ[key] = value
+    # Tolère les .env enregistrés par Notepad / PowerShell (`echo > .env` produit
+    # de l'UTF-16 avec BOM). On sniffe le BOM avant de décoder pour éviter un
+    # UnicodeDecodeError au démarrage (byte 0xff en UTF-16 LE).
+    raw = env_path.read_bytes()
+    if raw.startswith((b"\xff\xfe", b"\xfe\xff")):
+        text = raw.decode("utf-16", errors="ignore")
+    elif raw.startswith(b"\xef\xbb\xbf"):
+        text = raw.decode("utf-8-sig", errors="ignore")
+    else:
+        text = raw.decode("utf-8", errors="ignore")
+    for line in text.splitlines():
+        line = line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, _, value = line.partition("=")
+        key = key.strip()
+        value = value.strip().strip('"').strip("'")
+        if key and key not in os.environ:
+            os.environ[key] = value
 
 
 # Load .env before pydantic Settings is instantiated so os.getenv() works
@@ -70,9 +80,10 @@ class Settings(BaseSettings):
     # API
     api_host: str = "0.0.0.0"
     api_port: int = 8000
-    api_env: str = "development"
+    api_env: str = "development"  # "production" → /docs et /redoc désactivés
     database_url_override: Optional[str] = None  # maps to DATABASE_URL
     api_key: Optional[str] = None  # X-API-Key; empty/absent = open (dev mode)
+    max_upload_mb: int = 25  # taille max d'un fichier importé (écart D9)
 
     # SQL Server
     sql_server_host: str = "localhost"
@@ -94,8 +105,12 @@ class Settings(BaseSettings):
         if override:
             return override
 
+        # URL-encoder user et mot de passe : supporte les caractères spéciaux
+        # (@ : / etc.) qui cassaient silencieusement la connexion (écart D7).
+        user = quote_plus(self.sql_server_user)
+        password = quote_plus(self.sql_server_password)
         return (
-            f"mssql+pyodbc://{self.sql_server_user}:{self.sql_server_password}"
+            f"mssql+pyodbc://{user}:{password}"
             f"@{self.sql_server_host}:{self.sql_server_port}/{self.sql_server_database}"
             f"?driver={self.sql_server_driver.replace(' ', '+')}"
         )
@@ -152,15 +167,17 @@ class Settings(BaseSettings):
     erp_default_delay: str = "URGENT"
     erp_default_remark: str = "mise en bobine"
 
+    # NB : on NE passe PAS env_file à pydantic. Le .env est déjà chargé dans
+    # os.environ par _load_env_file() (robuste aux BOM UTF-8/UTF-16). Laisser
+    # pydantic relire le fichier provoquait un UnicodeDecodeError sur les .env
+    # UTF-16 (python-dotenv lit en utf-8 strict).
     if _PYDANTIC_V2:
         model_config = SettingsConfigDict(
-            env_file=".env",
             case_sensitive=False,
             extra="ignore",  # silently ignore unknown env vars (api_reload, etc.)
         )
     else:
         class Config:
-            env_file = ".env"
             case_sensitive = False
             extra = "ignore"
 
@@ -208,7 +225,7 @@ def _configure_logging() -> logging.Logger:
 
 _ensure_directories()
 logger = _configure_logging()
-logger.info("ECB Production Manager started in %s mode", settings.api_env)
+logger.info("PCB Flow Production Suite started in %s mode", settings.api_env)
 if settings.database_url.startswith("sqlite"):
     logger.info("Database: SQLite (%s)", settings.database_url)
 else:

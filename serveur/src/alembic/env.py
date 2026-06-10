@@ -85,6 +85,6 @@ def run_migrations_online() -> None:
 if context.is_offline_mode():
     run_migrations_offline()
 else:
-    # For autogenerate, we prefer offline mode to avoid DB connection issues
-    # unless we're explicitly running online migrations
-    run_migrations_offline()
+    # Mode online : applique réellement les migrations à la base connectée
+    # (requis pour `alembic upgrade head` au boot du backend — D14).
+    run_migrations_online()

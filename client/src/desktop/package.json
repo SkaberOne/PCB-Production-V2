@@ -1,12 +1,13 @@
 {
   "name": "ecb-production-desktop",
   "version": "1.0.0",
-  "description": "ECB Production Manager - Desktop App",
-  "author": "ECB Production Manager",
+  "description": "PCB Flow Production Suite - Desktop App",
+  "author": "ECB",
   "main": "src/main.js",
   "homepage": "./",
   "dependencies": {
-    "electron-squirrel-startup": "^1.0.1"
+    "electron-squirrel-startup": "^1.0.1",
+    "electron-updater": "^6.8.9"
   },
   "devDependencies": {
     "electron": "^34.0.0",
@@ -21,11 +22,17 @@
     "build:portable": "npm run build:renderer && electron-builder --publish never --win portable",
     "build": "npm run build:renderer && npm run build:desktop",
     "dist": "npm run build:renderer && electron-builder --publish never",
-    "dist:portable": "npm run build:renderer && electron-builder --publish never --win portable"
+    "dist:portable": "npm run build:renderer && electron-builder --publish never --win portable",
+    "publish": "npm run build:renderer && electron-builder --publish always"
   },
   "build": {
     "appId": "com.ecb.production",
-    "productName": "ECB Production Manager",
+    "productName": "PCB Flow Production Suite",
+    "publish": {
+      "provider": "github",
+      "owner": "SkaberOne",
+      "repo": "PCB-Production-V2"
+    },
     "files": [
       "src/**/*",
       "package.json",
@@ -35,6 +42,13 @@
       {
         "from": "../frontend/build",
         "to": "frontend/build",
+        "filter": [
+          "**/*"
+        ]
+      },
+      {
+        "from": "../../../serveur/dist/ecb-server",
+        "to": "ecb-server",
         "filter": [
           "**/*"
         ]

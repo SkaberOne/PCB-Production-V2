@@ -20,6 +20,25 @@ contextBridge.exposeInMainWorld('electronAPI', {
     // Get app version
     getVersion: () => appVersion,
 
+    // URL du backend injectée par le process principal au runtime (ADR 0006).
+    // Synchrone : lue au chargement par api/client.js. null en dev → fallback.
+    getBackendUrl: () => {
+        try {
+            return ipcRenderer.sendSync('ecb:get-backend-url');
+        } catch (err) {
+            return null;
+        }
+    },
+
+    // Clé X-API-Key de session, injectée par le process principal (Phase B).
+    getApiKey: () => {
+        try {
+            return ipcRenderer.sendSync('ecb:get-api-key');
+        } catch (err) {
+            return null;
+        }
+    },
+
     // Platform info
     platform: process.platform,
     nodeVersion: process.versions.node,

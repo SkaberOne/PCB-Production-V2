@@ -16,10 +16,24 @@ Or globally on the FastAPI app::
     app = FastAPI(dependencies=[Depends(require_api_key)])
 """
 
+import hmac
+
 from fastapi import HTTPException, Security, status
 from fastapi.security import APIKeyHeader
 
 from .config import settings
+
+
+def _configured_key() -> str:
+    """Clé API effective, ou chaîne vide si non configurée (mode ouvert).
+
+    Neutralise une valeur polluée non résolue (gabarit ``${user_config.api_key}``)
+    qui, sinon, activerait une auth avec une clé absurde et bloquerait tout.
+    """
+    key = (settings.api_key or "").strip()
+    if "${" in key:  # gabarit non résolu → considéré comme non configuré
+        return ""
+    return key
 
 
 _api_key_header = APIKeyHeader(
@@ -37,12 +51,15 @@ def require_api_key(x_api_key: str = Security(_api_key_header)) -> None:
     * If configured, the incoming ``X-API-Key`` header must be an exact
       case-sensitive match.  A missing or wrong key raises HTTP 401.
     """
-    configured_key: str = (settings.api_key or "").strip()
+    configured_key = _configured_key()
     if not configured_key:
-        # No key configured — allow all traffic.
+        # No key configured — allow all traffic (dev / open mode).
         return
 
-    if not x_api_key or x_api_key.strip() != configured_key:
+    provided = (x_api_key or "").strip()
+    # Comparaison constant-time (hmac.compare_digest) pour éviter les attaques
+    # temporelles ; encode en bytes car compare_digest l'exige.
+    if not provided or not hmac.compare_digest(provided.encode("utf-8"), configured_key.encode("utf-8")):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid or missing X-API-Key header.",
