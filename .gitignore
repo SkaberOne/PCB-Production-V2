@@ -98,3 +98,8 @@ temp/
 .obsidian/cache
 .obsidian/graph.json
 docs/attachments/
+
+# Artefacts temporaires build/publish
+client/publish*.log
+client/*_done.txt
+client/eb_*.log
