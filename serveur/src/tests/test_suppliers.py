@@ -1,9 +1,10 @@
-"""Unit tests for supplier connectors (Mouser, DigiKey, Farnell) and OAuth — no network."""
+"""Unit tests for supplier connectors (Mouser, DigiKey, Farnell, RS) and OAuth — no network."""
 
 from src.services.suppliers.base import OfferDTO, price_at_quantity
 from src.services.suppliers.mouser import MouserConnector, _parse_price
 from src.services.suppliers.digikey import DigiKeyConnector
 from src.services.suppliers.farnell import FarnellConnector
+from src.services.suppliers.rs import RsConnector
 from src.services.suppliers.oauth import OAuth2ClientCredentials
 
 
@@ -187,6 +188,138 @@ def test_farnell_filters_to_exact_mpn():
     connector = FarnellConnector(api_key="key", http_get=lambda url, params: payload)
     offers = connector.search_by_mpn("wanted")
     assert [o.mpn for o in offers] == ["WANTED"]
+
+
+def test_rs_inactive_without_credentials():
+    # Explicit empty creds => inactive, regardless of any value in .env.
+    connector = RsConnector(client_id="", client_secret="")
+    assert connector.is_configured is False
+    assert connector.search_by_mpn("X") == []
+    assert connector.search_by_keyword("X") == []
+    assert connector.get_stock(["123"]) == {}
+    assert connector.get_customer_pricing([{"ProductNumber": "123", "Quantity": 1}]) == {}
+
+
+def test_rs_is_configured_requires_id_and_secret():
+    assert RsConnector(client_id="id", client_secret="sec").is_configured is True
+    assert RsConnector(client_id="id", client_secret="").is_configured is False
+    assert RsConnector(client_id="", client_secret="sec").is_configured is False
+
+
+def test_rs_sends_client_headers_on_get():
+    captured = {}
+
+    def fake_get(url, params, headers):
+        captured["url"] = url
+        captured["headers"] = headers
+        return {}
+
+    connector = RsConnector(client_id="id", client_secret="sec", http_get=fake_get)
+    connector.search_by_mpn("ABC123")
+    assert captured["headers"]["Client-Id"] == "id"
+    assert captured["headers"]["Client-Secret"] == "sec"
+    assert captured["headers"]["Accept"] == "application/json"
+    # ISO code (FR) + MPN must appear in the endpoint path.
+    assert "/COUNTRY_CODE/FR/STORE_ID/FR_1/MPN/ABC123" in captured["url"]
+
+
+def test_rs_parses_real_mpn_response():
+    # Confirmed live shape (FR store): a single PascalCase product object, price as
+    # a string under BreakPrice, datasheet under DMS, SKU under MaterialNumberIntern.
+    payload = {
+        "LongDescription": "Kit de démarrage Siemens, série LOGO",
+        "Manufacturer": "Siemens",
+        "CurrencyCode": "EUR",
+        "BreakPrice": [
+            {"Quantity": 1, "PriceNoTax": "394.05"},
+            {"Quantity": 10, "PriceNoTax": "380.00"},
+        ],
+        "MaterialNumberIntern(SKU)": "0288170",
+        "ManufacturerPartNumber": "6ED1057-4BA11-0AA0",
+        "AvailableQuantity": "1200",
+        "DMS": {"url": "https://docs.rs-online.com/4fd4/X.pdf", "type": "data_sheet"},
+    }
+    connector = RsConnector(
+        client_id="id", client_secret="sec", http_get=lambda url, params, headers: payload
+    )
+    offers = connector.search_by_mpn("6ED1057-4BA11-0AA0")
+    assert len(offers) == 1
+    offer = offers[0]
+    assert offer.supplier == "RS"
+    assert offer.mpn == "6ED1057-4BA11-0AA0"
+    assert offer.supplier_part == "0288170"
+    assert offer.manufacturer == "Siemens"
+    assert offer.currency == "EUR"
+    assert offer.datasheet_url == "https://docs.rs-online.com/4fd4/X.pdf"
+    assert offer.unit_price == 394.05
+    assert offer.stock_qty == 1200
+    assert offer.price_for(10) == 380.00
+    assert offer.product_url and "6ED1057-4BA11-0AA0" in offer.product_url
+
+
+def test_rs_filters_to_exact_mpn():
+    # When RS returns several products (list shape), keep the exact MPN match.
+    payload = {
+        "products": [
+            {"ManufacturerPartNumber": "OTHER", "BreakPrice": []},
+            {"ManufacturerPartNumber": "WANTED", "BreakPrice": []},
+        ]
+    }
+    connector = RsConnector(
+        client_id="id", client_secret="sec", http_get=lambda url, params, headers: payload
+    )
+    offers = connector.search_by_mpn("wanted")
+    assert [o.mpn for o in offers] == ["WANTED"]
+
+
+def test_rs_keyword_search_degrades_to_empty_on_error():
+    # The Search API returns 400 live; _get swallows it -> {} -> no offers.
+    connector = RsConnector(
+        client_id="id", client_secret="sec", http_get=lambda url, params, headers: {}
+    )
+    assert connector.search_by_keyword("resistor") == []
+
+
+def test_rs_customer_pricing_builds_expected_body():
+    captured = {}
+
+    def fake_post(url, body, headers):
+        captured["url"] = url
+        captured["body"] = body
+        captured["headers"] = headers
+        return {"ok": True}
+
+    connector = RsConnector(
+        client_id="id", client_secret="sec", customer_number="C123", http_post=fake_post
+    )
+    result = connector.get_customer_pricing([{"ProductNumber": "8712298", "Quantity": 10}])
+    assert result == {"ok": True}
+    assert captured["url"].endswith("/customer-pricing/")
+    assert captured["headers"]["Content-Type"] == "application/json"
+    retrieve = captured["body"]["customerPricesRetrieve"]
+    assert retrieve["customerNumber"] == "C123"
+    assert retrieve["locationCode"] == "FR"
+    assert retrieve["products"] == [{"ProductNumber": "8712298", "Quantity": 10}]
+
+
+def test_rs_customer_pricing_requires_customer_number():
+    connector = RsConnector(client_id="id", client_secret="sec", customer_number="")
+    assert connector.get_customer_pricing([{"ProductNumber": "1", "Quantity": 1}]) == {}
+
+
+def test_rs_stock_repeats_product_number_params():
+    captured = {}
+
+    def fake_get(url, params, headers):
+        captured["url"] = url
+        captured["params"] = params
+        return {"stock": []}
+
+    connector = RsConnector(client_id="id", client_secret="sec", http_get=fake_get)
+    connector.get_stock(["111", "222"])
+    assert "/getProductStock/FR" in captured["url"]
+    product_params = [v for (k, v) in captured["params"] if k == "ProductNumber"]
+    assert product_params == ["111", "222"]
 
 
 def test_oauth_caches_token_until_expiry():
