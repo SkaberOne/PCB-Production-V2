@@ -1,5 +1,5 @@
 import React from 'react';
-import apiClient from '../../api/client';
+import apiClient, { extractApiError } from '../../api/client';
 import FactCheckRoundedIcon from '@mui/icons-material/FactCheckRounded';
 import TravelExploreRoundedIcon from '@mui/icons-material/TravelExploreRounded';
 import OpenInNewRoundedIcon from '@mui/icons-material/OpenInNewRounded';
@@ -37,6 +37,24 @@ const CONFIDENCE_META = {
 };
 
 const DEFAULT_LIMIT = 25;
+// Live search is processed in small sub-batches so each HTTP call stays well under
+// the axios timeout and supplier quotas are spread out (see the 30s timeout in
+// api/client.js). The whole lot is split into chunks of LIVE_CHUNK component ids.
+const LIVE_CHUNK = 25;
+const LIVE_PAUSE_MS = 1200; // brief pause between chunks to ease Mouser's ~30/min quota
+const LIVE_TIMEOUT_MS = 120000; // per-chunk timeout override (a chunk can still be slow)
+
+function computeCounts(items) {
+    return (items || []).reduce(
+        (acc, p) => {
+            acc[p.confidence] = (acc[p.confidence] || 0) + 1;
+            return acc;
+        },
+        { high: 0, medium: 0, manual: 0 },
+    );
+}
+
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 function MpnEnrichmentPanel() {
     const [proposals, setProposals] = React.useState([]);
@@ -88,6 +106,80 @@ function MpnEnrichmentPanel() {
             setBusy(false);
         }
     }, [initRows, limit]);
+
+    // Live search: process the loaded components in sub-batches so each request
+    // stays under the HTTP timeout and supplier quotas are spread out. Results are
+    // merged into the table incrementally with visible progress.
+    const runLiveSearch = React.useCallback(async () => {
+        setSearchingLive(true);
+        setFeedback(null);
+        try {
+            // Base list of components to enrich (ids). Reuse what's already loaded
+            // from "Charger (cache)"; otherwise fetch the cache list first.
+            let baseItems = proposals;
+            if (!baseItems.length) {
+                const resp = await apiClient.get(PROPOSALS_URL, { params: { live: false, limit } });
+                baseItems = resp.data?.proposals || [];
+                setProposals(baseItems);
+                setCounts(resp.data?.counts || { high: 0, medium: 0, manual: 0 });
+                initRows(baseItems);
+            }
+            const ids = baseItems.map((p) => p.component_id);
+            if (!ids.length) {
+                setFeedback({ severity: 'info', message: 'Aucun composant à enrichir (MPN déjà renseignés).' });
+                return;
+            }
+
+            const byId = new Map(baseItems.map((p) => [p.component_id, p]));
+            const chunks = [];
+            for (let i = 0; i < ids.length; i += LIVE_CHUNK) chunks.push(ids.slice(i, i + LIVE_CHUNK));
+
+            let processed = 0;
+            for (let ci = 0; ci < chunks.length; ci += 1) {
+                const chunk = chunks[ci];
+                setFeedback({
+                    severity: 'info',
+                    message: `Recherche en ligne… lot ${ci + 1}/${chunks.length} (${processed}/${ids.length} composants)`,
+                });
+                const resp = await apiClient.get(PROPOSALS_URL, {
+                    params: { live: true, component_ids: chunk.join(','), limit: chunk.length },
+                    timeout: LIVE_TIMEOUT_MS,
+                });
+                (resp.data?.proposals || []).forEach((p) => byId.set(p.component_id, p));
+                processed += chunk.length;
+
+                const merged = baseItems.map((p) => byId.get(p.component_id) || p);
+                setProposals(merged);
+                setCounts(computeCounts(merged));
+                // Prefill the MPN input for freshly proposed rows the user hasn't touched.
+                setRows((prev) => {
+                    const next = { ...prev };
+                    (resp.data?.proposals || []).forEach((p) => {
+                        const existing = next[p.component_id] || { status: 'pending', busy: false, mpn: '' };
+                        if (existing.status === 'pending' && !existing.mpn && p.proposed_mpn) {
+                            next[p.component_id] = { ...existing, mpn: p.proposed_mpn };
+                        }
+                    });
+                    return next;
+                });
+
+                if (ci < chunks.length - 1) await sleep(LIVE_PAUSE_MS);
+            }
+
+            const finalCounts = computeCounts(baseItems.map((p) => byId.get(p.component_id) || p));
+            setFeedback({
+                severity: 'success',
+                message: `Recherche en ligne terminée : ${finalCounts.high} exact(s), ${finalCounts.medium} probable(s) sur ${ids.length} composant(s).`,
+            });
+        } catch (error) {
+            setFeedback({
+                severity: 'error',
+                message: extractApiError(error) || error?.response?.data?.detail || 'Échec de la recherche en ligne.',
+            });
+        } finally {
+            setSearchingLive(false);
+        }
+    }, [proposals, limit, initRows]);
 
     const updateRow = (componentId, patch) => {
         setRows((prev) => ({ ...prev, [componentId]: { ...prev[componentId], ...patch } }));
@@ -187,7 +279,7 @@ function MpnEnrichmentPanel() {
                                     variant="contained"
                                     color="success"
                                     startIcon={searchingLive ? <CircularProgress size={16} color="inherit" /> : <TravelExploreRoundedIcon />}
-                                    onClick={() => load(true)}
+                                    onClick={runLiveSearch}
                                     disabled={loading || searchingLive}
                                 >
                                     {searchingLive ? 'Recherche...' : 'Rechercher en ligne'}
