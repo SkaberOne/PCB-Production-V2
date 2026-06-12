@@ -171,8 +171,8 @@ d'administrateur »).
 - Plan d'implémentation : `docs/guides/Plan_Deploiement_Config_Postes_2026-06.md`
 - Fichiers visés : `client/src/desktop/src/{main.js,preload.js}`,
   `client/src/desktop/package.json` (bloc `build.nsis`),
-  `client/src/desktop/build/installer.nsh` (nouveau),
-  `client/src/desktop/build/provision_host.ps1` (nouveau),
+  `client/src/desktop/nsis/installer.nsh` (nouveau),
+  `client/src/desktop/nsis/provision_host.ps1` (nouveau),
   `client/src/frontend/src/components/common/DatabaseSettings.jsx` (nouveau),
   `client/src/frontend/src/pages/SettingsPage.jsx`,
   `serveur/launch.py` / entrée packagée (`--check-db`)

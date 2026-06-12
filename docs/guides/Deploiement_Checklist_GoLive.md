@@ -60,3 +60,24 @@
 - Migrations **additives et rétro-compatibles** uniquement (base partagée).
 - **SemVer** : MAJOR = rupture schéma/contrat, MINOR = feature, PATCH = correctif.
 - Fonctionnalités en cours livrées derrière **feature flags** désactivés.
+
+---
+
+## Mise à jour 2026-06-12 — Déploiement assisté (ADR 0009)
+
+> Remplace partiellement les points 3-4 ci-dessus quand on utilise le mode Host.
+
+- [x] **Phase 1 — Panneau config DB** : Paramètres › Connexion base de données
+  (Tester / Enregistrer & redémarrer). Codé, testable sans admin.
+- [ ] **Phase 2 — ODBC embarqué** : déposer `msodbcsql17.msi` dans
+  `client/src/desktop/installers/` (sinon téléchargé), rebuild installeur.
+  ⚠️ L'installeur passe en **mode administrateur** (`perMachine: true`).
+- [ ] **Phase 3 — Installation Host** : choisir « Host » → saisir le mot de passe
+  de la base partagée → SQL Express + 1433 + pare-feu + base + login `pcbflow`
+  configurés automatiquement. Noter ce mot de passe pour les postes **Client**.
+- [ ] **Postes Client** : installer en mode « Client » puis renseigner l'hôte du
+  Host dans Paramètres › Connexion base de données (login `pcbflow` + mot de passe).
+- [ ] **Vérifier les liens Microsoft** (ODBC / SQL Express) dans
+  `nsis/install_odbc.ps1` et `nsis/provision_host.ps1` avant build.
+- [ ] **Tester sur VM Windows propre** (Client ET Host) avant diffusion atelier.
+- [ ] **Sauvegarde SQL Server** (tâche planifiée) une fois le Host en service.

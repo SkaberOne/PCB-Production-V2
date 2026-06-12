@@ -75,10 +75,10 @@ modifier l'hôte SQL → Tester → Enregistrer → l'app redémarre et se conne
 - `package.json` (bloc `build`) :
   - ajouter aux ressources embarquées (ex. `extraResources` →
     `{ "from": "installers/msodbcsql_17.msi", "to": "msodbcsql_17.msi" }`).
-  - `build.nsis` : `"include": "build/installer.nsh"`, élévation admin
+  - `build.nsis` : `"include": "nsis/installer.nsh"`, élévation admin
     (`"perMachine": true` ou `RequestExecutionLevel admin` dans le .nsh),
     conserver `oneClick:false`, `allowToChangeInstallationDirectory:true`.
-- `client/src/desktop/build/installer.nsh` — macro `customInstall` :
+- `client/src/desktop/nsis/installer.nsh` — macro `customInstall` :
   - check registre `HKLM\SOFTWARE\ODBC\ODBCINST.INI\ODBC Driver 17 for SQL Server` ;
     si absent → `ExecWait 'msiexec /i "$INSTDIR\resources\msodbcsql_17.msi" /qn
     IACCEPTMSODBCSQLLICENSETERMS=YES ADDLOCAL=ALL'`.
@@ -105,7 +105,7 @@ l'étape sans erreur.
   - **Host** : `ExecWait` élevé de `provision_host.ps1`
     (`powershell -ExecutionPolicy Bypass -File "$INSTDIR\resources\provision_host.ps1"
     -DbPassword … -AppPassword …`).
-- `client/src/desktop/build/provision_host.ps1` — **idempotent, journalisé**
+- `client/src/desktop/nsis/provision_host.ps1` — **idempotent, journalisé**
   (`%PROGRAMDATA%\PCBFlow\provision.log`) :
   1. Détecter SQL Express ; sinon **télécharger** le bootstrapper Microsoft (URL
      stable) ou utiliser `-LocalInstaller` ; install silencieuse
@@ -138,8 +138,8 @@ via le panneau Phase 1 et partage les données.
 | Electron | `client/src/desktop/src/main.js` | IPC config + restart + capture stderr |
 | Electron | `client/src/desktop/src/preload.js` | `electronAPI.dbConfig` |
 | Electron | `client/src/desktop/package.json` | ressources ODBC + `build.nsis.include` + admin |
-| Electron | `client/src/desktop/build/installer.nsh` | nouveau (page Client/Host + customInstall) |
-| Electron | `client/src/desktop/build/provision_host.ps1` | nouveau (provisioning Host) |
+| Electron | `client/src/desktop/nsis/installer.nsh` | nouveau (page Client/Host + customInstall) |
+| Electron | `client/src/desktop/nsis/provision_host.ps1` | nouveau (provisioning Host) |
 | Electron | `client/src/desktop/installers/msodbcsql_17.msi` | binaire embarqué |
 | React | `client/src/frontend/src/components/common/DatabaseSettings.jsx` | nouveau |
 | React | `client/src/frontend/src/pages/SettingsPage.jsx` | + section DB |
