@@ -39,6 +39,17 @@ contextBridge.exposeInMainWorld('electronAPI', {
         }
     },
 
+    // Config base de données pilotée par Electron (ADR 0009). Éditée hors backend
+    // pour rester accessible même quand la base est injoignable (fail-fast).
+    // Le mot de passe n'est jamais renvoyé (get() expose seulement `passwordSet`).
+    dbConfig: {
+        get: () => ipcRenderer.invoke('ecb:db-config:get'),
+        test: (cfg) => ipcRenderer.invoke('ecb:db-config:test', cfg),
+        save: (cfg) => ipcRenderer.invoke('ecb:db-config:save', cfg),
+        restart: () => ipcRenderer.invoke('ecb:db-config:restart'),
+    },
+    runtimeStatus: () => ipcRenderer.invoke('ecb:runtime:status'),
+
     // Platform info
     platform: process.platform,
     nodeVersion: process.versions.node,
