@@ -236,3 +236,37 @@ décrite plus haut.
 > PowerShell ne se valident pas hors Windows. Vérifier aussi le lien de
 > téléchargement ODBC/SQL Express (liens Microsoft `fwlink` susceptibles
 > d'évoluer) dans les deux `.ps1`.
+
+---
+
+## Signature de code interne (ADR 0009 / #5)
+
+Sans certificat, Windows affiche "editeur inconnu" a chaque poste. Solution interne
+(sans achat de certificat) : un certificat **auto-signe** de signature de code,
+approuve sur les 2-3 postes.
+
+1. **Generer le certificat** (une fois, sur la machine de build) :
+   ```powershell
+   cd client\src\desktop\nsis
+   .\make_signing_cert.ps1 -PfxPassword "<motdepasse_pfx>"
+   # -> %USERPROFILE%\pcbflow-cert\pcbflow-codesign.pfx (secret) + .cer (public)
+   ```
+2. **Builder signe** (winCodeSign requiert le Mode Developpeur, deja actif) :
+   ```powershell
+   $env:CSC_LINK = "$env:USERPROFILE\pcbflow-cert\pcbflow-codesign.pfx"
+   $env:CSC_KEY_PASSWORD = "<motdepasse_pfx>"
+   cd client\src\desktop ; npm run publish:signed   # (ou dist:signed pour local)
+   ```
+   Les scripts `*:signed` ne posent PAS `CSC_IDENTITY_AUTO_DISCOVERY=false` :
+   electron-builder signe alors avec `CSC_LINK`.
+3. **Approuver le certificat sur chaque poste** (admin) :
+   ```powershell
+   .\trust_cert.ps1 -CerPath "\\chemin\partage\pcbflow-codesign.cer"
+   ```
+   Importe le .cer public dans Trusted Root + Trusted Publisher -> l'app signee est
+   reconnue (plus d'avertissement editeur inconnu).
+
+> Le `.pfx` (cle privee) et le `.cer` ne sont **jamais** versionnes (`.gitignore`).
+> Un cert auto-signe ne confere pas de reputation SmartScreen globale (seul un cert
+> EV le ferait) ; il suffit pour une diffusion interne ou le .cer est approuve sur
+> les postes. Pour une distribution large, budgeter un certificat OV/EV.

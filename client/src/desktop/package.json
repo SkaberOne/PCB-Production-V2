@@ -23,6 +23,8 @@
     "build": "npm run build:renderer && npm run build:desktop",
     "dist": "npm run build:renderer && set CSC_IDENTITY_AUTO_DISCOVERY=false&& electron-builder --publish never",
     "dist:portable": "npm run build:renderer && set CSC_IDENTITY_AUTO_DISCOVERY=false&& electron-builder --publish never --win portable",
+    "dist:signed": "npm run build:renderer && electron-builder --publish never",
+    "publish:signed": "npm run build:renderer && electron-builder --publish always",
     "publish": "npm run build:renderer && set CSC_IDENTITY_AUTO_DISCOVERY=false&& electron-builder --publish always"
   },
   "build": {

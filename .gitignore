@@ -108,3 +108,7 @@ client/eb_*.log
 # récupérés au build du Host, jamais versionnés (le README reste suivi).
 client/src/desktop/installers/*.msi
 client/src/desktop/installers/*.exe
+
+# Certificats de signature (ADR 0009 #5) - jamais versionnes
+*.pfx
+*.cer
