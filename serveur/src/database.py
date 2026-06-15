@@ -151,8 +151,32 @@ def init_or_upgrade_schema() -> None:
         Base.metadata.create_all(bind=engine)
         _alembic_command.stamp(cfg, "head")
     else:
-        logger.info("Schéma : base existante → alembic upgrade head")
-        _alembic_command.upgrade(cfg, "head")
+        # Base existante. Si sa révision n'existe plus dans le script directory
+        # (ancienne chaîne archivée lors du collapse baseline00001), un
+        # `upgrade head` échouerait (« Can't locate revision »). On réaligne
+        # alors via create_all (idempotent) + stamp head, sans casser la base.
+        from alembic.script import ScriptDirectory
+
+        script = ScriptDirectory.from_config(cfg)
+        known = {rev.revision for rev in script.walk_revisions()}
+        with engine.connect() as conn:
+            current = conn.execute(
+                text("SELECT version_num FROM alembic_version")
+            ).scalar()
+
+        if current not in known:
+            logger.warning(
+                "Schéma : révision Alembic %s inconnue (chaîne archivée) "
+                "→ create_all + stamp head (purge)",
+                current,
+            )
+            Base.metadata.create_all(bind=engine)
+            # purge=True : vide alembic_version avant de tamponner, sinon Alembic
+            # tente de résoudre la révision orpheline et échoue.
+            _alembic_command.stamp(cfg, "head", purge=True)
+        else:
+            logger.info("Schéma : base existante → alembic upgrade head")
+            _alembic_command.upgrade(cfg, "head")
 
 
 def get_db():
