@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Installe le pilote « ODBC Driver 17 for SQL Server » (ADR 0009, Phase 2).
 

@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Provisionne le poste « Host » : SQL Server Express + réseau + base partagée
     (ADR 0009, Phase 3). Idempotent, journalisé, requiert l'administrateur.
@@ -185,6 +185,40 @@ MAX_UPLOAD_MB=25
     Write-Log "Fichier .env Host écrit : $envPath"
 }
 
+# ───────────────── 6. Sauvegarde auto (droit SYSTEM + tache planifiee) ─────────────────
+function Grant-BackupAccess {
+    # Donne au compte SYSTEM le droit de sauvegarder la base (db_backupoperator),
+    # pour que la tache planifiee (run SYSTEM, auth Windows) puisse faire BACKUP
+    # sans mot de passe stocke.
+    Write-Log "Autorisation sauvegarde pour NT AUTHORITY\SYSTEM."
+    $connStr = "Server=$ServerLocal;Database=master;Integrated Security=SSPI;TrustServerCertificate=True;Connect Timeout=30"
+    $conn = New-Object System.Data.SqlClient.SqlConnection $connStr
+    $conn.Open()
+    try {
+        $exec = { param($sql) $c = $conn.CreateCommand(); $c.CommandText = $sql; [void]$c.ExecuteNonQuery() }
+        & $exec "IF NOT EXISTS (SELECT 1 FROM sys.server_principals WHERE name = N'NT AUTHORITY\SYSTEM') CREATE LOGIN [NT AUTHORITY\SYSTEM] FROM WINDOWS;"
+        & $exec "USE [$DbName]; IF NOT EXISTS (SELECT 1 FROM sys.database_principals WHERE name = N'NT AUTHORITY\SYSTEM') BEGIN CREATE USER [NT AUTHORITY\SYSTEM] FOR LOGIN [NT AUTHORITY\SYSTEM]; ALTER ROLE db_backupoperator ADD MEMBER [NT AUTHORITY\SYSTEM]; END"
+    }
+    finally { $conn.Close() }
+}
+
+function Register-BackupTask {
+    # Tache planifiee quotidienne appelant backup_db.ps1 (situe a cote de ce script).
+    $script = Join-Path $PSScriptRoot "backup_db.ps1"
+    if (-not (Test-Path $script)) {
+        Write-Log "AVERTISSEMENT : backup_db.ps1 introuvable ($script) - tache non creee."
+        return
+    }
+    Write-Log "Enregistrement de la tache planifiee de sauvegarde (quotidienne 12:30, SYSTEM)."
+    $action = New-ScheduledTaskAction -Execute "powershell.exe" `
+        -Argument "-NoProfile -ExecutionPolicy Bypass -File `"$script`" -DbName `"$DbName`""
+    $trigger = New-ScheduledTaskTrigger -Daily -At 12:30pm
+    $principal = New-ScheduledTaskPrincipal -UserId "NT AUTHORITY\SYSTEM" -LogonType ServiceAccount -RunLevel Highest
+    $settings = New-ScheduledTaskSettingsSet -StartWhenAvailable -DontStopOnIdleEnd
+    Register-ScheduledTask -TaskName "PCBFlow - Sauvegarde base" -Action $action `
+        -Trigger $trigger -Principal $principal -Settings $settings -Force | Out-Null
+}
+
 # ───────────────────────── Orchestration ─────────────────────────
 try {
     Write-Log "=== Provisioning Host démarré ==="
@@ -193,6 +227,8 @@ try {
     Open-Firewall1433
     Initialize-DbAndLogin
     Write-HostEnv
+    Grant-BackupAccess
+    Register-BackupTask
     Write-Log "=== Provisioning Host terminé avec succès ==="
     exit 0
 }
