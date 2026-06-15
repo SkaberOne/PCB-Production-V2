@@ -19,7 +19,9 @@ import {
 } from '@mui/material';
 
 // Pont Electron exposé par preload.js (ADR 0009). Absent en contexte web/dev.
-const dbConfigApi = typeof window !== 'undefined' ? window.electronAPI?.dbConfig : undefined;
+// Lu DYNAMIQUEMENT (et non capturé au chargement du module) : le preload peut
+// l'exposer après l'évaluation du module, et les tests l'injectent au runtime.
+const getDbApi = () => (typeof window !== 'undefined' ? window.electronAPI?.dbConfig : undefined);
 
 const emptyForm = {
     host: '',
@@ -44,14 +46,15 @@ function DatabaseSettings() {
     const [feedback, setFeedback] = React.useState({ status: 'idle', message: '' });
 
     const load = React.useCallback(async () => {
-        if (!dbConfigApi) {
+        const api = getDbApi();
+        if (!api) {
             setAvailable(false);
             setLoading(false);
             return;
         }
         setLoading(true);
         try {
-            const data = await dbConfigApi.get();
+            const data = await api.get();
             if (!data || !data.available) {
                 setAvailable(false);
                 setUnavailableReason(data?.reason || '');
@@ -87,7 +90,7 @@ function DatabaseSettings() {
         setConn({ state: 'unknown', message: '' });
         setFeedback({ status: 'idle', message: '' });
         try {
-            const result = await dbConfigApi.test(form);
+            const result = await getDbApi().test(form);
             if (result?.ok) {
                 setConn({ state: 'ok', message: result.detail || 'Connexion réussie.' });
             } else {
@@ -104,13 +107,14 @@ function DatabaseSettings() {
         setSaving(true);
         setFeedback({ status: 'idle', message: '' });
         try {
-            const saved = await dbConfigApi.save(form);
+            const api = getDbApi();
+            const saved = await api.save(form);
             if (!saved?.ok) {
                 setFeedback({ status: 'error', message: saved?.detail || "Échec de l'enregistrement." });
                 return;
             }
             setFeedback({ status: 'info', message: 'Configuration enregistrée. Redémarrage du moteur…' });
-            const restarted = await dbConfigApi.restart();
+            const restarted = await api.restart();
             if (!restarted?.ok) {
                 // Le backend n'a pas redémarré : la config est enregistrée mais la
                 // base reste injoignable. Le panneau reste utilisable (piloté par
