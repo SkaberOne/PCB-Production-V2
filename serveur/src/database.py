@@ -2,6 +2,7 @@
 
 import logging
 import sys
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -100,15 +101,33 @@ def verify_connection_or_raise() -> None:
     silencieusement en SQLite — un poste mal configuré doit refuser de démarrer
     avec un message clair, pas tourner sur une base locale fantôme.
     """
-    try:
-        with engine.connect() as conn:
-            conn.execute(text("SELECT 1"))
-        logger.info("Database connection successful (%s)", engine.url.host or engine.url.database)
-    except Exception as exc:
-        raise RuntimeError(
-            "Connexion à la base de données impossible. Vérifiez la configuration "
-            f"SQL Server (hôte, identifiants, pilote ODBC 17) dans .env. Détail : {exc}"
-        ) from exc
+    # Au démarrage de l'app packagée, Electron + le renderer + le backend gelé se
+    # lancent simultanément → forte contention disque/CPU qui peut faire échouer
+    # le 1er essai de connexion ODBC (login timeout dépassé → erreur 87). On
+    # réessaie donc plusieurs fois avant d'abandonner ; la charge retombe vite et
+    # un essai suivant aboutit.
+    attempts = 8
+    delay_s = 4
+    last_exc = None
+    for i in range(1, attempts + 1):
+        try:
+            with engine.connect() as conn:
+                conn.execute(text("SELECT 1"))
+            logger.info(
+                "Database connection successful (%s) [essai %d]",
+                engine.url.host or engine.url.database, i,
+            )
+            return
+        except Exception as exc:  # noqa: BLE001
+            last_exc = exc
+            logger.warning("Connexion DB essai %d/%d échouée : %s", i, attempts, str(exc)[:200])
+            if i < attempts:
+                time.sleep(delay_s)
+    raise RuntimeError(
+        f"Connexion à la base de données impossible après {attempts} tentatives. "
+        f"Vérifiez la configuration SQL Server (hôte, identifiants, pilote ODBC 17) "
+        f"dans .env. Détail : {last_exc}"
+    ) from last_exc
 
 
 def _src_dir() -> Path:

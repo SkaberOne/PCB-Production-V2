@@ -637,10 +637,11 @@ const bootstrap = async () => {
             apiKey = crypto.randomBytes(24).toString('hex');
             backendPort = await findFreePort();
             startBackend(backendPort);
-            // Démarrage backend : connexion SQL Server (chiffrée) + init schéma
-            // peut dépasser 30 s au 1er lancement → délai porté à 90 s (sinon
-            // Electron tue le backend trop tôt et affiche « Backend indisponible »).
-            await waitForHealthOrExit(backendPort, 90000);
+            // Démarrage backend : au 1er lancement, contention disque/CPU
+            // (Electron + renderer + exe gelé) → le backend met ~30-90 s et
+            // réessaie sa connexion SQL (database.py). Délai large (180 s) pour
+            // ne pas le tuer trop tôt (sinon « Backend indisponible »).
+            await waitForHealthOrExit(backendPort, 180000);
             backendUrl = `http://127.0.0.1:${backendPort}/api`;
             lastBackendError = null;
         } catch (error) {
