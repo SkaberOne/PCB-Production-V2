@@ -161,9 +161,9 @@ def list_components(
     elif created_from_bom is False:
         query = query.filter(or_(Component.notes.is_(None), ~Component.notes.ilike("Created from BOM%")))
     if is_fixed_feeder is True:
-        query = query.filter(Component.is_fixed_feeder.is_(True))
+        query = query.filter(Component.is_fixed_feeder == True)  # noqa: E712 (SQL Server: IS 1 invalide)
     elif is_fixed_feeder is False:
-        query = query.filter(or_(Component.is_fixed_feeder.is_(False), Component.is_fixed_feeder.is_(None)))
+        query = query.filter(or_(Component.is_fixed_feeder == False, Component.is_fixed_feeder.is_(None)))  # noqa: E712
 
     sort_columns = {
         "id": Component.id,

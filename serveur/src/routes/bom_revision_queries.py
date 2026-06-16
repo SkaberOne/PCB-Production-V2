@@ -141,7 +141,7 @@ def list_bom_items(
     if footprint:
         query = query.filter(BomItem.footprint_eagle.ilike(f"%{footprint}%"))
     if dnp_only:
-        query = query.filter(BomItem.dnp.is_(True))
+        query = query.filter(BomItem.dnp == True)  # noqa: E712 (SQL Server: IS 1 invalide)
 
     items = query.offset(skip).limit(limit).all()
     return [BomItemSchema.model_validate(item) for item in items]

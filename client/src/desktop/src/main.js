@@ -412,16 +412,62 @@ const loadLoadingScreen = (win) => {
     win.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(html)}`);
 };
 
+// Script client (navigateur) injecté dans l'écran d'erreur. PAS de backticks ni
+// de ${...} ici : ce texte vit dans un template literal de main.js. On câble le
+// formulaire sur electronAPI.dbConfig (ADR 0009) pour configurer la base SANS
+// passer par le backend (qui est justement en échec) ni par une ligne de commande.
+const errorScreenClientScript = [
+    "var $=function(id){return document.getElementById(id);};",
+    "function getCfg(){return {host:$('h').value.trim(),port:($('p').value.trim()||'1433'),user:$('u').value.trim(),password:$('w').value,database:($('d').value.trim()||'ECB_Production')};}",
+    "function setStatus(msg,ok){var s=$('status');s.textContent=msg;s.style.color=ok?'#9ae6b4':'#fbb6ce';}",
+    "function lock(v){$('btnTest').disabled=v;$('btnSave').disabled=v;}",
+    "async function prefill(){try{var c=await window.electronAPI.dbConfig.get();if(c&&c.available){$('h').value=c.host||'';$('p').value=c.port||'1433';$('u').value=c.user||'pcbflow';$('d').value=c.database||'ECB_Production';if(c.passwordSet){$('w').placeholder='(inchange)';}}}catch(e){}}",
+    "async function doTest(){lock(true);setStatus('Test de connexion en cours...',true);try{var r=await window.electronAPI.dbConfig.test(getCfg());setStatus(r.ok?('Connexion reussie. '+(r.detail||'')):('Echec : '+(r.detail||'')),r.ok);}catch(e){setStatus('Erreur : '+e,false);}lock(false);}",
+    "async function doSave(){lock(true);setStatus('Enregistrement et demarrage du moteur...',true);try{var s=await window.electronAPI.dbConfig.save(getCfg());if(!s.ok){setStatus('Echec enregistrement : '+(s.detail||''),false);lock(false);return;}var r=await window.electronAPI.dbConfig.restart();if(!r.ok){setStatus('Le moteur n\\'a pas demarre : '+(r.detail||''),false);lock(false);}}catch(e){setStatus('Erreur : '+e,false);lock(false);}}",
+    "window.addEventListener('DOMContentLoaded',function(){if(!window.electronAPI||!window.electronAPI.dbConfig){setStatus('Configuration indisponible (API non chargee).',false);return;}prefill();$('btnTest').addEventListener('click',doTest);$('btnSave').addEventListener('click',doSave);});",
+].join("\n");
+
 const loadBackendErrorScreen = (win, error) => {
-    const html = screenShell(
-        'Backend indisponible',
-        `<h1>Backend indisponible</h1>
-         <p>Le moteur de production n'a pas pu démarrer.</p>
-         <p><code>${(error && error.message ? error.message : String(error)).replace(/</g, '&lt;')}</code></p>
-         <p>Fermez puis relancez l'application. Si le problème persiste, vérifiez le pilote
-         <strong>ODBC Driver 17</strong> et la connexion à la base.</p>`,
-    );
-    win.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(html)}`);
+    const msg = (error && error.message ? error.message : String(error)).replace(/</g, '&lt;');
+    const body = `<h1>Connexion à la base requise</h1>
+         <p>Le moteur de production n'a pas pu se connecter à la base de données.
+         Renseignez l'accès au serveur ci-dessous (poste « hôte »), testez puis démarrez.</p>
+         <details style="margin:8px 0 4px;"><summary style="cursor:pointer;opacity:.8;">Détail technique</summary>
+         <p><code>${msg}</code></p></details>
+         <style>
+            form.dbcfg{text-align:left;margin-top:16px;}
+            form.dbcfg label{display:block;font-size:13px;margin:10px 0 4px;opacity:.9;}
+            form.dbcfg input{width:100%;box-sizing:border-box;padding:9px 11px;border-radius:10px;
+              border:1px solid rgba(255,255,255,.25);background:rgba(255,255,255,.10);color:#f7fafc;font-size:14px;}
+            form.dbcfg input::placeholder{color:rgba(255,255,255,.5);}
+            .row{display:flex;gap:12px;}
+            .row>div{flex:1;}
+            .btns{margin-top:18px;display:flex;gap:12px;}
+            .btns button{flex:1;padding:11px;border-radius:10px;border:0;font-size:14px;font-weight:600;cursor:pointer;}
+            .btns button:disabled{opacity:.5;cursor:default;}
+            #btnTest{background:rgba(255,255,255,.16);color:#f7fafc;}
+            #btnSave{background:#2f9e6e;color:#fff;}
+            #status{margin-top:14px;font-size:13px;min-height:18px;}
+         </style>
+         <form class="dbcfg" onsubmit="return false;">
+            <label>Serveur (IP ou nom du PC hôte)</label>
+            <input id="h" placeholder="192.168.5.66" autocomplete="off" spellcheck="false" />
+            <div class="row">
+               <div><label>Port</label><input id="p" value="1433" autocomplete="off" /></div>
+               <div><label>Base de données</label><input id="d" value="ECB_Production" autocomplete="off" /></div>
+            </div>
+            <div class="row">
+               <div><label>Utilisateur</label><input id="u" value="pcbflow" autocomplete="off" /></div>
+               <div><label>Mot de passe</label><input id="w" type="password" autocomplete="off" /></div>
+            </div>
+            <div class="btns">
+               <button id="btnTest" type="button">Tester la connexion</button>
+               <button id="btnSave" type="button">Enregistrer et démarrer</button>
+            </div>
+            <div id="status"></div>
+         </form>
+         <script>${errorScreenClientScript}</script>`;
+    win.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(screenShell('Backend indisponible', body))}`);
 };
 
 // ───────────────────────── Renderer (build React) ─────────────────────────
@@ -769,11 +815,15 @@ ipcMain.handle('ecb:db-config:restart', async () => {
         await delay(400);
         backendPort = await findFreePort();
         startBackend(backendPort);
-        await waitForHealthOrExit(backendPort, 20000);
+        // 60 s : un Client se connectant à un SQL Server distant (LAN) peut être
+        // plus lent qu'un Host local, surtout au 1er essai sous contention.
+        await waitForHealthOrExit(backendPort, 60000);
         backendUrl = `http://127.0.0.1:${backendPort}/api`;
         lastBackendError = null;
-        // Recharge le renderer pour qu'il relise backendUrl/apiKey (nouveau port).
-        if (mainWindow) mainWindow.reload();
+        // Charge le renderer (app React). Depuis l'écran « Backend indisponible »,
+        // un simple reload rechargerait cet écran d'erreur : on navigue donc
+        // explicitement vers le frontend, qui relit backendUrl/apiKey (nouveau port).
+        if (mainWindow) await loadRenderer(mainWindow);
         return { ok: true };
     } catch (error) {
         lastBackendError = error && error.message ? error.message : String(error);

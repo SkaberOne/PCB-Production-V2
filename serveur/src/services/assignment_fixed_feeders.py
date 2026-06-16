@@ -333,7 +333,7 @@ class AssignmentFixedFeederMixin:
         if only_fixed:
             base_query = base_query.filter(
                 or_(
-                    Component.is_fixed_feeder.is_(True),
+                    Component.is_fixed_feeder == True,  # noqa: E712 (SQL Server: IS 1 invalide)
                     Component.fixed_cart_id.isnot(None),
                 )
             )
