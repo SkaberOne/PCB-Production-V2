@@ -141,7 +141,13 @@ def _alembic_config() -> "_AlembicConfig":
     src = _src_dir()
     cfg = _AlembicConfig(str(src / "alembic.ini"))
     cfg.set_main_option("script_location", str(src / "alembic"))
-    cfg.set_main_option("sqlalchemy.url", settings.database_url)
+    # configparser (sous-jacent à Alembic) interprète « % » comme syntaxe
+    # d'interpolation. Un mot de passe URL-encodé (quote_plus → %XX) fait alors
+    # planter set_main_option (« ValueError: invalid interpolation syntax ») et
+    # donc le boot du backend (« Backend indisponible »). On échappe « % » en
+    # « %% » : configparser le restitue tel quel via get_main_option, et env.py
+    # lit de toute façon DATABASE_URL directement → l'aller-retour reste correct.
+    cfg.set_main_option("sqlalchemy.url", settings.database_url.replace("%", "%%"))
     return cfg
 
 
