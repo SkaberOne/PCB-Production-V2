@@ -41,12 +41,10 @@ améliorer le quotidien atelier sans introduire de friction.
 
 ### 🔴 P1 — Critique (à traiter prochainement)
 
-**0. ⭐ PROCHAIN CHANTIER — T-003 : le handoff Import → Revue perd la 2ᵉ face (cartes recto/verso)**
-- Re-confirmé en test terrain le **2026-06-19** (cf `docs/JOURNAL_TESTS_RELEASE.md` + `docs/audits/Audit_2026-06-18_test_terrain_release_v1.0.6.md` §3).
-- **Symptôme** : import d'un lot 2 faces (BOT + TOP) → le *workspace d'import* garde bien les 2 faces (vérifié : BOT 257 + TOP 317), mais après « Passer à la revue » la session n'expose qu'**une seule face** (BOT) ; la production finit avec **1 BOM liée**. La 2ᵉ face (ses composants) est **silencieusement exclue** de Commande et Machine PnP.
-- **Risque** : commande et implantation incomplètes (perte de la moitié des composants d'une carte recto/verso). Gravité audit = P2, mais **impact données élevé**.
-- **Piste** : régression dans le handoff *Import → session de Revue* (et/ou persistance de la session qui n'en garde qu'une). Le modèle supporte 2 BOM liées (`prod01`/`prod02` en ont 2). À investiguer côté frontend (`BomImport.jsx` → Revue, `BomSessionContext`/Zustand) et l'API de liaison `productions/{id}/bom-revisions`.
-- **Note** : indépendant du correctif P1 SQL `dnp` (branche `fix/dnp-tsql-isnot`, déjà livré).
+> ✅ **Récemment résolu — T-003 (handoff Import → Revue perd la 2ᵉ face).** Corrigé le
+> 2026-06-19 (helper `buildReviewSelectionFromSettled`, PR #12 / `cae93ef`) ; vérifié E2E
+> « 2 BOM dans la session » / `bom_count=2`. Détail : `docs/JOURNAL_TESTS_RELEASE.md` (T-003).
+> Idem correctifs SQL `dnp` T-001/T-002 (PR #11) et `%` Alembic (PR #10).
 
 **1. Récupérer/recréer la DB de production**
 - Copier `dev.db` depuis l'ancien PC, OU

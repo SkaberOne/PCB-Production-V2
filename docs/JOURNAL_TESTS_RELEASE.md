@@ -82,7 +82,7 @@ puis l'**entrée détaillée** correspondante.
 | _(exemple)_ T-000 | 2026-06-18 | 1.0.x | Import BOM | 🟠 P2 | Description courte en une ligne | 🆕 Nouveau | — |
 | T-001 | 2026-06-18 | 1.0.6 | Commande | 🔴 P1 | Erreur SQL Server `dnp IS NOT 1` (liste à commander / export ERP) | ✅ Corrigé (2026-06-19) | — |
 | T-002 | 2026-06-18 | 1.0.6 | Prix carte | 🔴 P1 | « Erreur interne du serveur » au calcul du coût (même cause SQL) | ✅ Corrigé (2026-06-19) | — |
-| T-003 | 2026-06-18 | 1.0.6 | Import / Revue | 🟠 P2 | Import lot 2 faces → une seule face en Revue / reliée à la prod | 🆕 Nouveau (non re-testé UI 19/06) | — |
+| T-003 | 2026-06-18 | 1.0.6 | Import / Revue | 🟠 P2 | Import lot 2 faces → une seule face en Revue / reliée à la prod | ✅ Corrigé (2026-06-19, cae93ef) | — |
 | T-004 | 2026-06-18 | 1.0.6 | Import | 🟡 P3 | Bouton « Sauver » sans toast de confirmation | 🆕 Nouveau (non re-testé UI 19/06) | — |
 | T-005 | 2026-06-18 | 1.0.6 | Commande | 🟡 P3 | Nom de commande auto incohérent à l'affichage | 🆕 Nouveau (non re-testé UI 19/06) | — |
 | T-006 | 2026-06-18 | 1.0.6 | Revue BOM | 🟡 P3 | Chips/bandeaux d'avertissement non homogènes entre faces | 🆕 Nouveau (non re-testé UI 19/06) | — |
@@ -137,6 +137,32 @@ puis l'**entrée détaillée** correspondante.
 ---
 
 <!-- Ajouter les vraies entrées au-dessus de cette ligne, la plus récente en haut -->
+
+### T-003 — Import lot 2 faces → une seule face en revue · 🟠 P2 · Import / Revue
+
+- **Date** : 2026-06-18 (corrigé 2026-06-19)
+- **Version testée** : 1.0.6
+- **Poste / OS** : atelier — Windows (SQL Server) ; corrigé + vérifié E2E sur PC perso (LAPTOP-053)
+- **Statut** : ✅ Corrigé (en attente de re-déploiement)
+- **Issue GitHub** : —
+
+**Contexte / mode :** carte recto/verso ; import d'un lot des 2 faces (`..._TOP.txt` + `..._BOT.txt`).
+
+**Étapes pour reproduire :** Import BOM → sélectionner les 2 fichiers (mode Lot) → « Importer le lot » (les 2 faces passent à « Importée ») → « Passer à la revue ».
+
+**Résultat obtenu (avant correctif) :** la session de revue n'exposait qu'**une seule face** (« 1 BOM dans la session ») ; la production finissait avec **1 BOM liée**, la 2ᵉ face étant silencieusement exclue de Commande et Machine PnP.
+
+**Cause racine :** le handoff Import → Revue ne reconstruisait la sélection de revue qu'à partir de la BOM active, et non de toutes les faces persistées du lot.
+
+**Résolution (2026-06-19) :**
+- Nouveau helper `buildReviewSelectionFromSettled()` dans `client/src/frontend/src/utils/importReview.js` : repart de **tous** les items `fulfilled` ayant un `bom_revision_id` (toutes les faces du lot) et place la face active en tête (tri stable).
+- Câblé dans `components/BomImport.jsx` (handoff vers la revue).
+- Couverture : `utils/__tests__/importReview.test.js` (jest).
+- Vérifié E2E : import lot 2 faces → « **2 BOM dans la session** » et production avec `bom_count = 2`.
+
+**Branche / commit :** `fix/import-revue-2faces` → PR #12 (`eac2366`), commit `cae93ef`. Mergée dans `dev`.
+
+---
 
 ### T-002 — Prix carte « Erreur interne du serveur » · 🔴 P1 · Prix carte
 
@@ -210,7 +236,9 @@ puis l'**entrée détaillée** correspondante.
   d'import OK (« 1-2 of 2 », toast « 2 révisions ajoutées »). Mais après « Passer à la
   revue », la session de revue n'expose que la face **BOT** (tableau « 1-25 of 257 »,
   réf. « Carrier Board D3000 REV_F BOT ») ; la face **TOP est absente**. Bug du handoff
-  import→revue, **non corrigé** (hors périmètre P1).
+  import→revue. → **Corrigé depuis** (commit `cae93ef`, PR #12, 2026-06-19) : helper
+  `buildReviewSelectionFromSettled` ; vérifié E2E « 2 BOM dans la session » / `bom_count=2`.
+  Voir l'entrée détaillée T-003 ci-dessus.
 - **T-005 (nom de commande générique) — 🆕 se reproduit.** Champ « Nom de commande » =
   « Commande prod 2 » (générique) au lieu du nom de la production.
 - **T-006 (chips de revue) — 🆕 se reproduit.** Face BOT : « 56 à vérifier / 0 erreur /

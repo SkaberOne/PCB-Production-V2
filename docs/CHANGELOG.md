@@ -5,6 +5,46 @@
 
 ---
 
+## 2026-06-19 — Session 5 : Correctifs test terrain v1.0.6 (T-001/T-002/T-003)
+
+### Contexte
+Traitement des anomalies remontées par le test terrain de la release v1.0.6 sur le
+poste atelier (mode prod **SQL Server**). Audit source :
+`docs/audits/Audit_2026-06-18_test_terrain_release_v1.0.6.md` ; suivi :
+`docs/JOURNAL_TESTS_RELEASE.md`. Trois correctifs livrés et mergés dans `dev`.
+
+### T-001 / T-002 — dialecte SQL Server `dnp IS NOT 1` (PR #11, `4533ea6`)
+- **Symptôme** : modules **Commande** et **Prix carte** bloqués en SQL Server (erreur
+  pyodbc 102 « Syntaxe incorrecte vers '1' »). Invisible en SQLite (mode dev mono-poste).
+- **Cause** : `BomItem.dnp.isnot(True)` rendu en `dnp IS NOT 1` ; T-SQL n'accepte
+  `IS [NOT]` qu'avec `NULL`.
+- **Fix** : 4 occurrences (`command_service.py:708`, `production_service.py:131` & `:583`,
+  `report_service.py:89`) → forme NULL-safe `or_(BomItem.dnp == False, BomItem.dnp.is_(None))`.
+- **Garde-fou** : `serveur/src/tests/test_sql_dialect_guard.py` échoue si `.isnot(<bool>)` /
+  `.is_(<bool>)` réapparaît. Vérifié sur `ECB_Production` : sync commande + costing → HTTP 200.
+
+### T-003 — import lot 2 faces → une seule face en revue (PR #12, `cae93ef`)
+- **Symptôme** : import d'un lot recto/verso (TOP + BOT) → la revue n'exposait qu'une face ;
+  production avec 1 BOM liée, 2ᵉ face silencieusement exclue de Commande / Machine PnP.
+- **Fix** : helper `buildReviewSelectionFromSettled()` (`utils/importReview.js`) reconstruit
+  la sélection de revue à partir de **toutes** les faces persistées du lot (face active en
+  tête), câblé dans `components/BomImport.jsx` ; test `utils/__tests__/importReview.test.js`.
+- **Vérifié E2E** : « 2 BOM dans la session » + `bom_count = 2`.
+
+### Bonus — boot Alembic (PR #10, `db5cae9`)
+- Erreur d'interpolation `%` d'Alembic au démarrage corrigée : `database.py` échappe
+  l'URL (`set_main_option(..., settings.database_url.replace("%", "%%"))`).
+  Test : `serveur/src/tests/test_alembic_url_escape.py`.
+
+### Tests
+- pytest : **376 passed, 1 skipped**. jest : suite frontend verte (dont `importReview.test.js`).
+
+### Reste à faire
+- Anomalies P3 T-004 → T-008 (cf audit §4). Puis release `dev → main` + re-test terrain
+  (passer T-001/T-002/T-003 à « ✔️ Vérifié terrain »).
+
+---
+
 ## 2026-06-05 — Session 4 : Réintégration Machine PnP en V2 (feature flag) + complétion P0/P1
 
 ### Contexte
