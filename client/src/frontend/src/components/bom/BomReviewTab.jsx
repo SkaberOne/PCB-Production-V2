@@ -523,7 +523,7 @@ function BomReviewTab({
                 <Alert severity={errors.length ? 'error' : 'warning'}>
                     {errors.length
                         ? `${errors.length} erreur(s) détectée(s) dans cette révision.`
-                        : `${warnings.length} point(s) restent à vérifier dans cette révision.`}
+                        : `${warnings.length} avertissement(s) signalé(s) à l'import de cette révision.`}
                 </Alert>
             ) : null}
 
