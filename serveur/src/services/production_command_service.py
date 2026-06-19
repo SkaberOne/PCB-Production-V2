@@ -23,7 +23,12 @@ class ProductionCommandService:
     """Maintain a single implicit command per production and its receipts."""
 
     @staticmethod
-    def _implicit_name(production_id: int) -> str:
+    def _implicit_name(production_id: int, production: Optional[Production] = None) -> str:
+        # T-005 : nom par défaut lisible, dérivé du nom de la production plutôt que
+        # du compteur générique « Commande prod N ». Repli sur l'id si nom absent.
+        production_name = (getattr(production, "name", None) or "").strip()
+        if production_name:
+            return f"Commande {production_name}"
         return f"Commande prod {production_id}"
 
     @classmethod
@@ -35,8 +40,13 @@ class ProductionCommandService:
             .first()
         )
         if command is None:
+            production = (
+                db.query(Production)
+                .filter(Production.id == production_id)
+                .first()
+            )
             command = Command(
-                name=cls._implicit_name(production_id),
+                name=cls._implicit_name(production_id, production),
                 production_id=production_id,
                 status=Command.StatusEnum.DRAFT,
             )
