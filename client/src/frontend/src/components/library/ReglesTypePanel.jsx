@@ -485,14 +485,29 @@ function ReglesTypePanel() {
         [],
     );
     const duplicatePriorityValues = React.useMemo(() => {
-        const counts = componentTypeRules.reduce((accumulator, rule) => {
+        // T-008 : une priorité partagée n'est AMBIGUË que si deux règles peuvent
+        // matcher la même référence — c.-à-d. qu'un préfixe est lui-même préfixe
+        // (au sens chaîne) de l'autre (ex. « ESP-MODULE » vs « ESP-MODULE_COPY »).
+        // Des préfixes disjoints (LED / N$ / U$) qui partagent une priorité ne se
+        // disputent jamais une référence : ce n'est pas un conflit, on ne l'alerte plus.
+        const prefixesByPriority = componentTypeRules.reduce((accumulator, rule) => {
             const priorityKey = Number(rule.priority || 0);
-            accumulator.set(priorityKey, (accumulator.get(priorityKey) || 0) + 1);
+            if (!accumulator.has(priorityKey)) {
+                accumulator.set(priorityKey, []);
+            }
+            accumulator.get(priorityKey).push(String(rule.reference_prefix || ''));
             return accumulator;
         }, new Map());
+
+        const prefixesOverlap = (a, b) => Boolean(a) && Boolean(b) && (a.startsWith(b) || b.startsWith(a));
+
         return new Set(
-            Array.from(counts.entries())
-                .filter(([, count]) => count > 1)
+            Array.from(prefixesByPriority.entries())
+                .filter(([, prefixes]) => prefixes.some(
+                    (prefix, index) => prefixes.some(
+                        (other, otherIndex) => index !== otherIndex && prefixesOverlap(prefix, other),
+                    ),
+                ))
                 .map(([priority]) => priority),
         );
     }, [componentTypeRules]);
@@ -1489,7 +1504,7 @@ function ReglesTypePanel() {
                         ) : null}
                         {duplicatePriorityValues.size ? (
                             <Typography variant="caption" sx={{ color: 'warning.main', display: 'block', mt: -1 }}>
-                                {`${duplicatePriorityValues.size} priorité(s) partagée(s) détectée(s). Les flèches de réordonnancement restent prioritaires si tu veux clarifier l'ordre.`}
+                                {`${duplicatePriorityValues.size} priorité(s) ambiguë(s) détectée(s) (préfixes qui se chevauchent à priorité égale). Les flèches de réordonnancement restent prioritaires si tu veux clarifier l'ordre.`}
                             </Typography>
                         ) : null}
 
