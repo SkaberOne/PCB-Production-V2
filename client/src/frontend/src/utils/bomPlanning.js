@@ -133,7 +133,11 @@ export function buildStockSummary(line, stockDraft = {}) {
         tapeThicknessMm: resolvedTapeThicknessMm,
     });
     const reelManualOverrideQty = toNumber(stockDraft.reel_manual_override_qty, 0);
-    const reelAvailableQty = reelManualOverrideQty > 0 ? reelManualOverrideQty : (reelEstimatedQty || 0);
+    // T-007 garde-fou : l'estimation bobine est une AIDE au calcul et ne compte plus
+    // automatiquement comme stock disponible. Seule une quantité explicitement validée
+    // (reel_manual_override_qty) alimente le stock dispo — évite qu'une saisie de test
+    // bascule un composant de « À commander » à « OK stock » à l'insu de l'utilisateur.
+    const reelAvailableQty = reelManualOverrideQty > 0 ? reelManualOverrideQty : 0;
     const bagQty = toNumber(stockDraft.bag_qty, 0);
     const tubeQty = toNumber(stockDraft.tube_qty, 0);
     const totalAvailableQty = reelAvailableQty + bagQty + tubeQty;
