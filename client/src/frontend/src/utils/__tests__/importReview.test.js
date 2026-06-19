@@ -20,6 +20,7 @@ jest.mock('axios', () => {
 
 import axios from 'axios';
 import {
+    buildReviewSelectionFromSettled,
     hasPersistableImportSelection,
     persistImportedBatchMetadata,
     persistImportWorkspaceBeforeReview,
@@ -242,5 +243,49 @@ describe('importReview helpers', () => {
             side: 'TOP',
             category: 'POWER',
         });
+    });
+});
+
+describe('buildReviewSelectionFromSettled (fix T-003 — carte recto/verso)', () => {
+    const fulfilled = (value) => ({ status: 'fulfilled', value });
+
+    it('garde LES DEUX faces d un lot recto/verso (ne perd pas la 2e)', () => {
+        const entries = buildReviewSelectionFromSettled({
+            settledResults: [
+                fulfilled({ bom_revision_id: 10, reference: 'CARD', revision: 'REV_F', side: 'BOT' }),
+                fulfilled({ bom_revision_id: 11, reference: 'CARD', revision: 'REV_F', side: 'TOP' }),
+            ],
+            activeRevisionId: null,
+        });
+        expect(entries).toHaveLength(2);
+        expect(entries.map((e) => e.bom_revision_id)).toEqual([10, 11]);
+    });
+
+    it('ignore les résultats rejected et ceux sans bom_revision_id', () => {
+        const entries = buildReviewSelectionFromSettled({
+            settledResults: [
+                fulfilled({ bom_revision_id: 10, side: 'BOT' }),
+                { status: 'rejected', reason: new Error('boom') },
+                fulfilled({ bom_revision_id: null, side: 'TOP' }),
+                fulfilled({ bom_revision_id: 12, side: 'TOP' }),
+            ],
+        });
+        expect(entries.map((e) => e.bom_revision_id)).toEqual([10, 12]);
+    });
+
+    it('place la face active en tête pour qu elle reste la BOM active en revue', () => {
+        const entries = buildReviewSelectionFromSettled({
+            settledResults: [
+                fulfilled({ bom_revision_id: 10, side: 'BOT' }),
+                fulfilled({ bom_revision_id: 11, side: 'TOP' }),
+            ],
+            activeRevisionId: 11,
+        });
+        expect(entries.map((e) => e.bom_revision_id)).toEqual([11, 10]);
+    });
+
+    it('retourne un tableau vide quand rien n est persistable', () => {
+        expect(buildReviewSelectionFromSettled({ settledResults: [] })).toEqual([]);
+        expect(buildReviewSelectionFromSettled({})).toEqual([]);
     });
 });
