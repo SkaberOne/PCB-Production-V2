@@ -192,13 +192,35 @@ puis l'**entrée détaillée** correspondante.
 
 ---
 
-> **T-003 → T-008** : non re-testés via l'UI le 2026-06-19. Le frontend (:3000) et le
-> backend (:8000) tournent bien sur ce poste, mais l'instance Chrome pilotée n'atteint
-> pas le loopback local (toute URL `127.0.0.1` renvoie une page d'erreur navigateur,
-> alors que les serveurs répondent 200 en direct). Ces anomalies (P2/P3) n'étaient pas
-> dans le périmètre du correctif P1 et restent **🆕 Nouveau** telles que décrites dans
-> `docs/audits/Audit_2026-06-18_test_terrain_release_v1.0.6.md` (§3-4). À rejouer dès que
-> l'UI est accessible (corriger l'accès loopback de Chrome, ou tester via l'app Electron).
+### Confirmation UI des P1 + état T-003→T-008 (re-test 2026-06-19, Chrome → 127.0.0.1:3000)
+
+> **Accès Chrome** : l'extension pilotée n'atteignait pas le loopback ; contourné en
+> pilotant directement la fenêtre Chrome (barre d'adresse). Stack montée sur SQL Server
+> `ECB_Production`.
+
+- **T-001 (Commande) — ✅ confirmé corrigé en UI.** Module « Préparation commande
+  composants » s'ouvre sans bandeau rouge (seul un avertissement jaune fonctionnel
+  « revalide le stock »). Avant : erreur pyodbc `dnp IS NOT 1`.
+- **T-002 (Prix carte) — ✅ confirmé corrigé en UI.** Page « Prix carte à la production »
+  calcule et affiche tout (prod02 : Coût total HT 2 030 € / TTC 2 436 € / unitaire
+  101,51 € ; Carrier Board D3000, Matière 27 % / Main d'œuvre 73 %). Avant : « Erreur
+  interne du serveur ».
+- **T-003 (import lot 2 faces → 1 face en revue) — 🆕 se reproduit.** Production de test
+  `TEST_RETEST KT220430F 19-06` : ajout des 2 faces (BOT 257 + TOP 317) au workspace
+  d'import OK (« 1-2 of 2 », toast « 2 révisions ajoutées »). Mais après « Passer à la
+  revue », la session de revue n'expose que la face **BOT** (tableau « 1-25 of 257 »,
+  réf. « Carrier Board D3000 REV_F BOT ») ; la face **TOP est absente**. Bug du handoff
+  import→revue, **non corrigé** (hors périmètre P1).
+- **T-005 (nom de commande générique) — 🆕 se reproduit.** Champ « Nom de commande » =
+  « Commande prod 2 » (générique) au lieu du nom de la production.
+- **T-006 (chips de revue) — 🆕 se reproduit.** Face BOT : « 56 à vérifier / 0 erreur /
+  40 harmonisées / 24 type(s) à confirmer » — conforme à la description de l'audit.
+- **T-004 / T-007 / T-008 — non re-drillés individuellement** ce jour (cosmétique/P3,
+  code inchangé) : statut conservé depuis
+  `docs/audits/Audit_2026-06-18_test_terrain_release_v1.0.6.md` (§4).
+
+> **Donnée de test laissée** : production `TEST_RETEST KT220430F 19-06` (id 5) dans
+> `ECB_Production`, à supprimer si souhaité.
 
 ---
 
