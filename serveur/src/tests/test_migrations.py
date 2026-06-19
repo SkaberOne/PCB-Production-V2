@@ -91,9 +91,13 @@ def run_downgrade(cfg: Config, revision: str) -> None:
 
 class TestBaselineChain:
     def test_single_head_and_base(self):
-        """La chaîne se résume à une seule révision (tête == base == baseline)."""
+        """Chaîne linéaire : une seule tête et une seule base (la baseline)."""
         script = script_directory()
-        assert script.get_heads() == [BASELINE_REVISION]
+        # Une seule tête : pas de branche divergente (les migrations additives
+        # se branchent en ligne sur la baseline). On n'épingle pas l'id de tête
+        # pour ne pas casser ce test à chaque nouvelle migration.
+        assert len(script.get_heads()) == 1
+        # La racine reste la baseline collapse.
         assert script.get_bases() == [BASELINE_REVISION]
 
     def test_upgrade_head_creates_full_schema(self):
@@ -138,9 +142,15 @@ class TestBaselineConsistency:
         rev = script.get_revision(BASELINE_REVISION)
         assert rev.down_revision is None
 
-    def test_no_gaps_single_revision(self):
-        """Une seule révision dans la chaîne active (les anciennes sont archivées)."""
+    def test_linear_chain_rooted_on_baseline(self):
+        """Chaîne linéaire (aucune fusion) enracinée sur la baseline."""
         script = script_directory()
-        revs = list(script.walk_revisions())
-        assert len(revs) == 1
-        assert revs[0].revision == BASELINE_REVISION
+        revs = list(script.walk_revisions())  # ordre tête -> base
+        # Aucune révision de fusion (down_revision n'est jamais un tuple/liste).
+        for rev in revs:
+            assert not isinstance(rev.down_revision, (tuple, list)), (
+                f"Fusion détectée sur {rev.revision}"
+            )
+        # La plus ancienne révision est la baseline (racine sans parent).
+        assert revs[-1].revision == BASELINE_REVISION
+        assert revs[-1].down_revision is None
