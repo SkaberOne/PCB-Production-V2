@@ -4,7 +4,7 @@ Handles creation and management of production plans from commands
 """
 
 from sqlalchemy.orm import Session
-from sqlalchemy import and_, desc
+from sqlalchemy import and_, desc, or_
 from datetime import datetime
 from typing import List, Dict, Optional, Tuple
 import logging
@@ -128,7 +128,7 @@ class ProductionService:
             db.query(BomItem)
             .filter(
                 BomItem.bom_revision_id.in_(revision_ids),
-                BomItem.dnp.isnot(True),
+                or_(BomItem.dnp == False, BomItem.dnp.is_(None)),  # noqa: E712 (SQL Server: IS NOT 1 invalide; inclut les lignes dnp NULL legacy)
             )
             .all()
         ) if revision_ids else []
@@ -580,7 +580,7 @@ class ProductionService:
             db.query(BomItem)
             .filter(
                 BomItem.bom_revision_id.in_(revision_ids_v),
-                BomItem.dnp.isnot(True),
+                or_(BomItem.dnp == False, BomItem.dnp.is_(None)),  # noqa: E712 (SQL Server: IS NOT 1 invalide; inclut les lignes dnp NULL legacy)
             )
             .all()
         ) if revision_ids_v else []
