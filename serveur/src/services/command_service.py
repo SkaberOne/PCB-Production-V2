@@ -705,7 +705,7 @@ class CommandService:
                 db.query(BomItem)
                 .filter(
                     BomItem.bom_revision_id.in_(revision_ids),
-                    BomItem.dnp.isnot(True),
+                    or_(BomItem.dnp == False, BomItem.dnp.is_(None)),  # noqa: E712 (SQL Server: IS NOT 1 invalide; inclut les lignes dnp NULL legacy)
                 )
                 .all()
             ):
