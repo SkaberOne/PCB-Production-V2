@@ -5,6 +5,32 @@
 
 ---
 
+## 2026-06-30 — Session 6 : Build 1.0.7, re-test terrain + T-009 (suppression production)
+
+### Contexte
+Build complet 1.0.7 sur le host (backend PyInstaller + frontend + installeur NSIS),
+installé et re-testé en réel. T-001/T-002/T-008 confirmés « Vérifié terrain ». Le
+nettoyage des productions a révélé une anomalie P2 (T-009).
+
+### T-009 — suppression de production bloquée par FK (1.0.8)
+- **Symptôme** : supprimer une production passée par Prix carte / Machine PnP lève une
+  `IntegrityError` SQL Server (`FK PRODUCTION_COST_INPUT`, etc.). Invisible en SQLite
+  (FK non appliquées) → non détecté par les tests jusqu'au terrain.
+- **Cause** : `ProductionWorkspaceService.delete_production` ne purgeait que les liens BOM
+  (cascade) et détachait les commandes ; les autres enfants (`PRODUCTION_COST_INPUT`,
+  `PNP_SLOT_PINS`, `PNP_MANUAL_PLACEMENTS`, `PRODUCTION_COSTING`) n'avaient ni cascade ni
+  nettoyage.
+- **Fix** : purge explicite des enfants 1:1 (`PRODUCTION_COST_INPUT`, `PNP_SLOT_PINS`,
+  `PNP_MANUAL_PLACEMENTS`) + détachement des FK nullable conservant l'historique
+  (`PRODUCTION_COSTING` → `production_id=NULL`, comme les commandes). Test
+  `tests/test_production_delete_cascade.py`.
+- Bump version **1.0.8**.
+
+### Tests
+- pytest : **382 passed, 1 skipped**.
+
+---
+
 ## 2026-06-19 — Session 5 : Correctifs test terrain v1.0.6 (T-001/T-002/T-003)
 
 ### Contexte

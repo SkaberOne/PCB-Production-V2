@@ -9,7 +9,8 @@ from sqlalchemy.orm import Session, joinedload
 from ..database import utcnow
 from ..models.bom import BomRevision
 from ..models.commands import Command
-from ..models.machines import PnpMachine
+from ..models.costing import ProductionCostInput, ProductionCosting
+from ..models.machines import PnpManualPlacement, PnpMachine, PnpSlotPin
 from ..models.production import Production, ProductionBomRevision
 
 
@@ -530,17 +531,36 @@ class ProductionWorkspaceService:
         """Delete a production workspace.
 
         Linked BOM revision rows are removed via the ``bom_links`` cascade.
-        Commands keep a nullable FK to the production, so we detach them first
-        to avoid an integrity error instead of deleting the command history.
+        Les autres tables enfant n'ont PAS de cascade (ORM ni SQL) : sans nettoyage
+        explicite, SQL Server lève une IntegrityError sur leurs FK (bug T-009 —
+        une production passée par Prix carte / Machine PnP devenait non supprimable) :
+        - ``COMMANDS`` (FK nullable) → détachées pour conserver l'historique de commande
+        - ``PRODUCTION_COSTING`` (historique prix, FK nullable) → détaché pour préserver
+          l'historique de prix par carte
+        - ``PRODUCTION_COST_INPUT`` (inputs coût 1:1, NOT NULL) → supprimés
+        - ``PNP_SLOT_PINS`` / ``PNP_MANUAL_PLACEMENTS`` (plan d'implantation, NOT NULL) → supprimés
         """
         production = ProductionWorkspaceService.get_production_or_raise(db, production_id)
 
-        # Detach commands (nullable FK) so the production can be removed without
-        # cascading away the command history.
+        # Détacher les FK nullable (conserver l'historique commande + prix).
         db.query(Command).filter(Command.production_id == production_id).update(
             {Command.production_id: None},
             synchronize_session=False,
         )
+        db.query(ProductionCosting).filter(
+            ProductionCosting.production_id == production_id
+        ).update({ProductionCosting.production_id: None}, synchronize_session=False)
+
+        # Supprimer les enfants spécifiques à la production (FK NOT NULL, sans cascade).
+        db.query(ProductionCostInput).filter(
+            ProductionCostInput.production_id == production_id
+        ).delete(synchronize_session=False)
+        db.query(PnpSlotPin).filter(
+            PnpSlotPin.production_id == production_id
+        ).delete(synchronize_session=False)
+        db.query(PnpManualPlacement).filter(
+            PnpManualPlacement.production_id == production_id
+        ).delete(synchronize_session=False)
 
         db.delete(production)
         db.commit()
