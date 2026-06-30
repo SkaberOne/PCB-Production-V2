@@ -80,14 +80,14 @@ puis l'**entrée détaillée** correspondante.
 | ID | Date | Version | Module | Gravité | Résumé | Statut | Issue GH |
 |---|---|---|---|---|---|---|---|
 | _(exemple)_ T-000 | 2026-06-18 | 1.0.x | Import BOM | 🟠 P2 | Description courte en une ligne | 🆕 Nouveau | — |
-| T-001 | 2026-06-18 | 1.0.6 | Commande | 🔴 P1 | Erreur SQL Server `dnp IS NOT 1` (liste à commander / export ERP) | ✅ Corrigé (2026-06-19) | — |
-| T-002 | 2026-06-18 | 1.0.6 | Prix carte | 🔴 P1 | « Erreur interne du serveur » au calcul du coût (même cause SQL) | ✅ Corrigé (2026-06-19) | — |
-| T-003 | 2026-06-18 | 1.0.6 | Import / Revue | 🟠 P2 | Import lot 2 faces → une seule face en Revue / reliée à la prod | ✅ Corrigé (2026-06-19, cae93ef) | — |
-| T-004 | 2026-06-18 | 1.0.6 | Import | 🟡 P3 | Bouton « Sauver » sans toast de confirmation | 🆕 Nouveau (non re-testé UI 19/06) | — |
-| T-005 | 2026-06-18 | 1.0.6 | Commande | 🟡 P3 | Nom de commande auto incohérent à l'affichage | 🆕 Nouveau (non re-testé UI 19/06) | — |
-| T-006 | 2026-06-18 | 1.0.6 | Revue BOM | 🟡 P3 | Chips/bandeaux d'avertissement non homogènes entre faces | 🆕 Nouveau (non re-testé UI 19/06) | — |
-| T-007 | 2026-06-18 | 1.0.6 | Revue BOM | 🟡 P3 | Estimation bobine persistée en « stock dispo » | 🆕 Nouveau (non re-testé UI 19/06) | — |
-| T-008 | 2026-06-18 | 1.0.6 | Base de données | 🟡 P3 | Règles de type : priorités partagées + `ESP-MODULE_COPY` résiduelle | 🆕 Nouveau (non re-testé UI 19/06) | — |
+| T-001 | 2026-06-18 | 1.0.6 | Commande | 🔴 P1 | Erreur SQL Server `dnp IS NOT 1` (liste à commander / export ERP) | ✔️ Vérifié terrain (2026-06-30, v1.0.7) | — |
+| T-002 | 2026-06-18 | 1.0.6 | Prix carte | 🔴 P1 | « Erreur interne du serveur » au calcul du coût (même cause SQL) | ✔️ Vérifié terrain (2026-06-30, v1.0.7) | — |
+| T-003 | 2026-06-18 | 1.0.6 | Import / Revue | 🟠 P2 | Import lot 2 faces → une seule face en Revue / reliée à la prod | ✅ Corrigé (2026-06-19, cae93ef) — re-test UI app à refaire | — |
+| T-004 | 2026-06-18 | 1.0.6 | Import | 🟡 P3 | Bouton « Sauver » sans toast de confirmation | ✅ Corrigé (PR #13) | — |
+| T-005 | 2026-06-18 | 1.0.6 | Commande | 🟡 P3 | Nom de commande auto incohérent à l'affichage | ✅ Corrigé (PR #14) | — |
+| T-006 | 2026-06-18 | 1.0.6 | Revue BOM | 🟡 P3 | Chips/bandeaux d'avertissement non homogènes entre faces | ✅ Corrigé (PR #15) | — |
+| T-007 | 2026-06-18 | 1.0.6 | Revue BOM | 🟡 P3 | Estimation bobine persistée en « stock dispo » | ✅ Corrigé (PR #16) | — |
+| T-008 | 2026-06-18 | 1.0.6 | Base de données | 🟡 P3 | Règles de type : priorités partagées + `ESP-MODULE_COPY` résiduelle | ✔️ Vérifié terrain (2026-06-30, v1.0.7) | — |
 
 ---
 
@@ -249,6 +249,29 @@ puis l'**entrée détaillée** correspondante.
 
 > **Donnée de test laissée** : production `TEST_RETEST KT220430F 19-06` (id 5) dans
 > `ECB_Production`, à supprimer si souhaité.
+
+---
+
+### Re-test terrain v1.0.7 (build + install host, 2026-06-30)
+
+> Release 1.0.7 buildée et installée sur le host (LAPTOP-053) : backend embarqué
+> (PyInstaller) + frontend + installeur NSIS perMachine. Version installée vérifiée
+> = **1.0.7.0**. Backend démarre (health 200), connecté à `ECB_Production` (SQL Server).
+
+- **T-001 (Commande) — ✔️ Vérifié terrain.** Module « Préparation commande composants »
+  charge toute la table « Composants à commander » (besoins/stock/à commander, fournisseurs
+  Farnell/Digi-Key/Mouser, prix). Plus aucune erreur `dnp IS NOT 1`.
+- **T-002 (Prix carte) — ✔️ Vérifié terrain.** prod02 : Coût total HT 2 030 € / TTC 2 436 €
+  / unitaire 101,51 € (Carrier Board D3000). Plus d'« Erreur interne du serveur ».
+- **T-008 (règles de type) — ✔️ Vérifié terrain.** Migration `b2c4e6f8a0d1` exécutée au
+  démarrage du backend : `ESP-MODULE_COPY` supprimée de `ECB_Production` (vérifié SQL :
+  0 occurrence ; `ESP-MODULE` conservée).
+- **T-004 / T-005 / T-006 / T-007 — ✅ Corrigés (mergés)**, à re-drill en UI au besoin.
+  Note T-005 : les commandes créées AVANT le correctif gardent leur nom générique
+  (« Commande prod N ») ; le nom dérivé du nom de production ne s'applique qu'aux
+  nouvelles commandes.
+- **T-003 — ✅ Corrigé (code + jest E2E)**, re-test UI dans l'app à refaire (sélecteur de
+  fichiers natif non pilotable proprement ce jour).
 
 ---
 
