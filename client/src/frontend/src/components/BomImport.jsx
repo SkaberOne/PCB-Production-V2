@@ -751,6 +751,11 @@ function BomImport({ showVisualizationAction = true }) {
                 },
             });
             syncResultPayload(persistedEntry);
+            setItemUpdateState({
+                itemId: null,
+                message: `Révision « ${reference} ${revision} » enregistrée en bibliothèque.`,
+                type: 'success',
+            });
         } catch (requestError) {
             setWorkspaceError(
                 requestError.response?.data?.detail || requestError.message || 'Erreur lors de la mise à jour de la BOM'
