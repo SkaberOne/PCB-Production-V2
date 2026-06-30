@@ -140,6 +140,34 @@ describe('buildStockSummary wound-thickness mode', () => {
     });
 });
 
+describe('buildStockSummary garde-fou estimation bobine (T-007)', () => {
+    const line = { requiredQuantity: 10, componentTapeWidthMm: 8, componentPitchMm: 4 };
+    const reelDraft = {
+        reel_hub_diameter_mm: 60,
+        reel_wound_thickness_mm: 59,
+        tape_thickness_mm: 1.0,
+        reel_safety_pct: 0,
+    };
+
+    it("n'auto-compte PAS l'estimation comme stock dispo", () => {
+        const summary = buildStockSummary(line, reelDraft);
+        expect(summary.reelEstimatedQty).toBeGreaterThan(0);
+        // L'estimation reste une aide : ni stock dispo, ni bascule de statut.
+        expect(summary.reelAvailableQty).toBe(0);
+        expect(summary.totalAvailableQty).toBe(0);
+        expect(summary.quantityToOrder).toBe(10);
+        expect(summary.status).toBe('À commander');
+    });
+
+    it('compte la bobine seulement après validation explicite (reel_manual_override_qty)', () => {
+        const summary = buildStockSummary(line, { ...reelDraft, reel_manual_override_qty: 5514 });
+        expect(summary.reelAvailableQty).toBe(5514);
+        expect(summary.totalAvailableQty).toBe(5514);
+        expect(summary.quantityToOrder).toBe(0);
+        expect(summary.status).toBe('OK stock');
+    });
+});
+
 describe('bomPlanning helpers', () => {
     it('excludes DNP lines from component aggregation and stock needs', () => {
         const planningLines = buildAggregatedComponents(
