@@ -3,7 +3,7 @@
 
 > **Lecture obligatoire avant toute action** : ce fichier, puis `STRUCTURE.md`, puis `docs/Projet.md`, puis `docs/CHANGELOG.md` (dernière entrée), puis le dernier audit en date dans `docs/audits/`.
 >
-> **Avant toute opération Git** : appliquer `docs/guides/Workflow_Git_GitHub.md` (le §10 ci-dessous en résume la loi).
+> **Avant toute opération Git** : utiliser le skill **`git-workflow`** (skill général, méthode universelle) et appliquer `docs/guides/Workflow_Git_GitHub.md` (spécificités de CE projet ; le §10 ci-dessous en résume la loi).
 
 ---
 
@@ -68,8 +68,38 @@
 |---|---|
 | Manipulations fichiers/dossiers Windows | `anthropic-skills:cmd-file-ops` |
 
+### Git & versioning (OBLIGATOIRE pour tout dev de l'application)
+| Tâche | Skill |
+|---|---|
+| **Toute opération Git/GitHub** (branche, commit, push, PR, merge, release, nettoyage) | **`git-workflow`** (skill général réutilisable) + spécificités projet dans `docs/guides/Workflow_Git_GitHub.md` |
+| Message de commit | `caveman:caveman-commit` |
+
+> Le skill **`git-workflow`** doit être utilisé **systématiquement** dès qu'une étape touche au versionnement pendant le développement de l'application (cf §1 étape 3, §9 et §10). Il encode le modèle `main` + `dev` + branches courtes + PR + CI verte.
+
 ### Skills à NE PAS utiliser
-`wiki*`, `save`, `autoresearch`, `canvas`, `email-sort`, `add-model-descriptions`, `adr-*` (sauf `engineering:architecture`), `mcp-server-builder`.
+`wiki*`, `obsidian-*`, `defuddle`, `save`, `autoresearch`, `canvas`, `email-sort`, `add-model-descriptions`, `adr-*` (sauf `engineering:architecture`), `mcp-server-builder`, `pptx`, `skill-creator`, `setup-cowork`, `schedule`, `design:*`.
+
+**Famille `agent-*` (~30 skills SPARC/claude-flow : `agent-coder`, `agent-planner`, `agent-architecture`, etc.) : NE PAS utiliser.** Ce sont des personas qui supposent une infra multi-agents (memory_store, swarm) absente ici, et qui redondent avec les skills `engineering:*` / `caveman:*` curatés ci-dessus. Pour les besoins réels (migration SQLAlchemy, refactor, validation déploiement), utiliser les skills curatés + les agents délégables du §2 bis.
+
+---
+
+## 2 bis. Agents délégables (outil Agent / `subagent_type`)
+
+> Différents des *skills* : ils tournent dans un **contexte isolé** et ne renvoient
+> que leur conclusion (contexte principal préservé). À privilégier pour les gros
+> balayages et les tâches parallélisables.
+
+| Agent | Rôle | Cas projet |
+|---|---|---|
+| `caveman:cavecrew-investigator` | Localiser du code (read-only, sortie compressée) | Cartographier les `.query()` 1.x, trouver où un modèle/route est défini |
+| `caveman:cavecrew-builder` | Edit chirurgical 1-2 fichiers | Fix ciblés (`min_items→min_length`), renames, typos |
+| `caveman:cavecrew-reviewer` | Review de diff (1 ligne/finding) | Relecture avant commit/PR |
+| `Explore` | Recherche large read-only | Balayer un domaine inconnu |
+| `Plan` | Plan d'implémentation / archi | Refactor `MachinePnpPage.jsx`, migration tests SQL Server |
+| `general-purpose` | Tâche multi-étapes autonome | Migration SQLAlchemy module par module |
+
+Règle : déléguer dès qu'une tâche implique de lire beaucoup de fichiers pour n'en
+tirer qu'une conclusion, ou qu'un travail est parallélisable et indépendant.
 
 ---
 
@@ -209,7 +239,7 @@ URLs : API → `http://localhost:8000` · Swagger → `/docs` · Frontend → `h
 
 ## 10. Workflow Git & GitHub (LOI)
 
-> Détail complet et pédagogique : `docs/guides/Workflow_Git_GitHub.md`. Plan de restructuration du dépôt : `docs/guides/Nettoyage_Git_Plan_Action.md`. Modèle = **`main` (stable) + `dev` (développement)** + branches courtes.
+> **Utiliser le skill `git-workflow`** (skill général réutilisable) pour toute opération de versionnement. Spécificités de CE projet et détail pédagogique : `docs/guides/Workflow_Git_GitHub.md`. Plan de restructuration du dépôt : `docs/guides/Nettoyage_Git_Plan_Action.md`. Modèle = **`main` (stable) + `dev` (développement)** + branches courtes.
 
 **Branches permanentes :** `main` = stable/déployable (n'avance QUE par PR `dev → main`) · `dev` = développement quotidien (contient toutes les features).
 

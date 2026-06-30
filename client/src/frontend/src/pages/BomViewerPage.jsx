@@ -611,7 +611,6 @@ function BomViewerPage() {
             <PageHeader
                 eyebrow="Revue multi-BOM"
                 title="BOM"
-                description="Sélectionne une BOM active à la fois, renseigne les quantités à produire par référence, puis finalise la revue avant de basculer vers la préparation composants."
                 actions={(
                     <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
                         <Button
