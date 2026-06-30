@@ -12,6 +12,7 @@
 | [[Plan_Deploiement]] | 🔧 Structure projet, environnement dev, workflow session, git |
 | [[CHANGELOG]] | 📜 Historique des sessions et commits |
 | [[Roadmap]] | 🗺️ Vision stratégique, backlog priorisé, risques |
+| [[JOURNAL_TESTS_RELEASE]] | 🧪 Erreurs rencontrées en test release (poste atelier) → dev continu |
 
 ---
 

@@ -114,16 +114,38 @@ existe une nouvelle version ; vous pouvez aussi vérifier à tout moment via
 **Aide → Rechercher les mises à jour**. Quand une mise à jour est prête, elle
 propose de **redémarrer pour l'installer**.
 
-## 7. Bonnes pratiques
+## 7. Travail à plusieurs (postes partagés)
+
+En multi-postes, tous les postes lisent et écrivent dans **la même base** (hébergée
+sur le poste serveur). Concrètement :
+
+- **Données communes** : ce qu'un poste enregistre est aussitôt dans la base, et
+  les autres le verront — mais **pas en direct**. Si un collègue ajoute ou modifie
+  une donnée pendant qu'un écran est déjà ouvert chez vous, **rechargez la page**
+  (ou rouvrez l'écran) pour voir sa version à jour.
+- **Édition de la même fiche au même moment** : l'application applique la règle du
+  **« dernier qui enregistre gagne »**. Si deux personnes modifient **la même**
+  fiche (même composant, même BOM…) en même temps, la dernière sauvegarde
+  **écrase** celle de l'autre, sans avertissement. L'application ne détecte pas
+  ce conflit.
+- **Pas de risque pour la base** : la base elle-même n'est jamais corrompue ; le
+  seul risque est de **perdre une modification** sur une fiche éditée à deux au
+  même instant — cas rare à 2-3 personnes.
+
+**En pratique** : répartissez-vous le travail (chacun ses productions / BOM),
+rechargez une fiche avant de la modifier si un collègue pourrait y toucher, et
+évitez d'éditer la même fiche à deux en même temps.
+
+## 8. Bonnes pratiques
 
 - Travaillez toujours **dans une production active** (chargez-la avant l'import).
 - Complétez les **composants/empreintes manquants** signalés à l'import : ils
   bloquent les étapes suivantes.
 - **Validez le stock** en Revue BOM avant de générer la commande.
-- En multi-postes, les données sont **communes** : une modification est visible
-  par les collègues.
+- En multi-postes, **rechargez** un écran déjà ouvert pour voir les changements
+  des collègues (cf. § 7).
 
-## 8. En cas de souci
+## 9. En cas de souci
 
 | Symptôme | Que faire |
 |---|---|

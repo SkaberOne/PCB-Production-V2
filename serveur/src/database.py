@@ -2,6 +2,7 @@
 
 import logging
 import sys
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -100,15 +101,33 @@ def verify_connection_or_raise() -> None:
     silencieusement en SQLite — un poste mal configuré doit refuser de démarrer
     avec un message clair, pas tourner sur une base locale fantôme.
     """
-    try:
-        with engine.connect() as conn:
-            conn.execute(text("SELECT 1"))
-        logger.info("Database connection successful (%s)", engine.url.host or engine.url.database)
-    except Exception as exc:
-        raise RuntimeError(
-            "Connexion à la base de données impossible. Vérifiez la configuration "
-            f"SQL Server (hôte, identifiants, pilote ODBC 17) dans .env. Détail : {exc}"
-        ) from exc
+    # Au démarrage de l'app packagée, Electron + le renderer + le backend gelé se
+    # lancent simultanément → forte contention disque/CPU qui peut faire échouer
+    # le 1er essai de connexion ODBC (login timeout dépassé → erreur 87). On
+    # réessaie donc plusieurs fois avant d'abandonner ; la charge retombe vite et
+    # un essai suivant aboutit.
+    attempts = 8
+    delay_s = 4
+    last_exc = None
+    for i in range(1, attempts + 1):
+        try:
+            with engine.connect() as conn:
+                conn.execute(text("SELECT 1"))
+            logger.info(
+                "Database connection successful (%s) [essai %d]",
+                engine.url.host or engine.url.database, i,
+            )
+            return
+        except Exception as exc:  # noqa: BLE001
+            last_exc = exc
+            logger.warning("Connexion DB essai %d/%d échouée : %s", i, attempts, str(exc)[:200])
+            if i < attempts:
+                time.sleep(delay_s)
+    raise RuntimeError(
+        f"Connexion à la base de données impossible après {attempts} tentatives. "
+        f"Vérifiez la configuration SQL Server (hôte, identifiants, pilote ODBC 17) "
+        f"dans .env. Détail : {last_exc}"
+    ) from last_exc
 
 
 def _src_dir() -> Path:
@@ -122,7 +141,13 @@ def _alembic_config() -> "_AlembicConfig":
     src = _src_dir()
     cfg = _AlembicConfig(str(src / "alembic.ini"))
     cfg.set_main_option("script_location", str(src / "alembic"))
-    cfg.set_main_option("sqlalchemy.url", settings.database_url)
+    # configparser (sous-jacent à Alembic) interprète « % » comme syntaxe
+    # d'interpolation. Un mot de passe URL-encodé (quote_plus → %XX) fait alors
+    # planter set_main_option (« ValueError: invalid interpolation syntax ») et
+    # donc le boot du backend (« Backend indisponible »). On échappe « % » en
+    # « %% » : configparser le restitue tel quel via get_main_option, et env.py
+    # lit de toute façon DATABASE_URL directement → l'aller-retour reste correct.
+    cfg.set_main_option("sqlalchemy.url", settings.database_url.replace("%", "%%"))
     return cfg
 
 
@@ -151,8 +176,32 @@ def init_or_upgrade_schema() -> None:
         Base.metadata.create_all(bind=engine)
         _alembic_command.stamp(cfg, "head")
     else:
-        logger.info("Schéma : base existante → alembic upgrade head")
-        _alembic_command.upgrade(cfg, "head")
+        # Base existante. Si sa révision n'existe plus dans le script directory
+        # (ancienne chaîne archivée lors du collapse baseline00001), un
+        # `upgrade head` échouerait (« Can't locate revision »). On réaligne
+        # alors via create_all (idempotent) + stamp head, sans casser la base.
+        from alembic.script import ScriptDirectory
+
+        script = ScriptDirectory.from_config(cfg)
+        known = {rev.revision for rev in script.walk_revisions()}
+        with engine.connect() as conn:
+            current = conn.execute(
+                text("SELECT version_num FROM alembic_version")
+            ).scalar()
+
+        if current not in known:
+            logger.warning(
+                "Schéma : révision Alembic %s inconnue (chaîne archivée) "
+                "→ create_all + stamp head (purge)",
+                current,
+            )
+            Base.metadata.create_all(bind=engine)
+            # purge=True : vide alembic_version avant de tamponner, sinon Alembic
+            # tente de résoudre la révision orpheline et échoue.
+            _alembic_command.stamp(cfg, "head", purge=True)
+        else:
+            logger.info("Schéma : base existante → alembic upgrade head")
+            _alembic_command.upgrade(cfg, "head")
 
 
 def get_db():

@@ -5,7 +5,7 @@ Provides aggregated metrics and summaries for dashboard and reporting pages.
 
 from typing import Dict, List, Optional
 
-from sqlalchemy import func, case
+from sqlalchemy import func, case, or_
 from sqlalchemy.orm import Session
 
 from ..models.bom import BomItem, BomReference, BomRevision, Component
@@ -82,11 +82,13 @@ class ReportService:
             BomItem.footprint_pnp.isnot(None),
             BomItem.footprint_pnp != "",
         ).count()
-        # dnp column is nullable (default=False, no server_default).
-        # Use isnot(True) to correctly include rows where dnp IS NULL (= not placed,
-        # not explicitly marked DNP) — avoids silent under-count in items_to_verify.
+        # dnp column is NOT NULL (default=False, server_default="0"), but legacy data
+        # may still contain dnp=NULL rows. Use a NULL-safe (dnp == False OR dnp IS NULL)
+        # filter instead of isnot(True): SQL Server rejects `IS NOT 1` (T-SQL only allows
+        # IS [NOT] NULL), and we must still include NULL rows (= not placed, not explicitly
+        # DNP) to avoid the silent under-count in items_to_verify.
         items_to_verify = base_q.filter(
-            BomItem.dnp.isnot(True),
+            or_(BomItem.dnp == False, BomItem.dnp.is_(None)),  # noqa: E712
         ).filter(
             (BomItem.footprint_pnp.is_(None)) | (BomItem.footprint_pnp == "")
             | (BomItem.component_type.is_(None)) | (BomItem.component_type == "")
@@ -162,7 +164,7 @@ class ReportService:
                 total_required_expr.label("total_required"),
             )
             .join(CommandItem, CommandItem.bom_revision_id == BomItem.bom_revision_id)
-            .filter(BomItem.dnp.is_(False))
+            .filter(BomItem.dnp == False)  # noqa: E712 (SQL Server: IS 0 invalide)
             .group_by(value_expr, footprint_expr, component_type_expr)
             .order_by(total_required_expr.desc())
             .limit(limit)

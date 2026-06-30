@@ -138,4 +138,32 @@ export async function persistImportWorkspaceBeforeReview({
     return { settledResults: [], activeRevisionMeta };
 }
 
+/**
+ * Construit la liste des révisions à charger dans la session de revue à partir
+ * des résultats de persistance d'un lot.
+ *
+ * Cœur du fix T-003 : une carte recto/verso importée en lot (faces TOP + BOT)
+ * doit garder SES DEUX faces en revue (et donc liées à la production), pas
+ * seulement la BOM active. On repart de tous les items `fulfilled` qui ont un
+ * `bom_revision_id`, et on place la face active en tête pour qu'elle reste la
+ * BOM active à l'arrivée sur la revue.
+ *
+ * @param {{ settledResults?: Array, activeRevisionId?: number|string|null }} params
+ *   settledResults : sortie de `Promise.allSettled` de `persistImportWorkspaceBeforeReview`.
+ * @returns {Array<object>} entrées persistées (toutes les faces), face active en tête.
+ */
+export function buildReviewSelectionFromSettled({ settledResults = [], activeRevisionId = null } = {}) {
+    const entries = (Array.isArray(settledResults) ? settledResults : [])
+        .filter((settled) => settled?.status === 'fulfilled' && settled.value?.bom_revision_id)
+        .map((settled) => settled.value);
+
+    if (!activeRevisionId || entries.length < 2) {
+        return entries;
+    }
+
+    const isActive = (entry) => String(entry.bom_revision_id) === String(activeRevisionId);
+    // Tri stable : la face active passe en tête, l'ordre relatif des autres est conservé.
+    return [...entries].sort((left, right) => Number(isActive(right)) - Number(isActive(left)));
+}
+
 export { buildReviewPayload, hasBomRevisionId };

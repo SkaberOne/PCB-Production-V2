@@ -2,6 +2,7 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import ApiRoundedIcon from '@mui/icons-material/ApiRounded';
 import ArrowForwardRoundedIcon from '@mui/icons-material/ArrowForwardRounded';
+import DnsRoundedIcon from '@mui/icons-material/DnsRounded';
 import FolderRoundedIcon from '@mui/icons-material/FolderRounded';
 import StorageRoundedIcon from '@mui/icons-material/StorageRounded';
 import TuneRoundedIcon from '@mui/icons-material/TuneRounded';
@@ -15,6 +16,7 @@ import {
     Typography,
 } from '@mui/material';
 import PageHeader from '../components/common/PageHeader';
+import DatabaseSettings from '../components/common/DatabaseSettings';
 import SupplierApiSettings from '../components/common/SupplierApiSettings';
 
 const cardSx = { backgroundColor: '#18181b', border: '1px solid #1f2937' };
@@ -48,6 +50,10 @@ function SettingsPage() {
                 title="Réglages de l'application"
                 description="Intégrations fournisseurs, valeurs ERP par défaut et chemins des flux locaux. La gestion des référentiels (composants, empreintes, règles) se fait désormais dans Bibliothèque › Base de données."
             />
+
+            <SettingsSection icon={DnsRoundedIcon} title="Connexion base de données" chip="Poste">
+                <DatabaseSettings />
+            </SettingsSection>
 
             <SettingsSection icon={ApiRoundedIcon} title="Intégrations API fournisseurs">
                 <SupplierApiSettings />

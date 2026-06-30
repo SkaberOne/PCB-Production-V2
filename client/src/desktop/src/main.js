@@ -1,6 +1,7 @@
 const { app, BrowserWindow, Menu, dialog, ipcMain, shell, session } = require('electron');
 const fs = require('fs');
 const { existsSync } = fs;
+const os = require('os');
 const path = require('path');
 const net = require('net');
 const http = require('http');
@@ -24,6 +25,8 @@ let backendProcess = null;
 let backendUrl = null; // ex: http://127.0.0.1:54321/api  (null en dev → fallback REACT_APP_API_URL)
 let backendPort = null;
 let apiKey = null; // clé X-API-Key de session (générée au lancement packagé, ADR 0007/Phase B)
+let lastBackendStderr = ''; // dernières lignes stderr du backend (diagnostic config DB)
+let lastBackendError = null; // dernier message d'échec de démarrage backend (ADR 0009)
 
 // PCBFLOW_FORCE_PROD=1 force le comportement « packagé » (spawn backend + build
 // React local) même hors installeur — utile pour valider le runtime sans signer.
@@ -125,20 +128,36 @@ const startBackend = (port) => {
         }
     }
 
-    backendProcess = spawn(exe, ['--host', '127.0.0.1', '--port', String(port)], {
+    // stderr capturé (et non 'ignore') pour pouvoir expliquer un échec de
+    // démarrage — typiquement le fail-fast DB (ADR 0008) qui imprime la cause.
+    lastBackendStderr = '';
+    // Variable locale `child` : au redémarrage (ADR 0009), l'événement 'exit' de
+    // l'ANCIEN process peut arriver après l'assignation du nouveau. On ne nulle
+    // donc backendProcess que s'il pointe encore sur CE child (anti-orphelin).
+    const child = spawn(exe, ['--host', '127.0.0.1', '--port', String(port)], {
         cwd: path.dirname(exe),
         env: childEnv,
-        stdio: 'ignore',
+        stdio: ['ignore', 'ignore', 'pipe'],
         windowsHide: true,
     });
+    backendProcess = child;
 
-    backendProcess.on('exit', () => {
-        backendProcess = null;
+    if (child.stderr) {
+        child.stderr.on('data', (chunk) => {
+            lastBackendStderr += chunk.toString();
+            if (lastBackendStderr.length > 8000) {
+                lastBackendStderr = lastBackendStderr.slice(-8000);
+            }
+        });
+    }
+
+    child.on('exit', () => {
+        if (backendProcess === child) backendProcess = null;
     });
 
-    backendProcess.on('error', (err) => {
+    child.on('error', (err) => {
         console.error('Backend spawn error:', err);
-        backendProcess = null;
+        if (backendProcess === child) backendProcess = null;
     });
 };
 
@@ -189,6 +208,163 @@ const stopBackend = () => {
     backendProcess = null;
 };
 
+const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+/** Attend /api/health 200 OU l'arrêt prématuré du backend (remonte alors stderr). */
+const waitForHealthOrExit = (port, timeoutMs = 30000) => {
+    const proc = backendProcess;
+    return new Promise((resolve, reject) => {
+        let settled = false;
+        const onExit = (code) => {
+            if (settled) return;
+            settled = true;
+            const tail = lastBackendStderr.trim().slice(-400);
+            reject(new Error(
+                `Le backend s'est arrêté (code ${code}).${tail ? ' ' + tail : ''}`,
+            ));
+        };
+        if (proc) proc.once('exit', onExit);
+
+        waitForHealth(port, timeoutMs)
+            .then(() => {
+                if (settled) return;
+                settled = true;
+                if (proc) proc.removeListener('exit', onExit);
+                resolve();
+            })
+            .catch((err) => {
+                if (settled) return;
+                settled = true;
+                if (proc) proc.removeListener('exit', onExit);
+                const tail = lastBackendStderr.trim().slice(-400);
+                reject(new Error(`${err.message}${tail ? ' — ' + tail : ''}`));
+            });
+    });
+};
+
+// ───────────────────── Config DB pilotée par Electron (ADR 0009) ─────────────────────
+// La config base est éditée HORS du backend : le fail-fast (ADR 0008) empêche un
+// poste mal configuré de démarrer le serveur, donc on ne peut pas servir l'écran
+// de config par une route HTTP (poule/œuf). Electron lit/écrit directement le
+// .env runtime et teste la connexion via `pcb-flow-server.exe --check-db`.
+
+/** Dossier de données contenant le .env runtime (identique à startBackend). */
+const getServerDataDir = () => {
+    if (app.isPackaged) {
+        return path.join(app.getPath('userData'), 'server');
+    }
+    // Mode force-prod local : le backend gelé lit le .env à côté de l'exe de test.
+    const exe = resolveBackendExe();
+    return exe ? path.dirname(exe) : null;
+};
+
+const getServerEnvPath = () => {
+    const dir = getServerDataDir();
+    return dir ? path.join(dir, '.env') : null;
+};
+
+/** Parse un .env en map clé→valeur (ignore commentaires et lignes vides). */
+const readEnvFile = (envPath) => {
+    const map = {};
+    if (envPath && existsSync(envPath)) {
+        const content = fs.readFileSync(envPath, 'utf-8');
+        for (const raw of content.split(/\r?\n/)) {
+            const line = raw.trim();
+            if (!line || line.startsWith('#')) continue;
+            const eq = line.indexOf('=');
+            if (eq === -1) continue;
+            map[line.slice(0, eq).trim()] = line.slice(eq + 1).trim();
+        }
+    }
+    return map;
+};
+
+/** Réécrit uniquement les clés fournies (préserve commentaires/flags/MAX_UPLOAD_MB). */
+const patchEnvFile = (envPath, updates) => {
+    let lines = existsSync(envPath)
+        ? fs.readFileSync(envPath, 'utf-8').split(/\r?\n/)
+        : [];
+    const remaining = new Set(Object.keys(updates));
+
+    lines = lines.map((raw) => {
+        const line = raw.trim();
+        if (!line || line.startsWith('#')) return raw;
+        const eq = line.indexOf('=');
+        if (eq === -1) return raw;
+        const key = line.slice(0, eq).trim();
+        if (Object.prototype.hasOwnProperty.call(updates, key)) {
+            remaining.delete(key);
+            return `${key}=${updates[key]}`;
+        }
+        return raw;
+    });
+
+    for (const key of remaining) {
+        lines.push(`${key}=${updates[key]}`);
+    }
+    fs.writeFileSync(envPath, lines.join('\n'), 'utf-8');
+};
+
+/** Sonde TCP rapide : le port SQL est-il joignable ? (filtre « port fermé » avant ODBC). */
+const tcpProbe = (host, port, timeoutMs = 2000) =>
+    new Promise((resolve) => {
+        if (!host) {
+            resolve({ ok: true, detail: 'ignoré' });
+            return;
+        }
+        const sock = new net.Socket();
+        let done = false;
+        const finish = (ok, detail) => {
+            if (done) return;
+            done = true;
+            sock.destroy();
+            resolve({ ok, detail });
+        };
+        sock.setTimeout(timeoutMs);
+        sock.once('connect', () => finish(true, 'ouvert'));
+        sock.once('timeout', () => finish(false, 'timeout'));
+        sock.once('error', (e) => finish(false, e.code || e.message));
+        sock.connect(port, host);
+    });
+
+/** Lance `pcb-flow-server.exe --check-db` sur un .env candidat, renvoie le JSON. */
+const runCheckDb = (exe, dataDir) =>
+    new Promise((resolve) => {
+        const child = spawn(exe, ['--check-db'], {
+            cwd: path.dirname(exe),
+            env: { ...process.env, PCBFLOW_DATA_DIR: dataDir, API_ENV: 'production' },
+            windowsHide: true,
+        });
+        let stdout = '';
+        let stderr = '';
+        child.stdout.on('data', (d) => { stdout += d.toString(); });
+        child.stderr.on('data', (d) => { stderr += d.toString(); });
+
+        const timer = setTimeout(() => {
+            try { child.kill(); } catch (e) { /* noop */ }
+            resolve({ ok: false, engine: 'unknown', detail: 'Délai dépassé lors du test.' });
+        }, 30000);
+
+        child.on('error', (e) => {
+            clearTimeout(timer);
+            resolve({ ok: false, engine: 'unknown', detail: e.message });
+        });
+        child.on('exit', () => {
+            clearTimeout(timer);
+            const lines = stdout.split(/\r?\n/).map((s) => s.trim()).filter(Boolean);
+            const last = lines[lines.length - 1];
+            try {
+                resolve(JSON.parse(last));
+            } catch (e) {
+                resolve({
+                    ok: false,
+                    engine: 'unknown',
+                    detail: (stderr || stdout || 'Réponse inattendue du test.').slice(0, 500),
+                });
+            }
+        });
+    });
+
 // ───────────────────────── Écrans (attente / erreur) ─────────────────────────
 
 const screenShell = (title, body) => `
@@ -236,16 +412,62 @@ const loadLoadingScreen = (win) => {
     win.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(html)}`);
 };
 
+// Script client (navigateur) injecté dans l'écran d'erreur. PAS de backticks ni
+// de ${...} ici : ce texte vit dans un template literal de main.js. On câble le
+// formulaire sur electronAPI.dbConfig (ADR 0009) pour configurer la base SANS
+// passer par le backend (qui est justement en échec) ni par une ligne de commande.
+const errorScreenClientScript = [
+    "var $=function(id){return document.getElementById(id);};",
+    "function getCfg(){return {host:$('h').value.trim(),port:($('p').value.trim()||'1433'),user:$('u').value.trim(),password:$('w').value,database:($('d').value.trim()||'ECB_Production')};}",
+    "function setStatus(msg,ok){var s=$('status');s.textContent=msg;s.style.color=ok?'#9ae6b4':'#fbb6ce';}",
+    "function lock(v){$('btnTest').disabled=v;$('btnSave').disabled=v;}",
+    "async function prefill(){try{var c=await window.electronAPI.dbConfig.get();if(c&&c.available){$('h').value=c.host||'';$('p').value=c.port||'1433';$('u').value=c.user||'pcbflow';$('d').value=c.database||'ECB_Production';if(c.passwordSet){$('w').placeholder='(inchange)';}}}catch(e){}}",
+    "async function doTest(){lock(true);setStatus('Test de connexion en cours...',true);try{var r=await window.electronAPI.dbConfig.test(getCfg());setStatus(r.ok?('Connexion reussie. '+(r.detail||'')):('Echec : '+(r.detail||'')),r.ok);}catch(e){setStatus('Erreur : '+e,false);}lock(false);}",
+    "async function doSave(){lock(true);setStatus('Enregistrement et demarrage du moteur...',true);try{var s=await window.electronAPI.dbConfig.save(getCfg());if(!s.ok){setStatus('Echec enregistrement : '+(s.detail||''),false);lock(false);return;}var r=await window.electronAPI.dbConfig.restart();if(!r.ok){setStatus('Le moteur n\\'a pas demarre : '+(r.detail||''),false);lock(false);}}catch(e){setStatus('Erreur : '+e,false);lock(false);}}",
+    "window.addEventListener('DOMContentLoaded',function(){if(!window.electronAPI||!window.electronAPI.dbConfig){setStatus('Configuration indisponible (API non chargee).',false);return;}prefill();$('btnTest').addEventListener('click',doTest);$('btnSave').addEventListener('click',doSave);});",
+].join("\n");
+
 const loadBackendErrorScreen = (win, error) => {
-    const html = screenShell(
-        'Backend indisponible',
-        `<h1>Backend indisponible</h1>
-         <p>Le moteur de production n'a pas pu démarrer.</p>
-         <p><code>${(error && error.message ? error.message : String(error)).replace(/</g, '&lt;')}</code></p>
-         <p>Fermez puis relancez l'application. Si le problème persiste, vérifiez le pilote
-         <strong>ODBC Driver 17</strong> et la connexion à la base.</p>`,
-    );
-    win.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(html)}`);
+    const msg = (error && error.message ? error.message : String(error)).replace(/</g, '&lt;');
+    const body = `<h1>Connexion à la base requise</h1>
+         <p>Le moteur de production n'a pas pu se connecter à la base de données.
+         Renseignez l'accès au serveur ci-dessous (poste « hôte »), testez puis démarrez.</p>
+         <details style="margin:8px 0 4px;"><summary style="cursor:pointer;opacity:.8;">Détail technique</summary>
+         <p><code>${msg}</code></p></details>
+         <style>
+            form.dbcfg{text-align:left;margin-top:16px;}
+            form.dbcfg label{display:block;font-size:13px;margin:10px 0 4px;opacity:.9;}
+            form.dbcfg input{width:100%;box-sizing:border-box;padding:9px 11px;border-radius:10px;
+              border:1px solid rgba(255,255,255,.25);background:rgba(255,255,255,.10);color:#f7fafc;font-size:14px;}
+            form.dbcfg input::placeholder{color:rgba(255,255,255,.5);}
+            .row{display:flex;gap:12px;}
+            .row>div{flex:1;}
+            .btns{margin-top:18px;display:flex;gap:12px;}
+            .btns button{flex:1;padding:11px;border-radius:10px;border:0;font-size:14px;font-weight:600;cursor:pointer;}
+            .btns button:disabled{opacity:.5;cursor:default;}
+            #btnTest{background:rgba(255,255,255,.16);color:#f7fafc;}
+            #btnSave{background:#2f9e6e;color:#fff;}
+            #status{margin-top:14px;font-size:13px;min-height:18px;}
+         </style>
+         <form class="dbcfg" onsubmit="return false;">
+            <label>Serveur (IP ou nom du PC hôte)</label>
+            <input id="h" placeholder="192.168.5.66" autocomplete="off" spellcheck="false" />
+            <div class="row">
+               <div><label>Port</label><input id="p" value="1433" autocomplete="off" /></div>
+               <div><label>Base de données</label><input id="d" value="ECB_Production" autocomplete="off" /></div>
+            </div>
+            <div class="row">
+               <div><label>Utilisateur</label><input id="u" value="pcbflow" autocomplete="off" /></div>
+               <div><label>Mot de passe</label><input id="w" type="password" autocomplete="off" /></div>
+            </div>
+            <div class="btns">
+               <button id="btnTest" type="button">Tester la connexion</button>
+               <button id="btnSave" type="button">Enregistrer et démarrer</button>
+            </div>
+            <div id="status"></div>
+         </form>
+         <script>${errorScreenClientScript}</script>`;
+    win.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(screenShell('Backend indisponible', body))}`);
 };
 
 // ───────────────────────── Renderer (build React) ─────────────────────────
@@ -461,10 +683,16 @@ const bootstrap = async () => {
             apiKey = crypto.randomBytes(24).toString('hex');
             backendPort = await findFreePort();
             startBackend(backendPort);
-            await waitForHealth(backendPort);
+            // Démarrage backend : au 1er lancement, contention disque/CPU
+            // (Electron + renderer + exe gelé) → le backend met ~30-90 s et
+            // réessaie sa connexion SQL (database.py). Délai large (180 s) pour
+            // ne pas le tuer trop tôt (sinon « Backend indisponible »).
+            await waitForHealthOrExit(backendPort, 180000);
             backendUrl = `http://127.0.0.1:${backendPort}/api`;
+            lastBackendError = null;
         } catch (error) {
             console.error('Échec du démarrage backend:', error);
+            lastBackendError = error && error.message ? error.message : String(error);
             if (mainWindow) loadBackendErrorScreen(mainWindow, error);
             return;
         }
@@ -489,6 +717,127 @@ ipcMain.on('ecb:get-backend-url', (event) => {
 ipcMain.on('ecb:get-api-key', (event) => {
     event.returnValue = apiKey;
 });
+
+// ───────────────────── IPC config DB (ADR 0009) ─────────────────────
+// Le mot de passe n'est JAMAIS renvoyé au renderer (seul `passwordSet` l'indique).
+
+ipcMain.handle('ecb:db-config:get', () => {
+    if (isDev) return { available: false, reason: 'dev' };
+    const envPath = getServerEnvPath();
+    if (!envPath) return { available: false, reason: 'no-backend' };
+    const env = readEnvFile(envPath);
+    return {
+        available: true,
+        host: env.SQL_SERVER_HOST || '',
+        port: env.SQL_SERVER_PORT || '1433',
+        user: env.SQL_SERVER_USER || '',
+        database: env.SQL_SERVER_DATABASE || 'ECB_Production',
+        driver: env.SQL_SERVER_DRIVER || 'ODBC Driver 17 for SQL Server',
+        passwordSet: !!(env.SQL_SERVER_PASSWORD && env.SQL_SERVER_PASSWORD.length),
+        databaseUrlOverride: env.DATABASE_URL || null,
+    };
+});
+
+ipcMain.handle('ecb:db-config:test', async (event, cfg = {}) => {
+    if (isDev) return { ok: false, detail: 'Indisponible en mode développement.' };
+    const exe = resolveBackendExe();
+    if (!exe) return { ok: false, detail: 'Backend introuvable (pcb-flow-server.exe).' };
+
+    // Pré-test TCP rapide : si l'hôte/port n'est pas joignable, inutile de lancer ODBC.
+    const port = Number(cfg.port) || 1433;
+    if (cfg.host) {
+        const probe = await tcpProbe(cfg.host, port);
+        if (!probe.ok) {
+            return {
+                ok: false,
+                engine: 'mssql',
+                detail: `Hôte injoignable : ${cfg.host}:${port} (${probe.detail}). `
+                    + 'Vérifiez que SQL Server est démarré, le port ouvert et le pare-feu autorisé.',
+            };
+        }
+    }
+
+    // Mot de passe : si non saisi, réutiliser celui déjà enregistré.
+    let password = cfg.password;
+    if (password == null || password === '') {
+        password = readEnvFile(getServerEnvPath()).SQL_SERVER_PASSWORD || '';
+    }
+
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'pcbflow-dbtest-'));
+    const envContent = [
+        `SQL_SERVER_HOST=${cfg.host || ''}`,
+        `SQL_SERVER_PORT=${port}`,
+        `SQL_SERVER_USER=${cfg.user || ''}`,
+        `SQL_SERVER_PASSWORD=${password}`,
+        `SQL_SERVER_DATABASE=${cfg.database || 'ECB_Production'}`,
+        `SQL_SERVER_DRIVER=${cfg.driver || 'ODBC Driver 17 for SQL Server'}`,
+        '',
+    ].join('\n');
+    fs.writeFileSync(path.join(tmpDir, '.env'), envContent, 'utf-8');
+
+    try {
+        return await runCheckDb(exe, tmpDir);
+    } finally {
+        try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch (e) { /* noop */ }
+    }
+});
+
+ipcMain.handle('ecb:db-config:save', (event, cfg = {}) => {
+    if (isDev) return { ok: false, detail: 'Indisponible en mode développement.' };
+    const envPath = getServerEnvPath();
+    if (!envPath) return { ok: false, detail: 'Backend introuvable.' };
+    try {
+        fs.mkdirSync(path.dirname(envPath), { recursive: true });
+        if (!existsSync(envPath)) seedDefaultConfig(path.dirname(envPath));
+
+        const updates = {
+            SQL_SERVER_HOST: cfg.host ?? '',
+            SQL_SERVER_PORT: String(cfg.port ?? '1433'),
+            SQL_SERVER_USER: cfg.user ?? '',
+            SQL_SERVER_DATABASE: cfg.database ?? 'ECB_Production',
+            SQL_SERVER_DRIVER: cfg.driver ?? 'ODBC Driver 17 for SQL Server',
+        };
+        // Mot de passe : modifié uniquement si l'utilisateur en a saisi un.
+        if (cfg.password != null && cfg.password !== '') {
+            updates.SQL_SERVER_PASSWORD = cfg.password;
+        }
+        patchEnvFile(envPath, updates);
+        return { ok: true };
+    } catch (error) {
+        return { ok: false, detail: error.message };
+    }
+});
+
+ipcMain.handle('ecb:db-config:restart', async () => {
+    if (isDev) return { ok: false, detail: 'Indisponible en mode développement.' };
+    try {
+        stopBackend();
+        await delay(400);
+        backendPort = await findFreePort();
+        startBackend(backendPort);
+        // 60 s : un Client se connectant à un SQL Server distant (LAN) peut être
+        // plus lent qu'un Host local, surtout au 1er essai sous contention.
+        await waitForHealthOrExit(backendPort, 60000);
+        backendUrl = `http://127.0.0.1:${backendPort}/api`;
+        lastBackendError = null;
+        // Charge le renderer (app React). Depuis l'écran « Backend indisponible »,
+        // un simple reload rechargerait cet écran d'erreur : on navigue donc
+        // explicitement vers le frontend, qui relit backendUrl/apiKey (nouveau port).
+        if (mainWindow) await loadRenderer(mainWindow);
+        return { ok: true };
+    } catch (error) {
+        lastBackendError = error && error.message ? error.message : String(error);
+        return { ok: false, detail: lastBackendError };
+    }
+});
+
+ipcMain.handle('ecb:runtime:status', () => ({
+    packaged: app.isPackaged,
+    isDev,
+    backendUp: !!backendProcess,
+    backendUrl,
+    lastError: lastBackendError,
+}));
 
 app.whenReady().then(() => {
     hardenSession();

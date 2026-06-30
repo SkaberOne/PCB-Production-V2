@@ -7,7 +7,7 @@ import BomImportPreviewCard from './import/BomImportPreviewCard';
 import BomImportResolutionDialogs from './import/BomImportResolutionDialogs';
 import BomImportWorkspaceCard from './import/BomImportWorkspaceCard';
 import { useBomSession } from '../context/BomSessionContext';
-import { persistImportedBatchMetadata, persistImportWorkspaceBeforeReview } from '../utils/importReview';
+import { buildReviewSelectionFromSettled, persistImportedBatchMetadata, persistImportWorkspaceBeforeReview } from '../utils/importReview';
 import {
     applyPreviewFieldToWorkspace,
     buildPreviewTarget,
@@ -37,6 +37,7 @@ function BomImport({ showVisualizationAction = true }) {
         importWorkspace,
         resetImportWorkspace,
         setImportedBom,
+        setSelectedBomEntries,
         updateImportWorkspace,
     } = useBomSession();
 
@@ -750,6 +751,11 @@ function BomImport({ showVisualizationAction = true }) {
                 },
             });
             syncResultPayload(persistedEntry);
+            setItemUpdateState({
+                itemId: null,
+                message: `Révision « ${reference} ${revision} » enregistrée en bibliothèque.`,
+                type: 'success',
+            });
         } catch (requestError) {
             setWorkspaceError(
                 requestError.response?.data?.detail || requestError.message || 'Erreur lors de la mise à jour de la BOM'
@@ -1151,11 +1157,25 @@ function BomImport({ showVisualizationAction = true }) {
 
         setReviewNavigationLoading(true);
         try {
-            await persistImportWorkspaceBeforeReview({
+            const { settledResults, activeRevisionMeta } = await persistImportWorkspaceBeforeReview({
                 importWorkspace,
                 currentBom,
                 setImportedBom,
             });
+            // T-003 : charger TOUTES les faces persistées du lot dans la session de
+            // revue (une carte recto/verso doit garder ses 2 faces TOP+BOT et les lier
+            // à la production), pas seulement la BOM active. Sans ça, la session de
+            // revue retombe sur la seule `currentBom` et la 2e face est perdue.
+            const reviewEntries = buildReviewSelectionFromSettled({
+                settledResults,
+                activeRevisionId: activeRevisionMeta?.bom_revision_id
+                    || currentBom?.bomRevisionId
+                    || result?.bom_revision_id
+                    || null,
+            });
+            if (reviewEntries.length > 0) {
+                setSelectedBomEntries(reviewEntries);
+            }
             navigate('/bom');
         } catch (requestError) {
             setWorkspaceError(

@@ -109,10 +109,15 @@ class Settings(BaseSettings):
         # (@ : / etc.) qui cassaient silencieusement la connexion (écart D7).
         user = quote_plus(self.sql_server_user)
         password = quote_plus(self.sql_server_password)
+        # Encrypt=no + TrustServerCertificate=yes : l'ODBC Driver 17.10+ chiffre
+        # par défaut et fait une négociation TLS lente (8-22 s) qui échoue parfois
+        # (erreur 87) au démarrage sous charge. En LAN avec SQL Server local/de
+        # confiance, on désactive le chiffrement → connexion ~2 s, fiable.
         return (
             f"mssql+pyodbc://{user}:{password}"
             f"@{self.sql_server_host}:{self.sql_server_port}/{self.sql_server_database}"
             f"?driver={self.sql_server_driver.replace(' ', '+')}"
+            f"&Encrypt=no&TrustServerCertificate=yes"
         )
 
     # Logging
@@ -150,8 +155,17 @@ class Settings(BaseSettings):
     digikey_locale_currency: str = "EUR"
     digikey_locale_language: str = "fr"
 
+    # RS / RS Components (DigiProc API). Auth = Client-Id + Client-Secret headers.
+    # Inactive until client_id + client_secret are set. customer_number is only
+    # needed for the Customer-Pricing endpoint.
     rs_api_url: Optional[str] = None
-    rs_api_key: Optional[str] = None
+    rs_api_key: Optional[str] = None  # legacy/unused, kept for compatibility
+    rs_client_id: Optional[str] = None
+    rs_client_secret: Optional[str] = None
+    rs_country_code: str = "FR"  # ISO code used in path + countryCode query
+    rs_language: str = "FR_FR"
+    rs_currency: str = "EUR"
+    rs_customer_number: Optional[str] = None  # required only for Customer-Pricing
 
     mouser_api_url: Optional[str] = None
     mouser_api_key: Optional[str] = None

@@ -324,7 +324,7 @@ class ComponentTypeService:
     def ensure_default_rules(cls, db: Session) -> List[ComponentTypeRule]:
         existing_count = db.query(ComponentTypeRule).count()
         if existing_count > 0:
-            return db.query(ComponentTypeRule).filter(ComponentTypeRule.enabled.is_(True)).all()
+            return db.query(ComponentTypeRule).filter(ComponentTypeRule.enabled == True).all()  # noqa: E712 (SQL Server: IS 1 invalide)
 
         for rule_definition in DEFAULT_COMPONENT_TYPE_RULES:
             normalized_prefix = cls.normalize_reference(rule_definition["reference_prefix"])
@@ -342,7 +342,7 @@ class ComponentTypeService:
         db.commit()
         # Newly created rules → stale cache
         invalidate_component_type_rules()
-        return db.query(ComponentTypeRule).filter(ComponentTypeRule.enabled.is_(True)).all()
+        return db.query(ComponentTypeRule).filter(ComponentTypeRule.enabled == True).all()  # noqa: E712 (SQL Server: IS 1 invalide)
 
     @classmethod
     def reset_rules(cls, db: Session) -> List[ComponentTypeRule]:
@@ -362,7 +362,7 @@ class ComponentTypeService:
 
         db.commit()
         invalidate_component_type_rules()
-        return db.query(ComponentTypeRule).filter(ComponentTypeRule.enabled.is_(True)).all()
+        return db.query(ComponentTypeRule).filter(ComponentTypeRule.enabled == True).all()  # noqa: E712 (SQL Server: IS 1 invalide)
 
     @classmethod
     def list_rules(cls, db: Session) -> List[ComponentTypeRuleSnapshot]:
@@ -377,7 +377,7 @@ class ComponentTypeService:
             return cached
 
         cls.ensure_default_rules(db)
-        rules = db.query(ComponentTypeRule).filter(ComponentTypeRule.enabled.is_(True)).all()
+        rules = db.query(ComponentTypeRule).filter(ComponentTypeRule.enabled == True).all()  # noqa: E712 (SQL Server: IS 1 invalide)
         sorted_rules = sorted(
             rules,
             key=lambda rule: (

@@ -333,7 +333,7 @@ class CostingService:
             # Demote previous references for this card.
             db.query(ProductionCosting).filter(
                 ProductionCosting.bom_reference_id == rid,
-                ProductionCosting.is_reference.is_(True),
+                ProductionCosting.is_reference == True,  # noqa: E712 (SQL Server: IS 1 invalide)
             ).update({ProductionCosting.is_reference: False})
             row = ProductionCosting(
                 bom_reference_id=rid,
@@ -396,7 +396,7 @@ class CostingService:
                 db.query(ProductionCosting)
                 .filter(
                     ProductionCosting.bom_reference_id == ref.id,
-                    ProductionCosting.is_reference.is_(True),
+                    ProductionCosting.is_reference == True,  # noqa: E712 (SQL Server: IS 1 invalide)
                 )
                 .order_by(ProductionCosting.computed_at.desc())
                 .first()

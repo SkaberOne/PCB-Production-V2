@@ -1,18 +1,21 @@
-"""
-Alembic migration tests: verify every migration can upgrade and downgrade cleanly.
+"""Tests Alembic — chaîne « baseline » (collapse 2026-06-15).
 
-Strategy:
-- Runs migrations against an in-memory SQLite database.
-- Tests the full upgrade chain from base → head.
-- Tests the full downgrade chain from head → base.
-- Tests each individual step (up then down) in isolation.
+La chaîne historique (20 migrations) a été archivée dans
+``serveur/src/alembic/versions_archive/`` car elle était désynchronisée des
+modèles ORM : la table ``PNP_MACHINES`` n'y était jamais créée, donc
+``alembic upgrade head`` échouait (``ALTER TABLE PNP_MACHINES ... -> no such
+table``). Elle est remplacée par une **baseline unique** (``baseline00001``) qui
+construit le schéma courant complet depuis les modèles (cohérent avec le
+bootstrap ``create_all`` d'ADR 0008).
+
+Ces tests vérifient la nouvelle réalité : tête unique, ``upgrade head`` depuis
+une base vide produit le schéma complet, ``downgrade base`` le retire, et un
+aller-retour est idempotent.
 """
-import os
 import sys
 from pathlib import Path
 
-import pytest
-from sqlalchemy import create_engine, inspect, text
+from sqlalchemy import create_engine, inspect
 from sqlalchemy.pool import StaticPool
 
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
@@ -20,41 +23,20 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from alembic.config import Config
-from alembic import command as alembic_command
 from alembic.operations import Operations
 from alembic.runtime.migration import MigrationContext
 from alembic.script import ScriptDirectory
 
-# ── Migration revision chain (oldest → newest) ───────────────────────────────
-
-REVISION_CHAIN = [
-    "2e81347cc7b0",  # initial_schema_with_bom_models
-    "7a6f2c0f1e90",  # add_bom_item_review_fields
-    "9c1f4a0c8f2b",  # extend_component_library_fields
-    "4d1f8d5e2c19",  # add_pitch_mm_to_components
-    "b31a0f8e6a12",  # add_production_workspaces
-    "d8f2b91d3c4e",  # add_bom_reference_categories_and_pnp_carts
-    "f6c3b12a9d44",  # add_bom_categories_catalog
-    "7b4a1c2e9f10",  # add_machine_link_to_productions
-    "c4f7d9e21a8b",  # add_production_order_fields
-    "e1a3b7c9d4f2",  # add_quantity_to_production_bom_revisions
-    "a2f9c3d7e1b5",  # add_erp_context_to_productions
-    "f2a8c1d4e6b0",  # add_reel_fields_to_components
-    "g1b2c3d4e5f6",  # add_supplier_offers
-    "h2c3d4e5f6a7",  # add_erp_defaults
-    "i3d4e5f6a7b8",  # add_command_receipts
-    "j4e5f6a7b8c9",  # add_num_nozzles_to_machines
-    "k5f6a7b8c9d0",  # add_nozzle_layout_to_machines
-]
-
-HEAD_REVISION = REVISION_CHAIN[-1]
-# Layout actuel : serveur/src/alembic.ini + serveur/src/alembic/
-# Ancien (obsolète) : src/backend/alembic — laissé pour mémoire seulement
+BASELINE_REVISION = "baseline00001"
 ALEMBIC_INI = str(PROJECT_ROOT / "serveur" / "src" / "alembic.ini")
 MIGRATIONS_DIR = str(PROJECT_ROOT / "serveur" / "src" / "alembic")
 
+# Quelques tables clés attendues dans le schéma courant (dont PNP_MACHINES, le
+# point de rupture de l'ancienne chaîne).
+EXPECTED_TABLES = {"BOM_REFERENCES", "PNP_MACHINES"}
 
-# ── Helpers ───────────────────────────────────────────────────────────────────
+
+# ── Helpers ──────────────────────────────────────────────────────────────────
 
 def make_sqlite_engine():
     """Fresh in-memory SQLite engine for each test."""
@@ -66,36 +48,33 @@ def make_sqlite_engine():
 
 
 def make_alembic_config(engine) -> Config:
-    """Build an Alembic Config that uses the given engine instead of the real DB URL."""
+    """Alembic Config branché sur la connexion SQLite en mémoire du test."""
     cfg = Config(ALEMBIC_INI)
     cfg.set_main_option("script_location", MIGRATIONS_DIR)
-    # Override the URL so Alembic talks to the in-memory SQLite engine
     cfg.attributes["connection"] = engine.connect()
     return cfg
 
 
+def script_directory() -> ScriptDirectory:
+    cfg = Config(ALEMBIC_INI)
+    cfg.set_main_option("script_location", MIGRATIONS_DIR)
+    return ScriptDirectory.from_config(cfg)
+
+
 def run_upgrade(cfg: Config, revision: str) -> None:
-    """Run alembic upgrade to the given revision using the pre-opened connection."""
     conn = cfg.attributes["connection"]
     script = ScriptDirectory.from_config(cfg)
 
     def do_upgrade(rev, ctx):
         return script._upgrade_revs(revision, rev)
 
-    # La fonction de migration doit être passée via opts à configure() :
-    # run_migrations(fn=...) est ignoré par Alembic >= 1.x (fn n'est lu que
-    # depuis _migrations_fn, lui-même alimenté par opts["fn"]).
     mc = MigrationContext.configure(conn, opts={"fn": do_upgrade})
-
-    # Operations.context() installe le proxy `op` (utilisé par `from alembic
-    # import op` dans chaque script) ; sans lui, op.create_table lève NameError.
     with mc.begin_transaction():
         with Operations.context(mc):
             mc.run_migrations()
 
 
 def run_downgrade(cfg: Config, revision: str) -> None:
-    """Run alembic downgrade to the given revision (or 'base') using the pre-opened connection."""
     conn = cfg.attributes["connection"]
     script = ScriptDirectory.from_config(cfg)
 
@@ -103,176 +82,75 @@ def run_downgrade(cfg: Config, revision: str) -> None:
         return script._downgrade_revs(revision, rev)
 
     mc = MigrationContext.configure(conn, opts={"fn": do_downgrade})
-
     with mc.begin_transaction():
         with Operations.context(mc):
             mc.run_migrations()
 
 
-def get_current_revision(conn) -> str | None:
-    """Read the current alembic_version from the database."""
-    mc = MigrationContext.configure(conn)
-    return mc.get_current_revision()
+# ── Tests ────────────────────────────────────────────────────────────────────
 
+class TestBaselineChain:
+    def test_single_head_and_base(self):
+        """Chaîne linéaire : une seule tête et une seule base (la baseline)."""
+        script = script_directory()
+        # Une seule tête : pas de branche divergente (les migrations additives
+        # se branchent en ligne sur la baseline). On n'épingle pas l'id de tête
+        # pour ne pas casser ce test à chaque nouvelle migration.
+        assert len(script.get_heads()) == 1
+        # La racine reste la baseline collapse.
+        assert script.get_bases() == [BASELINE_REVISION]
 
-# ── Tests: full chain ─────────────────────────────────────────────────────────
-
-class TestFullMigrationChain:
-    def test_upgrade_head_from_base(self):
-        """All migrations run cleanly from scratch to head."""
+    def test_upgrade_head_creates_full_schema(self):
+        """upgrade head depuis une base vide crée le schéma courant complet."""
         engine = make_sqlite_engine()
         cfg = make_alembic_config(engine)
-        conn = cfg.attributes["connection"]
+        run_upgrade(cfg, "head")
 
-        run_upgrade(cfg, HEAD_REVISION)
-
-        current = get_current_revision(conn)
-        assert current == HEAD_REVISION
-        conn.close()
-
-    def test_downgrade_base_from_head(self):
-        """All migrations can be rolled back from head to base."""
-        engine = make_sqlite_engine()
-        cfg = make_alembic_config(engine)
-        conn = cfg.attributes["connection"]
-
-        run_upgrade(cfg, HEAD_REVISION)
-        run_downgrade(cfg, "base")
-
-        current = get_current_revision(conn)
-        assert current is None  # base = no revision recorded
-        conn.close()
-
-    def test_upgrade_then_downgrade_full_roundtrip(self):
-        """Full up → down → up cycle produces the same head revision."""
-        engine = make_sqlite_engine()
-        cfg = make_alembic_config(engine)
-        conn = cfg.attributes["connection"]
-
-        run_upgrade(cfg, HEAD_REVISION)
-        run_downgrade(cfg, "base")
-        run_upgrade(cfg, HEAD_REVISION)
-
-        current = get_current_revision(conn)
-        assert current == HEAD_REVISION
-        conn.close()
-
-    def test_head_revision_tables_exist(self):
-        """After upgrade to head, core tables must be present."""
-        engine = make_sqlite_engine()
-        cfg = make_alembic_config(engine)
-        conn = cfg.attributes["connection"]
-
-        run_upgrade(cfg, HEAD_REVISION)
-
-        inspector = inspect(engine)
-        tables = set(inspector.get_table_names())
-        expected = {
-            "BOM_REFERENCES",
-            "BOM_REVISIONS",
-            "BOM_ITEMS",
-            "COMPONENTS",
-            "PNP_MACHINES",
-            "PNP_FEEDERS",
-            "PNP_CARTS",
-            "PRODUCTIONS",
-            "PRODUCTION_BOM_REVISIONS",
-        }
-        missing = expected - tables
-        assert not missing, f"Tables missing after full upgrade: {missing}"
-        conn.close()
-
-    def test_base_has_no_app_tables(self):
-        """After downgrade to base, application tables should be gone."""
-        engine = make_sqlite_engine()
-        cfg = make_alembic_config(engine)
-        conn = cfg.attributes["connection"]
-
-        run_upgrade(cfg, HEAD_REVISION)
-        run_downgrade(cfg, "base")
-
-        inspector = inspect(engine)
-        tables = set(inspector.get_table_names())
-        app_tables = {t for t in tables if t not in ("alembic_version",)}
-        assert not app_tables, f"Unexpected tables after downgrade to base: {app_tables}"
-        conn.close()
-
-
-# ── Tests: individual step up/down ────────────────────────────────────────────
-
-class TestIndividualMigrationSteps:
-    """Each migration: upgrade to it, then downgrade back one step."""
-
-    @pytest.mark.parametrize("target_rev,prev_rev", [
-        (REVISION_CHAIN[0], "base"),
-        *[(REVISION_CHAIN[i], REVISION_CHAIN[i - 1]) for i in range(1, len(REVISION_CHAIN))],
-    ])
-    def test_step_up_then_down(self, target_rev, prev_rev):
-        """
-        Upgrade to prev_rev (or base), then step up to target_rev,
-        then step back down — verify we return to prev_rev (or None).
-        """
-        engine = make_sqlite_engine()
-        cfg = make_alembic_config(engine)
-        conn = cfg.attributes["connection"]
-
-        # Bring DB to the state just before this migration
-        if prev_rev != "base":
-            run_upgrade(cfg, prev_rev)
-
-        # Apply this migration
-        run_upgrade(cfg, target_rev)
-        assert get_current_revision(conn) == target_rev
-
-        # Roll it back
-        run_downgrade(cfg, prev_rev)
-        expected_rev = None if prev_rev == "base" else prev_rev
-        assert get_current_revision(conn) == expected_rev
-
-        conn.close()
-
-
-# ── Tests: script consistency ─────────────────────────────────────────────────
-
-class TestMigrationScriptConsistency:
-    def test_no_duplicate_revision_ids(self):
-        """Each revision ID is unique across all migration files."""
-        cfg = Config(ALEMBIC_INI)
-        cfg.set_main_option("script_location", MIGRATIONS_DIR)
-        script = ScriptDirectory.from_config(cfg)
-
-        all_revisions = [sc.revision for sc in script.walk_revisions()]
-        assert len(all_revisions) == len(set(all_revisions)), "Duplicate revision IDs found"
-
-    def test_chain_has_no_gaps(self):
-        """The revision chain forms a single linear sequence with no gaps."""
-        cfg = Config(ALEMBIC_INI)
-        cfg.set_main_option("script_location", MIGRATIONS_DIR)
-        script = ScriptDirectory.from_config(cfg)
-
-        # Walk from head to base; should visit every revision in REVISION_CHAIN
-        heads = script.get_heads()
-        assert len(heads) == 1, f"Expected single head, got: {heads}"
-        assert heads[0] == HEAD_REVISION
-
-        walked = [sc.revision for sc in script.walk_revisions()]
-        assert set(walked) == set(REVISION_CHAIN), (
-            f"Chain mismatch. Extra: {set(walked) - set(REVISION_CHAIN)}, "
-            f"Missing: {set(REVISION_CHAIN) - set(walked)}"
+        tables = set(inspect(engine).get_table_names())
+        assert EXPECTED_TABLES.issubset(tables), (
+            f"Tables manquantes : {EXPECTED_TABLES - tables}"
         )
+        assert len(tables) >= 20  # schéma complet (28 tables au moment du collapse)
 
-    def test_revision_chain_matches_expected_order(self):
-        """The REVISION_CHAIN list matches the actual Alembic down_revision links."""
-        cfg = Config(ALEMBIC_INI)
-        cfg.set_main_option("script_location", MIGRATIONS_DIR)
-        script = ScriptDirectory.from_config(cfg)
+    def test_downgrade_base_drops_app_tables(self):
+        """downgrade base retire les tables applicatives."""
+        engine = make_sqlite_engine()
+        cfg = make_alembic_config(engine)
+        run_upgrade(cfg, "head")
+        run_downgrade(cfg, "base")
 
-        revision_map = {sc.revision: sc.down_revision for sc in script.walk_revisions()}
+        tables = set(inspect(engine).get_table_names())
+        assert "PNP_MACHINES" not in tables
+        assert "BOM_REFERENCES" not in tables
 
-        # Verify each step in REVISION_CHAIN matches the actual down_revision
-        for i, rev in enumerate(REVISION_CHAIN):
-            expected_down = None if i == 0 else REVISION_CHAIN[i - 1]
-            actual_down = revision_map.get(rev)
-            assert actual_down == expected_down, (
-                f"Revision {rev}: expected down_revision={expected_down}, got {actual_down}"
+    def test_upgrade_downgrade_roundtrip(self):
+        """Aller-retour head -> base -> head sans erreur (idempotent)."""
+        engine = make_sqlite_engine()
+        cfg = make_alembic_config(engine)
+        run_upgrade(cfg, "head")
+        run_downgrade(cfg, "base")
+        run_upgrade(cfg, "head")
+
+        tables = set(inspect(engine).get_table_names())
+        assert EXPECTED_TABLES.issubset(tables)
+
+
+class TestBaselineConsistency:
+    def test_baseline_has_no_down_revision(self):
+        """La baseline est bien une racine (down_revision = None)."""
+        script = script_directory()
+        rev = script.get_revision(BASELINE_REVISION)
+        assert rev.down_revision is None
+
+    def test_linear_chain_rooted_on_baseline(self):
+        """Chaîne linéaire (aucune fusion) enracinée sur la baseline."""
+        script = script_directory()
+        revs = list(script.walk_revisions())  # ordre tête -> base
+        # Aucune révision de fusion (down_revision n'est jamais un tuple/liste).
+        for rev in revs:
+            assert not isinstance(rev.down_revision, (tuple, list)), (
+                f"Fusion détectée sur {rev.revision}"
             )
+        # La plus ancienne révision est la baseline (racine sans parent).
+        assert revs[-1].revision == BASELINE_REVISION
+        assert revs[-1].down_revision is None

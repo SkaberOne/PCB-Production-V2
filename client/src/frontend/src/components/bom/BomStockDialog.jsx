@@ -327,9 +327,38 @@ function BomStockDialog({
                                                 </Grid>
                                             </Grid>
 
-                                            <Alert severity="success">
+                                            <Alert severity="info">
                                                 Quantité estimée en bobine : {line.reelEstimatedQty ?? '-'}
+                                                {' '}— estimation d'aide au calcul, <strong>non comptée</strong> en stock dispo
+                                                tant qu'elle n'est pas validée.
                                             </Alert>
+
+                                            <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap>
+                                                <Button
+                                                    size="small"
+                                                    variant="outlined"
+                                                    disabled={!line.reelEstimatedQty}
+                                                    onClick={() => onStockDraftChange(line.key, 'reel_manual_override_qty', true)({ target: { value: line.reelEstimatedQty } })}
+                                                >
+                                                    Valider {line.reelEstimatedQty ?? 0} en stock dispo
+                                                </Button>
+                                                {Number(line.draft.reel_manual_override_qty) > 0 ? (
+                                                    <>
+                                                        <Chip
+                                                            size="small"
+                                                            color="success"
+                                                            label={`Stock bobine validé : ${line.draft.reel_manual_override_qty}`}
+                                                        />
+                                                        <Button
+                                                            size="small"
+                                                            color="inherit"
+                                                            onClick={() => onStockDraftChange(line.key, 'reel_manual_override_qty', true)({ target: { value: '' } })}
+                                                        >
+                                                            Retirer
+                                                        </Button>
+                                                    </>
+                                                ) : null}
+                                            </Stack>
                                         </Stack>
                                     </CardContent>
                                 </Card>

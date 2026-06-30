@@ -8,6 +8,7 @@ from .base import OfferDTO, SupplierConnector, price_at_quantity
 from .mouser import MouserConnector
 from .digikey import DigiKeyConnector
 from .farnell import FarnellConnector
+from .rs import RsConnector
 
 __all__ = [
     "OfferDTO",
@@ -16,6 +17,7 @@ __all__ = [
     "MouserConnector",
     "DigiKeyConnector",
     "FarnellConnector",
+    "RsConnector",
     "build_connectors",
 ]
 
@@ -33,6 +35,7 @@ def build_connectors():
     mouser_creds = stored.get("mouser") or {}
     digikey_creds = stored.get("digikey") or {}
     farnell_creds = stored.get("farnell") or {}
+    rs_creds = stored.get("rs") or {}
 
     mouser = MouserConnector(api_key=(mouser_creds.get("api_key") or None))
     digikey = DigiKeyConnector(
@@ -40,5 +43,13 @@ def build_connectors():
         client_secret=(digikey_creds.get("client_secret") or None),
     )
     farnell = FarnellConnector(api_key=(farnell_creds.get("api_key") or None))
+    rs = RsConnector(
+        client_id=(rs_creds.get("client_id") or None),
+        client_secret=(rs_creds.get("client_secret") or None),
+    )
 
-    return [connector for connector in (mouser, digikey, farnell) if connector.is_configured]
+    return [
+        connector
+        for connector in (mouser, digikey, farnell, rs)
+        if connector.is_configured
+    ]

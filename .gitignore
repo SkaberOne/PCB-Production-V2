@@ -103,3 +103,12 @@ docs/attachments/
 client/publish*.log
 client/*_done.txt
 client/eb_*.log
+
+# Binaires installeurs tiers embarqués (ADR 0009) — redistribuables Microsoft,
+# récupérés au build du Host, jamais versionnés (le README reste suivi).
+client/src/desktop/installers/*.msi
+client/src/desktop/installers/*.exe
+
+# Certificats de signature (ADR 0009 #5) - jamais versionnes
+*.pfx
+*.cer

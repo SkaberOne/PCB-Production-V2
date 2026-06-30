@@ -25,11 +25,11 @@ from typing import Any, Dict
 
 logger = logging.getLogger(__name__)
 
-SUPPORTED_PROVIDERS = ("mouser", "digikey", "farnell")
+SUPPORTED_PROVIDERS = ("mouser", "digikey", "farnell", "rs")
 SECRET_FIELDS = ("api_key", "client_secret")
-# Providers authenticating with a client_id + client_secret pair (OAuth2);
+# Providers authenticating with a client_id + client_secret pair;
 # every other provider defaults to a single API key.
-CLIENT_CREDENTIALS_PROVIDERS = ("digikey",)
+CLIENT_CREDENTIALS_PROVIDERS = ("digikey", "rs")
 
 # serveur/src/services/supplier_credentials.py -> parents[2] == serveur/
 _SERVER_ROOT = Path(__file__).resolve().parents[2]

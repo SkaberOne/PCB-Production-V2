@@ -26,7 +26,7 @@ if str(SERVEUR_DIR) not in sys.path:
     sys.path.insert(0, str(SERVEUR_DIR))
 os.chdir(SERVEUR_DIR)
 
-from sqlalchemy import create_engine, insert, inspect, select
+from sqlalchemy import create_engine, insert, inspect, select, text
 
 from src.config import settings
 from src.database import Base
@@ -61,23 +61,39 @@ def main() -> None:
 
     total = 0
     with source_engine.connect() as src, target_engine.begin() as dst:
+        # SQL Server applique les FK (contrairement à SQLite source qui peut
+        # contenir des orphelins). On désactive les contraintes le temps de la
+        # copie, puis on les réactive sans revalider l'existant.
+        for table in Base.metadata.sorted_tables:
+            dst.execute(text(f"ALTER TABLE [{table.name}] NOCHECK CONSTRAINT ALL"))
+
+        # Sécurité : refuse si la cible a déjà des données, sauf --force qui vide
+        # d'abord (rend la reprise ré-exécutable proprement).
+        if args.force:
+            for table in reversed(Base.metadata.sorted_tables):
+                dst.execute(table.delete())
+        else:
+            for table in Base.metadata.sorted_tables:
+                if table.name in source_tables and dst.execute(select(table)).first() is not None:
+                    sys.exit(
+                        f"[ERREUR] La table cible '{table.name}' contient déjà des données. "
+                        "Relancez avec --force pour forcer (vide la cible avant copie)."
+                    )
+
         for table in Base.metadata.sorted_tables:  # ordre FK-safe
             if table.name not in source_tables:
                 print(f"  · {table.name}: absente de la source, ignorée")
                 continue
-
-            existing = dst.execute(select(table)).first()
-            if existing is not None and not args.force:
-                sys.exit(
-                    f"[ERREUR] La table cible '{table.name}' contient déjà des données. "
-                    "Relancez avec --force pour forcer (les doublons ne sont pas gérés)."
-                )
-
             rows = [dict(r._mapping) for r in src.execute(select(table))]
             if rows:
                 dst.execute(insert(table), rows)
             print(f"  · {table.name}: {len(rows)} lignes")
             total += len(rows)
+
+        # Réactive les contraintes FK (sans revalider les éventuels orphelins
+        # hérités de la source SQLite — l'app reste fonctionnelle).
+        for table in Base.metadata.sorted_tables:
+            dst.execute(text(f"ALTER TABLE [{table.name}] CHECK CONSTRAINT ALL"))
 
     print("=" * 60)
     print(f"Reprise terminée : {total} lignes copiées.")

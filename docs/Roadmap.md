@@ -41,6 +41,11 @@ améliorer le quotidien atelier sans introduire de friction.
 
 ### 🔴 P1 — Critique (à traiter prochainement)
 
+> ✅ **Récemment résolu — T-003 (handoff Import → Revue perd la 2ᵉ face).** Corrigé le
+> 2026-06-19 (helper `buildReviewSelectionFromSettled`, PR #12 / `cae93ef`) ; vérifié E2E
+> « 2 BOM dans la session » / `bom_count=2`. Détail : `docs/JOURNAL_TESTS_RELEASE.md` (T-003).
+> Idem correctifs SQL `dnp` T-001/T-002 (PR #11) et `%` Alembic (PR #10).
+
 **1. Récupérer/recréer la DB de production**
 - Copier `dev.db` depuis l'ancien PC, OU
 - Ré-importer manuellement les BOM depuis les fichiers source

@@ -185,3 +185,88 @@ arrière applicatif ne casse pas la base partagée (ADR 0008).
 > ⚠️ L'installeur déjà construit porte l'ancien nom « PCB Flow Production Suite ».
 > Le renommage en **« PCB Flow Production Suite »** (productName, fenêtre, À
 > propos, titre, API) prendra effet au prochain `npm run dist`.
+
+---
+
+## Mise à jour 2026-06-12 — Déploiement assisté (ADR 0009)
+
+> Détail : `Plan_Deploiement_Config_Postes_2026-06.md`. Trois apports pour
+> simplifier la mise en service de 2-3 postes.
+
+### 1. Configurer la base depuis l'application (Phase 1 — faite)
+
+Paramètres › **Connexion base de données** : un panneau édite la connexion SQL
+Server (hôte, port, identifiants, base) sans toucher au `.env` à la main. La
+config est pilotée par **Electron** (pas par le backend) afin de rester
+accessible même quand la base est injoignable (le fail-fast ADR 0008 empêcherait
+sinon de corriger un poste mal configuré). Boutons **Tester la connexion** (lance
+`pcb-flow-server.exe --check-db`, avec pré-test TCP) et **Enregistrer &
+redémarrer**.
+
+### 2. Pilote ODBC embarqué (Phase 2)
+
+L'installeur pose désormais l'**ODBC Driver 17** automatiquement
+(`nsis/install_odbc.ps1`, idempotent : MSI embarqué dans
+`resources/installers/msodbcsql17.msi` si présent, sinon téléchargé).
+
+> ⚠️ **L'installeur requiert désormais l'administrateur** (`perMachine: true`) :
+> l'installation de l'ODBC (et le provisioning Host) sont machine-wide. La
+> propriété « installeur sans admin » n'est plus valable pour ce flux ; l'usage
+> quotidien de l'app, lui, reste sans admin. (Corrige la mention plus haut.)
+
+### 3. Choix Client / Host à l'installation (Phase 3)
+
+Une page d'installation propose **Client** ou **Host** :
+
+- **Client** : pose l'ODBC, puis l'utilisateur renseigne l'hôte SQL dans
+  Paramètres › Connexion base de données.
+- **Host** : pose l'ODBC **et** provisionne tout le côté serveur via
+  `nsis/provision_host.ps1` (administrateur) — SQL Server Express (instance
+  `SQLEXPRESS`), port **TCP 1433 statique**, **pare-feu**, base partagée +
+  **login dédié least-privilege** (`pcbflow`, pas `sa`), puis sème le `.env`
+  Host. Le mot de passe saisi à l'installation Host est celui à renseigner sur
+  les postes Client.
+
+Journaux de provisioning : `%PROGRAMDATA%\PCBFlow\install_odbc.log` et
+`provision_host.log`. En cas d'échec, l'app reste installée et la base se
+configure ensuite (panneau Paramètres) ; repli manuel = configuration SQL Server
+décrite plus haut.
+
+> **À tester sur VM Windows propre** (Client ET Host) avant diffusion : NSIS +
+> PowerShell ne se valident pas hors Windows. Vérifier aussi le lien de
+> téléchargement ODBC/SQL Express (liens Microsoft `fwlink` susceptibles
+> d'évoluer) dans les deux `.ps1`.
+
+---
+
+## Signature de code interne (ADR 0009 / #5)
+
+Sans certificat, Windows affiche "editeur inconnu" a chaque poste. Solution interne
+(sans achat de certificat) : un certificat **auto-signe** de signature de code,
+approuve sur les 2-3 postes.
+
+1. **Generer le certificat** (une fois, sur la machine de build) :
+   ```powershell
+   cd client\src\desktop\nsis
+   .\make_signing_cert.ps1 -PfxPassword "<motdepasse_pfx>"
+   # -> %USERPROFILE%\pcbflow-cert\pcbflow-codesign.pfx (secret) + .cer (public)
+   ```
+2. **Builder signe** (winCodeSign requiert le Mode Developpeur, deja actif) :
+   ```powershell
+   $env:CSC_LINK = "$env:USERPROFILE\pcbflow-cert\pcbflow-codesign.pfx"
+   $env:CSC_KEY_PASSWORD = "<motdepasse_pfx>"
+   cd client\src\desktop ; npm run publish:signed   # (ou dist:signed pour local)
+   ```
+   Les scripts `*:signed` ne posent PAS `CSC_IDENTITY_AUTO_DISCOVERY=false` :
+   electron-builder signe alors avec `CSC_LINK`.
+3. **Approuver le certificat sur chaque poste** (admin) :
+   ```powershell
+   .\trust_cert.ps1 -CerPath "\\chemin\partage\pcbflow-codesign.cer"
+   ```
+   Importe le .cer public dans Trusted Root + Trusted Publisher -> l'app signee est
+   reconnue (plus d'avertissement editeur inconnu).
+
+> Le `.pfx` (cle privee) et le `.cer` ne sont **jamais** versionnes (`.gitignore`).
+> Un cert auto-signe ne confere pas de reputation SmartScreen globale (seul un cert
+> EV le ferait) ; il suffit pour une diffusion interne ou le .cer est approuve sur
+> les postes. Pour une distribution large, budgeter un certificat OV/EV.
