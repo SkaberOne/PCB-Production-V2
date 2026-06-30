@@ -88,6 +88,7 @@ puis l'**entrée détaillée** correspondante.
 | T-006 | 2026-06-18 | 1.0.6 | Revue BOM | 🟡 P3 | Chips/bandeaux d'avertissement non homogènes entre faces | ✅ Corrigé (PR #15) | — |
 | T-007 | 2026-06-18 | 1.0.6 | Revue BOM | 🟡 P3 | Estimation bobine persistée en « stock dispo » | ✅ Corrigé (PR #16) | — |
 | T-008 | 2026-06-18 | 1.0.6 | Base de données | 🟡 P3 | Règles de type : priorités partagées + `ESP-MODULE_COPY` résiduelle | ✔️ Vérifié terrain (2026-06-30, v1.0.7) | — |
+| T-009 | 2026-06-30 | 1.0.7 | Productions | 🟠 P2 | Suppression d'une production impossible si coûts/PnP (FK `PRODUCTION_COST_INPUT` etc., sans cascade) | ✅ Corrigé (1.0.8) | — |
 
 ---
 
