@@ -5,6 +5,55 @@
 
 ---
 
+## 2026-07-01 — Session 7 : Inventaire physique des composants (Phase 1)
+
+### Contexte
+Nouvelle feature « Bibliothèque / Stock » : inventaire physique interne des composants
+pour anticiper les manques AVANT production. Livraison en 3 phases ; **seule la Phase 1**
+est codée dans cette PR, derrière le feature flag `libraryStock` (défaut OFF).
+Décisions d'architecture : `docs/adr/0010-inventaire-stock-composants.md` (4e notion de
+stock, distincte des 3 existantes ; ancrage sur `Component.id`).
+
+### Ajouts backend
+- Modèles `ComponentStock` (solde cache + détail reel/bag/tube + `safety_stock` + `loss_pct`),
+  `StockMovement` (journal append-only signé) et `StockSettings` (coefficient de perte global) —
+  `serveur/src/models/stock.py`.
+- **Idempotence + réversibilité** : index unique **filtré** `(source_type, source_id)
+  WHERE is_reversed = 0` (SQLite + SQL Server), mouvements annulés par inverse (jamais
+  supprimés). Booléens en `== False  # noqa: E712` (T-SQL safe, cf. T-001/T-002).
+- Service `stock_service.py` : déclaration **set-to** (recomptage absolu, pas de double
+  comptage avec les réceptions), correction d'inventaire (absorbe le drain SAV), réception
+  auto (`get_or_create` composant), annulation réversible, solde recalculable, statuts.
+- Routes `marketplace_stock.py` : `GET /marketplace/stock`, `POST /stock/movements`
+  (declaration/correction), `GET /stock/{id}/journal`, `POST /stock/movements/{id}/cancel`,
+  `GET|PUT /stock/settings`, `PUT /stock/{id}/params`.
+- **IN auto à la réception** branché dans `ProductionCommandService.set_receipt`
+  (best-effort, réconcilié sur `qty_received`).
+- Migration Alembic additive `c3d5f7a9b1e2` (down_revision `b2c4e6f8a0d1`), testée SQLite
+  (upgrade/downgrade) — compatible SQL Server (ADR 0008 §3).
+
+### Ajouts frontend
+- Flag `libraryStock` (`utils/featureFlags.js`, défaut false) ; nouvelle entrée de menu
+  **Stock** (nav + route `/stock` conditionnels). Le référentiel composants reste dans
+  **Base de données → Composants**.
+- `pages/StockPage.jsx`, `components/library/StockPanel.jsx` (liste + solde + statut
+  OK/bas/manque + coefficient de perte + correction/seuils) ; `BomStockDialog` réutilisé
+  (prop optionnelle `onSave`) pour la déclaration.
+
+### Tests
+- Backend : `tests/test_stock.py` (15 tests) — set-to idempotent, réception reconcile +
+  anti-double-comptage, annulation réversible, index unique filtré, statuts, get_or_create,
+  hook réception (matché/non-matché). Migration up/down validée sur SQLite. Garde-fou
+  dialecte SQL et `test_production_command_name` toujours verts.
+- Frontend : `components/library/__tests__/StockPanel.test.jsx` (rendu liste + état vide).
+
+### Phases suivantes (non codées)
+- **Phase 2** : clôture de production (OUT auto, `ProductionRun`, `×(1+perte%)`, DNP/NC
+  exclus), réservation entre prods, écran « Puis-je produire ? ».
+- **Phase 3** : stock engagé sur feeders (requiert un nouveau modèle loaded/mounted).
+
+---
+
 ## 2026-06-30 — Session 6 : Build 1.0.7, re-test terrain + T-009 (suppression production)
 
 ### Contexte

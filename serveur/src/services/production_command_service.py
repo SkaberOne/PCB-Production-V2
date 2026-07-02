@@ -15,6 +15,7 @@ from sqlalchemy.orm import Session
 from ..models.commands import Command, CommandItem, CommandReceipt
 from ..models.production import Production
 from .command_service import CommandService
+from .stock_service import StockService
 
 logger = logging.getLogger(__name__)
 
@@ -113,7 +114,57 @@ class ProductionCommandService:
         else:
             row.qty_received = value
         db.commit()
+        db.refresh(row)
+
+        # ADR 0010 : IN auto dans l'inventaire physique interne, réconcilié sur la
+        # valeur courante de la réception (idempotent). Best-effort : un échec stock
+        # ne doit jamais casser la saisie de réception.
+        try:
+            cls._sync_stock_reception(db, command_id, row)
+        except Exception:  # pragma: no cover - defensive
+            logger.exception(
+                "Stock: échec IN auto réception (command=%s line=%s)",
+                command_id,
+                line_key,
+            )
+
         return value
+
+    @staticmethod
+    def _sync_stock_reception(db: Session, command_id: int, receipt: CommandReceipt) -> None:
+        """Résout la ligne agrégée -> Component (get_or_create) et poste l'IN auto."""
+        summary = CommandService.get_command_summary(db=db, command_id=command_id)
+        line = next(
+            (
+                item
+                for item in summary.get("aggregated_components", [])
+                if item.get("key") == receipt.line_key
+            ),
+            None,
+        )
+        if line is None:
+            logger.warning(
+                "Stock: ligne réception %s introuvable dans la commande %s (IN ignoré)",
+                receipt.line_key,
+                command_id,
+            )
+            return
+        component_id = line.get("component_library_id")
+        if not component_id:
+            component = StockService.get_or_create_component(
+                db,
+                value=line.get("value"),
+                mpn=line.get("component_mpn"),
+                footprint_eagle=line.get("footprint"),
+                component_type=line.get("component_type"),
+            )
+            component_id = component.id
+        StockService.post_reception(
+            db,
+            receipt_id=receipt.id,
+            component_id=component_id,
+            qty=receipt.qty_received,
+        )
 
     @classmethod
     def summary_with_receipts(cls, db: Session, command_id: int) -> Dict:
