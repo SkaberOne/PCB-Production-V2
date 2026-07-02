@@ -59,6 +59,9 @@ from src.models.production import Production, ProductionBomRevision  # noqa: F40
 from src.models.costing import (  # noqa: F401
     CostParameters, ProductionCostInput, ProductionCosting,
 )
+from src.models.stock import (  # noqa: F401
+    ComponentStock, StockMovement, StockSettings,
+)
 
 SQLALCHEMY_TEST_DATABASE_URL = "sqlite:///:memory:"
 

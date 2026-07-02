@@ -13,6 +13,14 @@ from .commands import (
 )
 from .machines import PnpCart, PnpFeeder, PnpMachine
 from .production import Production, ProductionBomRevision
+from .stock import (
+    ComponentStock,
+    StockConditionnement,
+    StockMotif,
+    StockMovement,
+    StockSens,
+    StockSettings,
+)
 
 __all__ = [
     "BomItem",
@@ -23,6 +31,7 @@ __all__ = [
     "CommandItem",
     "CommandReceipt",
     "Component",
+    "ComponentStock",
     "CostParameters",
     "ErpDefaults",
     "FootprintMapping",
@@ -35,5 +44,10 @@ __all__ = [
     "ProductionCostInput",
     "ProductionCosting",
     "ProductionPlan",
+    "StockConditionnement",
+    "StockMotif",
+    "StockMovement",
+    "StockSens",
+    "StockSettings",
     "SupplierOffer",
 ]

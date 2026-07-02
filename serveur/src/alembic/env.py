@@ -13,7 +13,7 @@ if str(SERVEUR_DIR) not in sys.path:
 
 from src.config import DATABASE_URL
 from src.database import Base
-from src.models import bom, machines, commands  # Import all model modules to register them
+from src.models import bom, machines, commands, stock  # Import all model modules to register them
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

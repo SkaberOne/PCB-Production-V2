@@ -110,6 +110,8 @@ function BomStockDialog({
     onClose,
     onStockDraftChange,
     onPitchBlur,
+    onSave = null,
+    saveLabel = 'Enregistrer',
 }) {
     return (
         <Dialog
@@ -431,9 +433,14 @@ function BomStockDialog({
             </DialogContent>
 
             <DialogActions sx={{ px: 3, pb: 2.5, borderTop: '1px solid #27272a' }}>
-                <Button onClick={onClose} variant="contained">
+                <Button onClick={onClose} variant={onSave ? 'outlined' : 'contained'} color="inherit">
                     Fermer
                 </Button>
+                {onSave ? (
+                    <Button onClick={onSave} variant="contained">
+                        {saveLabel}
+                    </Button>
+                ) : null}
             </DialogActions>
         </Dialog>
     );
