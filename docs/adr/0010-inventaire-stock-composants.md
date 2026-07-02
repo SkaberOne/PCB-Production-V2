@@ -125,8 +125,8 @@ UNIQUE (source_type, source_id) WHERE reversed = 0     -- SQLite & SQL Server (i
 Toute la feature est livrée derrière le flag **`libraryStock`** (motif
 `machinePnpPlan`, `utils/featureFlags.js`), **désactivé par défaut** (ADR 0008 §5).
 Permet de tester sur le PC atelier sans risque pour la release. UI : nouvelle
-section **« Bibliothèque »** (masquée si flag OFF), onglets **Composants** (réutilise
-le panneau existant) / **Stock**.
+entrée de menu **« Stock »** (masquée si flag OFF) → page d'inventaire physique. Le
+référentiel composants reste dans **Base de données → Composants**.
 
 ---
 
@@ -164,8 +164,8 @@ le panneau existant) / **Stock**.
 ## Phasage
 
 - **Phase 1 (cette PR)** : modèles + migration (SQLite + SQL Server) ; paramètre perte
-  (global + surcharge) + `safety_stock`/composant ; section Bibliothèque + onglets
-  derrière flag ; onglet Stock (liste + statut + édition via `BomStockDialog` → IN
+  (global + surcharge) + `safety_stock`/composant ; entrée de menu **Stock**
+  derrière flag (page inventaire : liste + statut + édition via `BomStockDialog` → IN
   declaration) ; IN auto à la réception ; correction d'inventaire ; routes (GET stock,
   POST mouvement, GET journal, annulation réversible) ; tests.
 - **Phase 2** : clôture de production (OUT auto, `ProductionRun`, `produce`
@@ -182,6 +182,6 @@ le panneau existant) / **Stock**.
 - Service/route : `serveur/src/services/stock_service.py`,
   `serveur/src/routes/marketplace_stock.py`
 - Front : `client/src/frontend/src/utils/featureFlags.js`,
-  `pages/BibliothequePage.jsx`, `components/library/StockPanel.jsx`,
+  `pages/StockPage.jsx`, `components/library/StockPanel.jsx`,
   `components/bom/BomStockDialog.jsx`
 - ADR liés : `0004-supplier-api-connectors.md`, `0008-base-partagee-sql-server.md`

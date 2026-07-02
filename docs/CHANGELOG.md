@@ -33,9 +33,10 @@ stock, distincte des 3 existantes ; ancrage sur `Component.id`).
   (upgrade/downgrade) — compatible SQL Server (ADR 0008 §3).
 
 ### Ajouts frontend
-- Flag `libraryStock` (`utils/featureFlags.js`, défaut false) ; section **Bibliothèque**
-  (nav + route conditionnels) avec onglets **Composants** (réutilise l'existant) / **Stock**.
-- `pages/BibliothequePage.jsx`, `components/library/StockPanel.jsx` (liste + solde + statut
+- Flag `libraryStock` (`utils/featureFlags.js`, défaut false) ; nouvelle entrée de menu
+  **Stock** (nav + route `/stock` conditionnels). Le référentiel composants reste dans
+  **Base de données → Composants**.
+- `pages/StockPage.jsx`, `components/library/StockPanel.jsx` (liste + solde + statut
   OK/bas/manque + coefficient de perte + correction/seuils) ; `BomStockDialog` réutilisé
   (prop optionnelle `onSave`) pour la déclaration.
 

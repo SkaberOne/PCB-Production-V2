@@ -13,7 +13,7 @@ import { Navigate, Route, Routes } from 'react-router-dom';
 import featureFlags from './utils/featureFlags';
 import AppShell from './components/layout/AppShell';
 import ErrorBoundary from './components/common/ErrorBoundary';
-import BibliothequePage from './pages/BibliothequePage';
+import StockPage from './pages/StockPage';
 import BomFilesPage from './pages/BomFilesPage';
 import BomViewerPage from './pages/BomViewerPage';
 import CommandPage from './pages/CommandPage';
@@ -116,10 +116,10 @@ const pages = [
 // `libraryStock` (ADR 0010) : masquée en release, activable pour test atelier.
 if (featureFlags.libraryStock) {
     pages.splice(8, 0, {
-        path: '/bibliotheque',
-        label: 'Bibliothèque',
-        title: 'Bibliothèque',
-        description: 'Composants du référentiel et inventaire physique interne (stock, seuils, mouvements).',
+        path: '/stock',
+        label: 'Stock',
+        title: 'Stock',
+        description: 'Inventaire physique interne des composants : soldes, seuils et mouvements.',
         icon: Inventory2RoundedIcon,
         group: 'library',
         step: null
@@ -141,7 +141,7 @@ function App() {
                 <Route path="/prix-carte" element={<ErrorBoundary context="Prix carte"><CostingPage /></ErrorBoundary>} />
                 <Route path="/base-donnees" element={<ErrorBoundary context="Base de donnees"><BaseDeDonneesPage /></ErrorBoundary>} />
                 {featureFlags.libraryStock ? (
-                    <Route path="/bibliotheque" element={<ErrorBoundary context="Bibliotheque"><BibliothequePage /></ErrorBoundary>} />
+                    <Route path="/stock" element={<ErrorBoundary context="Stock"><StockPage /></ErrorBoundary>} />
                 ) : null}
                 <Route path="/parametre" element={<ErrorBoundary context="Parametres"><SettingsPage /></ErrorBoundary>} />
                 <Route path="/parametre-erp" element={<ErrorBoundary context="Defauts ERP"><ErpDefaultsPage /></ErrorBoundary>} />
