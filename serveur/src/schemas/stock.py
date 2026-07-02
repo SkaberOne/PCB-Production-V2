@@ -99,3 +99,46 @@ class SettingsOut(BaseModel):
 
 class StockListOut(BaseModel):
     items: List[StockLineOut]
+
+
+# ---------------------------------------------------------- Phase 2 (ADR 0011)
+class ProduceRequest(BaseModel):
+    """Close a production batch: real number of boards produced."""
+
+    boards_produced: int = Field(..., ge=0)
+    note: Optional[str] = Field(default=None, max_length=500)
+
+
+class RunOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    production_id: int
+    machine_id: Optional[int] = None
+    boards_produced: int
+    note: Optional[str] = None
+    is_cancelled: bool
+    created_at: Optional[datetime] = None
+
+
+class CanProduceLine(BaseModel):
+    component_id: int
+    reference: Optional[str] = None
+    value: Optional[str] = None
+    mpn: Optional[str] = None
+    footprint: Optional[str] = None
+    besoin: int
+    solde: int
+    reserve: int
+    disponible: int
+    manque: int
+    a_commander: int
+
+
+class CanProduceOut(BaseModel):
+    production_id: int
+    production_name: Optional[str] = None
+    board_count: int
+    can_produce: bool
+    shortage_count: int
+    lines: List[CanProduceLine]

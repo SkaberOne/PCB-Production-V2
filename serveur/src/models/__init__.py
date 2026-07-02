@@ -12,7 +12,7 @@ from .commands import (
     SupplierOffer,
 )
 from .machines import PnpCart, PnpFeeder, PnpMachine
-from .production import Production, ProductionBomRevision
+from .production import Production, ProductionBomRevision, ProductionRun
 from .stock import (
     ComponentStock,
     StockConditionnement,
@@ -41,6 +41,7 @@ __all__ = [
     "PnpMachine",
     "Production",
     "ProductionBomRevision",
+    "ProductionRun",
     "ProductionCostInput",
     "ProductionCosting",
     "ProductionPlan",

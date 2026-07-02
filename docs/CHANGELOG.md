@@ -5,6 +5,45 @@
 
 ---
 
+## 2026-07-02 — Session 8 : Stock Phase 2 (clôture production, réservation, « Puis-je produire ? »)
+
+### Contexte
+Suite de la Phase 1 (mergée dans `dev`, PR #23). Phase 2 = consommation OUT à la
+clôture de production, réservation entre productions, écran d'anticipation des manques.
+Toujours derrière le flag `libraryStock`. Décisions : `docs/adr/0011-cloture-production-reservation-stock.md`.
+Branche `feat/stock-phase2-production`.
+
+### Ajouts backend
+- Modèle `ProductionRun` (plusieurs lots/production) — `models/production.py` ; migration
+  additive `d4e6a8c0f2b3` (PRODUCTION_RUNS ; pas de FK ajoutée sur `production_run_id`, SQLite-safe).
+- `StockService.post_production_out` (OUT reconcile-to-target par (run, composant)),
+  `cancel_production_run_movements` (contre-passation réversible), `consumed_by_run_ids`.
+- `services/production_stock_service.py` : agrégation besoins/carte (TOP+BOT, DNP exclus,
+  matching biblio + get_or_create), `produce` (OUT = ⌈besoin/carte × nb_réel × (1+perte%)⌉),
+  `update_run`, `cancel_run`, réservation (besoin restant des prods non clôturées/archivées),
+  `can_i_produce` (besoin vs stock − réservé, manques + à commander).
+- Routes : `POST /marketplace/machines/{id}/productions/{pid}/produce`,
+  `GET .../runs`, `POST .../runs/{run_id}/cancel`,
+  `GET /marketplace/stock/can-produce/{production_id}`.
+
+### Ajouts frontend
+- Section **Stock** re-tabifiée : **Inventaire** / **Puis-je produire ?**
+  (`pages/StockPage.jsx`).
+- `components/library/ProduceCheckPanel.jsx` : sélection production, besoin/solde/réservé/
+  dispo/manque + à commander, clôture de lot (nb réel de cartes) + liste/annulation des lots.
+
+### Tests
+- Backend : `tests/test_production_stock.py` (9) — OUT + décrément, TOP+BOT non doublé,
+  multi-runs additifs, ré-édition reconcile, annulation réversible, coefficient de perte,
+  DNP exclu, réservation + manque + à commander, endpoint HTTP produce/runs.
+  **Suite complète : 406 passed, 1 skipped.**
+- Frontend : `ProduceCheckPanel.test.jsx`. **Suite : 25 suites / 105 tests.**
+
+### Reste (Phase 3)
+- Stock engagé sur feeders (stock libre vs chargé) — requiert un modèle loaded/mounted.
+
+---
+
 ## 2026-07-01 — Session 7 : Inventaire physique des composants (Phase 1)
 
 ### Contexte
