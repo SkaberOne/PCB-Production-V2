@@ -700,14 +700,6 @@ function BomViewerPage() {
                         />
                     ) : (
                         <>
-                            {featureFlags.libraryStock && activeProduction?.id ? (
-                                <Box sx={{ mb: 3 }}>
-                                    <ProduceCheckPanel
-                                        productionId={activeProduction.id}
-                                        productionMachineId={activeProduction.machine_id}
-                                    />
-                                </Box>
-                            ) : null}
                             <BomStockTab
                                 aggregatedPreview={aggregatedPreview}
                                 stockValidation={stockValidation}
@@ -717,7 +709,16 @@ function BomViewerPage() {
                                 onValidateStock={handleValidateStock}
                                 onOpenCommandPage={handleOpenCommandPage}
                                 onOpenStockDialog={handleOpenStockDialog}
+                                hideEstimateTable={Boolean(featureFlags.libraryStock && activeProduction?.id)}
                             />
+                            {featureFlags.libraryStock && activeProduction?.id ? (
+                                <Box sx={{ mt: 3 }}>
+                                    <ProduceCheckPanel
+                                        productionId={activeProduction.id}
+                                        productionMachineId={activeProduction.machine_id}
+                                    />
+                                </Box>
+                            ) : null}
                         </>
                     )}
                 </CardContent>

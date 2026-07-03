@@ -27,10 +27,13 @@ Branche `feat/stock-phase2-production`.
   `GET /marketplace/stock/can-produce/{production_id}`.
 
 ### Ajouts frontend
-- Section **Stock** re-tabifiée : **Inventaire** / **Puis-je produire ?**
-  (`pages/StockPage.jsx`).
-- `components/library/ProduceCheckPanel.jsx` : sélection production, besoin/solde/réservé/
-  dispo/manque + à commander, clôture de lot (nb réel de cartes) + liste/annulation des lots.
+- `components/library/ProduceCheckPanel.jsx` : besoin/solde/réservé/dispo/manque + à
+  commander (2 modes : autonome avec menu + clôture de lot ; embarqué lié à une production).
+- **Anticipation « Puis-je produire ? » intégrée dans la Revue BOM** (onglet « Composants et
+  stock ») : **un seul tableau alimenté par l'inventaire réel** (− réservé). L'ancien tableau
+  d'estimation front (bobine/sachet/tube), qui affichait un « disponible » trompeur, est masqué
+  quand le flag est ON (`BomStockTab hideEstimateTable`). La section **Stock** reste
+  l'**inventaire seul** (`pages/StockPage.jsx`, sans onglet). Décidé après revue UX (doublon).
 
 ### Tests
 - Backend : `tests/test_production_stock.py` (9) — OUT + décrément, TOP+BOT non doublé,

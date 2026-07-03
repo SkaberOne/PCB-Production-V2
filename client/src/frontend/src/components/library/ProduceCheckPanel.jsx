@@ -120,8 +120,8 @@ function ProduceCheckPanel({ productionId = null, productionMachineId = null }) 
 
             {embedded ? (
                 <Typography variant="body2" sx={{ color: '#a1a1aa' }}>
-                    Anticipation basée sur l’<strong>inventaire réel</strong> (− réservé par les autres
-                    productions) — distincte de l’estimation de revue ci-dessous.
+                    Besoin comparé à l’<strong>inventaire réel</strong> des composants
+                    (− réservé par les autres productions).
                 </Typography>
             ) : (
                 <TextField
