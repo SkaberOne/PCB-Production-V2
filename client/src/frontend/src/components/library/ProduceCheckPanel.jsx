@@ -18,6 +18,8 @@ import {
     Typography,
 } from '@mui/material';
 import apiClient from '../../api/client';
+import BomStockDialog from '../bom/BomStockDialog';
+import { buildStockSummary } from '../../utils/bomPlanning';
 import { compactCellSx, compactTableContainerSx, compactTableSx } from '../../utils/compactTable';
 
 /**
@@ -39,6 +41,10 @@ function ProduceCheckPanel({ productionId = null, productionMachineId = null }) 
     const [loading, setLoading] = React.useState(false);
     const [error, setError] = React.useState(null);
     const [feedback, setFeedback] = React.useState(null);
+
+    // Saisie du stock physique en cliquant une ligne (déclaration réelle, set-to).
+    const [declareRow, setDeclareRow] = React.useState(null);
+    const [draft, setDraft] = React.useState({});
 
     const machineIdFor = React.useCallback((id) => {
         if (embedded) return productionMachineId || 0;
@@ -113,6 +119,61 @@ function ProduceCheckPanel({ productionId = null, productionMachineId = null }) 
         }
     };
 
+    // ---- Saisie du stock physique (déclaration réelle) via BomStockDialog ----
+    const openDeclare = (line) => {
+        setDeclareRow(line);
+        setDraft({
+            reel_manual_override_qty: line.qty_reel > 0 ? String(line.qty_reel) : '',
+            bag_qty: line.qty_bag > 0 ? String(line.qty_bag) : '',
+            tube_qty: line.qty_tube > 0 ? String(line.qty_tube) : '',
+        });
+    };
+
+    const handleStockDraftChange = React.useCallback(
+        (key, field) => (event) => {
+            const value = event?.target?.value;
+            setDraft((prev) => ({ ...prev, [field]: value }));
+        },
+        [],
+    );
+
+    const noop = React.useCallback(() => () => {}, []);
+
+    const declareLine = React.useMemo(() => {
+        if (!declareRow) return null;
+        const base = { requiredQuantity: 0, componentTapeWidthMm: null, componentPitchMm: null, manualPlacementBase: false };
+        const summary = buildStockSummary(base, draft);
+        return {
+            key: String(declareRow.component_id),
+            value: declareRow.value || '',
+            footprint: declareRow.footprint || '',
+            type: '',
+            componentLibraryName: declareRow.mpn || declareRow.value || 'Composant',
+            componentPitchMm: null,
+            requiredQuantity: 0,
+            draft,
+            ...summary,
+        };
+    }, [declareRow, draft]);
+
+    const saveDeclaration = async () => {
+        if (!declareRow) return;
+        try {
+            await apiClient.post('/marketplace/stock/movements', {
+                component_id: declareRow.component_id,
+                motif: 'declaration',
+                qty_reel: Number(draft.reel_manual_override_qty) || 0,
+                qty_bag: Number(draft.bag_qty) || 0,
+                qty_tube: Number(draft.tube_qty) || 0,
+            });
+            setDeclareRow(null);
+            setFeedback('Stock déclaré : inventaire mis à jour.');
+            if (selectedId) await loadReport(selectedId);
+        } catch (err) {
+            setError(err?.response?.data?.detail || 'Échec de la déclaration de stock.');
+        }
+    };
+
     return (
         <Stack spacing={2}>
             {error ? <Alert severity="error" onClose={() => setError(null)}>{error}</Alert> : null}
@@ -121,7 +182,8 @@ function ProduceCheckPanel({ productionId = null, productionMachineId = null }) 
             {embedded ? (
                 <Typography variant="body2" sx={{ color: '#a1a1aa' }}>
                     Besoin comparé à l’<strong>inventaire réel</strong> des composants
-                    (− réservé par les autres productions).
+                    (− réservé par les autres productions). Clique sur une ligne pour saisir le
+                    stock physique du composant.
                 </Typography>
             ) : (
                 <TextField
@@ -168,7 +230,7 @@ function ProduceCheckPanel({ productionId = null, productionMachineId = null }) 
                             </TableHead>
                             <TableBody>
                                 {report.lines.map((l) => (
-                                    <TableRow key={l.component_id} hover>
+                                    <TableRow key={l.component_id} hover onClick={() => openDeclare(l)} sx={{ cursor: 'pointer' }}>
                                         <TableCell sx={compactCellSx}>{l.value || '-'}</TableCell>
                                         <TableCell sx={compactCellSx}>{l.mpn || '-'}</TableCell>
                                         <TableCell sx={compactCellSx}>{l.footprint || '-'}</TableCell>
@@ -229,6 +291,16 @@ function ProduceCheckPanel({ productionId = null, productionMachineId = null }) 
                     ) : null}
                 </>
             ) : null}
+
+            <BomStockDialog
+                line={declareLine}
+                open={Boolean(declareRow)}
+                onClose={() => setDeclareRow(null)}
+                onStockDraftChange={handleStockDraftChange}
+                onPitchBlur={noop}
+                onSave={saveDeclaration}
+                saveLabel="Déclarer le stock"
+            />
         </Stack>
     );
 }

@@ -133,6 +133,9 @@ class CanProduceLine(BaseModel):
     disponible: int
     manque: int
     a_commander: int
+    qty_reel: int = 0
+    qty_bag: int = 0
+    qty_tube: int = 0
 
 
 class CanProduceOut(BaseModel):

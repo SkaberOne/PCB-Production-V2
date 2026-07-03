@@ -70,8 +70,8 @@ function BomStockTab({
                                 </Typography>
                                 {hideEstimateTable ? (
                                     <Typography variant="body2" sx={{ color: '#d4d4d8' }}>
-                                        Le tableau ci-dessous compare le besoin au stock réel (− réservé). La saisie du
-                                        stock physique se fait dans la section « Stock ».
+                                        Le tableau ci-dessous compare le besoin au stock réel (− réservé).
+                                        Clique sur une ligne pour saisir le stock physique du composant.
                                     </Typography>
                                 ) : (
                                     <Typography variant="body2" sx={{ color: '#d4d4d8' }}>

@@ -225,6 +225,7 @@ class ProductionStockService:
             if manque > 0:
                 shortage_count += 1
             comp = components.get(component_id)
+            s = stocks.get(component_id)
             lines.append(
                 {
                     "component_id": component_id,
@@ -238,6 +239,9 @@ class ProductionStockService:
                     "disponible": disponible,
                     "manque": manque,
                     "a_commander": manque,
+                    "qty_reel": s.qty_reel if s else 0,
+                    "qty_bag": s.qty_bag if s else 0,
+                    "qty_tube": s.qty_tube if s else 0,
                 }
             )
         lines.sort(key=lambda r: (-r["manque"], (r["value"] or "")))
