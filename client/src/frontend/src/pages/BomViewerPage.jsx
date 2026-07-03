@@ -21,6 +21,8 @@ import BomSelectionPanel from '../components/bom/BomSelectionPanel';
 import BomReviewTab from '../components/bom/BomReviewTab';
 import BomStockDialog from '../components/bom/BomStockDialog';
 import BomStockTab from '../components/bom/BomStockTab';
+import ProduceCheckPanel from '../components/library/ProduceCheckPanel';
+import featureFlags from '../utils/featureFlags';
 import ConfirmDialog from '../components/common/ConfirmDialog';
 import PageHeader from '../components/common/PageHeader';
 import EmptyState from '../components/common/EmptyState';
@@ -697,16 +699,27 @@ function BomViewerPage() {
                             onUndo={applyUndo}
                         />
                     ) : (
-                        <BomStockTab
-                            aggregatedPreview={aggregatedPreview}
-                            stockValidation={stockValidation}
-                            loadedEntryCount={loadedEntryCount}
-                            selectedEntries={selectedEntries}
-                            canValidateStock={canValidateStock}
-                            onValidateStock={handleValidateStock}
-                            onOpenCommandPage={handleOpenCommandPage}
-                            onOpenStockDialog={handleOpenStockDialog}
-                        />
+                        <>
+                            <BomStockTab
+                                aggregatedPreview={aggregatedPreview}
+                                stockValidation={stockValidation}
+                                loadedEntryCount={loadedEntryCount}
+                                selectedEntries={selectedEntries}
+                                canValidateStock={canValidateStock}
+                                onValidateStock={handleValidateStock}
+                                onOpenCommandPage={handleOpenCommandPage}
+                                onOpenStockDialog={handleOpenStockDialog}
+                                hideEstimateTable={Boolean(featureFlags.libraryStock && activeProduction?.id)}
+                            />
+                            {featureFlags.libraryStock && activeProduction?.id ? (
+                                <Box sx={{ mt: 3 }}>
+                                    <ProduceCheckPanel
+                                        productionId={activeProduction.id}
+                                        productionMachineId={activeProduction.machine_id}
+                                    />
+                                </Box>
+                            ) : null}
+                        </>
                     )}
                 </CardContent>
             </Card>

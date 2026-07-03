@@ -1,6 +1,6 @@
 """Marketplace machine routes."""
 
-from typing import Optional
+from typing import List, Optional
 
 from urllib.parse import quote
 
@@ -10,12 +10,17 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from ..database import get_db
+from ..models.bom import Component
+from ..models.machines import PnpMachine
 from ..schemas.marketplace import (
     CreateMachineRequest,
     UpdateMachineProductionBomOrderRequest,
     UpdateMachineRequest,
 )
+from ..schemas.stock import MachineLoadOut, ProduceRequest, RunOut, SetLoadRequest
 from ..services.assignment_service import AssignmentService
+from ..services.production_stock_service import ProductionStockService
+from ..services.stock_service import StockService
 
 router = APIRouter(prefix="/machines")
 
@@ -130,6 +135,77 @@ def validate_machine_production_order(
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error validating production order: {str(e)}")
+
+
+@router.post("/{machine_id}/productions/{production_id}/produce", response_model=RunOut)
+def produce_production(
+    machine_id: int,
+    production_id: int,
+    request: ProduceRequest,
+    db: Session = Depends(get_db),
+):
+    """Close a production batch (real boards) → ProductionRun + auto OUT (ADR 0011)."""
+    try:
+        return ProductionStockService.produce(
+            db=db,
+            production_id=production_id,
+            machine_id=machine_id,
+            boards_produced=request.boards_produced,
+            note=request.note,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:  # pragma: no cover - defensive
+        raise HTTPException(status_code=500, detail=f"Error producing: {str(e)}")
+
+
+@router.get("/{machine_id}/productions/{production_id}/runs", response_model=List[RunOut])
+def list_production_runs(
+    machine_id: int,
+    production_id: int,
+    db: Session = Depends(get_db),
+):
+    """List the production runs (batches) of a production."""
+    return ProductionStockService.list_runs(db, production_id)
+
+
+@router.post(
+    "/{machine_id}/productions/{production_id}/runs/{run_id}/cancel",
+    response_model=RunOut,
+)
+def cancel_production_run(
+    machine_id: int,
+    production_id: int,
+    run_id: int,
+    db: Session = Depends(get_db),
+):
+    """Reversibly cancel a run (contra-post its OUT movements)."""
+    try:
+        return ProductionStockService.cancel_run(db, run_id)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+
+@router.get("/{machine_id}/loads", response_model=List[MachineLoadOut])
+def list_machine_loads(machine_id: int, db: Session = Depends(get_db)):
+    """Composants physiquement chargés sur les feeders de la machine (ADR 0012)."""
+    return StockService.list_machine_loads(db, machine_id)
+
+
+@router.put("/{machine_id}/loads/{component_id}", response_model=List[MachineLoadOut])
+def set_machine_load(
+    machine_id: int,
+    component_id: int,
+    request: SetLoadRequest,
+    db: Session = Depends(get_db),
+):
+    """Charger/décharger un composant sur une machine (set-to ; 0 = déchargé)."""
+    if db.get(PnpMachine, machine_id) is None:
+        raise HTTPException(status_code=404, detail="Machine introuvable")
+    if db.get(Component, component_id) is None:
+        raise HTTPException(status_code=404, detail="Composant introuvable")
+    StockService.set_machine_load(db, machine_id, component_id, request.qty_loaded, request.note)
+    return StockService.list_machine_loads(db, machine_id)
 
 
 @router.get("/{machine_id}/productions/{production_id}/feeder-plan")

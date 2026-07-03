@@ -5,6 +5,130 @@
 
 ---
 
+## 2026-07-02 — Session 9 : Stock Phase 3 (stock engagé sur feeders)
+
+### Contexte
+Phase 3 de l'inventaire : distinguer le stock **libre** (en tiroir) du stock **engagé**
+(physiquement clipsé sur les feeders d'une machine). Phase 2 mergée dans `dev` (PR #24).
+Toujours derrière le flag `libraryStock`. ADR : `docs/adr/0012-stock-engage-feeders.md`.
+Branche `feat/stock-phase3-feeders`.
+
+### Décisions actées (Eric)
+- **Annotation** (pas un transfert) : charger ne consomme pas le solde ; engagé = Σ chargé,
+  libre = solde − engagé. La conso prod (Phase 2) reste inchangée.
+- Granularité **par (machine + composant)**. Déclenchement **manuel** (Charger/Décharger).
+
+### Ajouts backend
+- Modèle `ComponentMachineLoad` (machine_id, component_id, qty_loaded, unique(machine, composant))
+  + migration additive `e5f7b9d1c3a4`.
+- `StockService` : `set_machine_load` (set-to, 0 = déchargé), `engaged_by_component`,
+  `list_machine_loads`. `list_stock` expose **engaged** + **libre**.
+- `can_i_produce` : colonne **engage** ; `disponible = solde − réservé − engagé`.
+- Routes : `GET /marketplace/machines/{id}/loads`, `PUT /marketplace/machines/{id}/loads/{component_id}`.
+
+### Ajouts frontend
+- `components/machine/MachineLoadPanel.jsx` (Charger/Décharger par machine) intégré à la page
+  **Machine PnP** derrière `libraryStock`.
+- Colonnes **Engagé / Libre** dans l'inventaire (`StockPanel`) et **Engagé** dans « Puis-je produire ? ».
+
+### Tests
+- Backend : `tests/test_feeder_load.py` (7) — set/unload, engagé multi-machines, engagé/libre dans
+  list_stock, dispo = solde−réservé−engagé, endpoints HTTP. Suite complète verte.
+- Frontend : `MachineLoadPanel.test.jsx`.
+
+---
+
+## 2026-07-02 — Session 8 : Stock Phase 2 (clôture production, réservation, « Puis-je produire ? »)
+
+### Contexte
+Suite de la Phase 1 (mergée dans `dev`, PR #23). Phase 2 = consommation OUT à la
+clôture de production, réservation entre productions, écran d'anticipation des manques.
+Toujours derrière le flag `libraryStock`. Décisions : `docs/adr/0011-cloture-production-reservation-stock.md`.
+Branche `feat/stock-phase2-production`.
+
+### Ajouts backend
+- Modèle `ProductionRun` (plusieurs lots/production) — `models/production.py` ; migration
+  additive `d4e6a8c0f2b3` (PRODUCTION_RUNS ; pas de FK ajoutée sur `production_run_id`, SQLite-safe).
+- `StockService.post_production_out` (OUT reconcile-to-target par (run, composant)),
+  `cancel_production_run_movements` (contre-passation réversible), `consumed_by_run_ids`.
+- `services/production_stock_service.py` : agrégation besoins/carte (TOP+BOT, DNP exclus,
+  matching biblio + get_or_create), `produce` (OUT = ⌈besoin/carte × nb_réel × (1+perte%)⌉),
+  `update_run`, `cancel_run`, réservation (besoin restant des prods non clôturées/archivées),
+  `can_i_produce` (besoin vs stock − réservé, manques + à commander).
+- Routes : `POST /marketplace/machines/{id}/productions/{pid}/produce`,
+  `GET .../runs`, `POST .../runs/{run_id}/cancel`,
+  `GET /marketplace/stock/can-produce/{production_id}`.
+
+### Ajouts frontend
+- `components/library/ProduceCheckPanel.jsx` : besoin/solde/réservé/dispo/manque + à
+  commander (2 modes : autonome avec menu + clôture de lot ; embarqué lié à une production).
+- **Anticipation « Puis-je produire ? » intégrée dans la Revue BOM** (onglet « Composants et
+  stock ») : **un seul tableau alimenté par l'inventaire réel** (− réservé). L'ancien tableau
+  d'estimation front (bobine/sachet/tube), qui affichait un « disponible » trompeur, est masqué
+  quand le flag est ON (`BomStockTab hideEstimateTable`). La section **Stock** reste
+  l'**inventaire seul** (`pages/StockPage.jsx`, sans onglet). Décidé après revue UX (doublon).
+
+### Tests
+- Backend : `tests/test_production_stock.py` (9) — OUT + décrément, TOP+BOT non doublé,
+  multi-runs additifs, ré-édition reconcile, annulation réversible, coefficient de perte,
+  DNP exclu, réservation + manque + à commander, endpoint HTTP produce/runs.
+  **Suite complète : 406 passed, 1 skipped.**
+- Frontend : `ProduceCheckPanel.test.jsx`. **Suite : 25 suites / 105 tests.**
+
+### Reste (Phase 3)
+- Stock engagé sur feeders (stock libre vs chargé) — requiert un modèle loaded/mounted.
+
+---
+
+## 2026-07-01 — Session 7 : Inventaire physique des composants (Phase 1)
+
+### Contexte
+Nouvelle feature « Bibliothèque / Stock » : inventaire physique interne des composants
+pour anticiper les manques AVANT production. Livraison en 3 phases ; **seule la Phase 1**
+est codée dans cette PR, derrière le feature flag `libraryStock` (défaut OFF).
+Décisions d'architecture : `docs/adr/0010-inventaire-stock-composants.md` (4e notion de
+stock, distincte des 3 existantes ; ancrage sur `Component.id`).
+
+### Ajouts backend
+- Modèles `ComponentStock` (solde cache + détail reel/bag/tube + `safety_stock` + `loss_pct`),
+  `StockMovement` (journal append-only signé) et `StockSettings` (coefficient de perte global) —
+  `serveur/src/models/stock.py`.
+- **Idempotence + réversibilité** : index unique **filtré** `(source_type, source_id)
+  WHERE is_reversed = 0` (SQLite + SQL Server), mouvements annulés par inverse (jamais
+  supprimés). Booléens en `== False  # noqa: E712` (T-SQL safe, cf. T-001/T-002).
+- Service `stock_service.py` : déclaration **set-to** (recomptage absolu, pas de double
+  comptage avec les réceptions), correction d'inventaire (absorbe le drain SAV), réception
+  auto (`get_or_create` composant), annulation réversible, solde recalculable, statuts.
+- Routes `marketplace_stock.py` : `GET /marketplace/stock`, `POST /stock/movements`
+  (declaration/correction), `GET /stock/{id}/journal`, `POST /stock/movements/{id}/cancel`,
+  `GET|PUT /stock/settings`, `PUT /stock/{id}/params`.
+- **IN auto à la réception** branché dans `ProductionCommandService.set_receipt`
+  (best-effort, réconcilié sur `qty_received`).
+- Migration Alembic additive `c3d5f7a9b1e2` (down_revision `b2c4e6f8a0d1`), testée SQLite
+  (upgrade/downgrade) — compatible SQL Server (ADR 0008 §3).
+
+### Ajouts frontend
+- Flag `libraryStock` (`utils/featureFlags.js`, défaut false) ; nouvelle entrée de menu
+  **Stock** (nav + route `/stock` conditionnels). Le référentiel composants reste dans
+  **Base de données → Composants**.
+- `pages/StockPage.jsx`, `components/library/StockPanel.jsx` (liste + solde + statut
+  OK/bas/manque + coefficient de perte + correction/seuils) ; `BomStockDialog` réutilisé
+  (prop optionnelle `onSave`) pour la déclaration.
+
+### Tests
+- Backend : `tests/test_stock.py` (15 tests) — set-to idempotent, réception reconcile +
+  anti-double-comptage, annulation réversible, index unique filtré, statuts, get_or_create,
+  hook réception (matché/non-matché). Migration up/down validée sur SQLite. Garde-fou
+  dialecte SQL et `test_production_command_name` toujours verts.
+- Frontend : `components/library/__tests__/StockPanel.test.jsx` (rendu liste + état vide).
+
+### Phases suivantes (non codées)
+- **Phase 2** : clôture de production (OUT auto, `ProductionRun`, `×(1+perte%)`, DNP/NC
+  exclus), réservation entre prods, écran « Puis-je produire ? ».
+- **Phase 3** : stock engagé sur feeders (requiert un nouveau modèle loaded/mounted).
+
+---
+
 ## 2026-06-30 — Session 6 : Build 1.0.7, re-test terrain + T-009 (suppression production)
 
 ### Contexte

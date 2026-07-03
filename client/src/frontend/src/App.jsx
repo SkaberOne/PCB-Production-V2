@@ -8,9 +8,12 @@ import ShoppingCartRoundedIcon from '@mui/icons-material/ShoppingCartRounded';
 import StorageRoundedIcon from '@mui/icons-material/StorageRounded';
 import TableViewRoundedIcon from '@mui/icons-material/TableViewRounded';
 import UploadFileRoundedIcon from '@mui/icons-material/UploadFileRounded';
+import Inventory2RoundedIcon from '@mui/icons-material/Inventory2Rounded';
 import { Navigate, Route, Routes } from 'react-router-dom';
+import featureFlags from './utils/featureFlags';
 import AppShell from './components/layout/AppShell';
 import ErrorBoundary from './components/common/ErrorBoundary';
+import StockPage from './pages/StockPage';
 import BomFilesPage from './pages/BomFilesPage';
 import BomViewerPage from './pages/BomViewerPage';
 import CommandPage from './pages/CommandPage';
@@ -109,6 +112,20 @@ const pages = [
     }
 ];
 
+// Section « Bibliothèque » (inventaire physique) livrée derrière le flag
+// `libraryStock` (ADR 0010) : masquée en release, activable pour test atelier.
+if (featureFlags.libraryStock) {
+    pages.splice(8, 0, {
+        path: '/stock',
+        label: 'Stock',
+        title: 'Stock',
+        description: 'Inventaire physique interne des composants : soldes, seuils et mouvements.',
+        icon: Inventory2RoundedIcon,
+        group: 'library',
+        step: null
+    });
+}
+
 function App() {
     return (
         <AppShell pages={pages}>
@@ -123,6 +140,9 @@ function App() {
                 <Route path="/machine-pnp" element={<ErrorBoundary context="Machine PnP"><MachinePnpPage /></ErrorBoundary>} />
                 <Route path="/prix-carte" element={<ErrorBoundary context="Prix carte"><CostingPage /></ErrorBoundary>} />
                 <Route path="/base-donnees" element={<ErrorBoundary context="Base de donnees"><BaseDeDonneesPage /></ErrorBoundary>} />
+                {featureFlags.libraryStock ? (
+                    <Route path="/stock" element={<ErrorBoundary context="Stock"><StockPage /></ErrorBoundary>} />
+                ) : null}
                 <Route path="/parametre" element={<ErrorBoundary context="Parametres"><SettingsPage /></ErrorBoundary>} />
                 <Route path="/parametre-erp" element={<ErrorBoundary context="Defauts ERP"><ErpDefaultsPage /></ErrorBoundary>} />
             </Routes>

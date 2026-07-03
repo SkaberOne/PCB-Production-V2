@@ -27,6 +27,7 @@ function BomStockTab({
     onValidateStock,
     onOpenCommandPage,
     onOpenStockDialog,
+    hideEstimateTable = false,
 }) {
     return (
         <Stack spacing={3}>
@@ -67,9 +68,16 @@ function BomStockTab({
                                     marge de sécurité. Le sachet et le tube s'ajoutent au stock disponible et impliquent
                                     une pose manuelle.
                                 </Typography>
-                                <Typography variant="body2" sx={{ color: '#d4d4d8' }}>
-                                    Clique sur une ligne du tableau pour ouvrir la fiche stock détaillée du composant.
-                                </Typography>
+                                {hideEstimateTable ? (
+                                    <Typography variant="body2" sx={{ color: '#d4d4d8' }}>
+                                        Le tableau ci-dessous compare le besoin au stock réel (− réservé).
+                                        Clique sur une ligne pour saisir le stock physique du composant.
+                                    </Typography>
+                                ) : (
+                                    <Typography variant="body2" sx={{ color: '#d4d4d8' }}>
+                                        Clique sur une ligne du tableau pour ouvrir la fiche stock détaillée du composant.
+                                    </Typography>
+                                )}
                                 {!canValidateStock && selectedEntries.length ? (
                                     <Typography variant="body2" sx={{ color: '#fbbf24' }}>
                                         Attends le chargement complet des BOM avant validation :
@@ -103,7 +111,9 @@ function BomStockTab({
                 </Grid>
             </Grid>
 
-            <BomStockTable lines={aggregatedPreview} onOpenStockDialog={onOpenStockDialog} />
+            {hideEstimateTable ? null : (
+                <BomStockTable lines={aggregatedPreview} onOpenStockDialog={onOpenStockDialog} />
+            )}
         </Stack>
     );
 }

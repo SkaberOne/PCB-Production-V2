@@ -2,7 +2,18 @@
 
 import enum
 
-from sqlalchemy import Column, DateTime, Enum, ForeignKey, Integer, JSON, String, Text, UniqueConstraint
+from sqlalchemy import (
+    Boolean,
+    Column,
+    DateTime,
+    Enum,
+    ForeignKey,
+    Integer,
+    JSON,
+    String,
+    Text,
+    UniqueConstraint,
+)
 from sqlalchemy.orm import relationship
 
 from ..database import Base, utcnow
@@ -62,3 +73,31 @@ class ProductionBomRevision(Base):
 
     def __repr__(self):
         return f"<ProductionBomRevision production={self.production_id} bom={self.bom_revision_id}>"
+
+
+class ProductionRun(Base):
+    """A production batch (clôture) that consumed stock — see ADR 0011.
+
+    Several runs per production are allowed (batches); each posts its own OUT
+    movements (source_type='production', production_run_id=this.id) which add up.
+    Cancelling a run reverses its OUT (never deletes). No DB FK from
+    STOCK_MOVEMENTS.production_run_id (kept SQLite-friendly): the link is
+    application-level.
+    """
+
+    __tablename__ = "PRODUCTION_RUNS"
+
+    id = Column(Integer, primary_key=True, index=True)
+    production_id = Column(Integer, ForeignKey("PRODUCTIONS.id"), nullable=False, index=True)
+    machine_id = Column(Integer, ForeignKey("PNP_MACHINES.id"), nullable=True, index=True)
+    boards_produced = Column(Integer, nullable=False, default=0, server_default="0")
+    note = Column(Text, nullable=True)
+    is_cancelled = Column(Boolean, nullable=False, default=False, server_default="0")
+    created_at = Column(DateTime, default=utcnow)
+    updated_at = Column(DateTime, default=utcnow, onupdate=utcnow)
+
+    production = relationship("Production")
+    machine = relationship("PnpMachine")
+
+    def __repr__(self):
+        return f"<ProductionRun prod={self.production_id} boards={self.boards_produced}>"

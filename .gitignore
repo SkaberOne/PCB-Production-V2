@@ -112,3 +112,9 @@ client/src/desktop/installers/*.exe
 # Certificats de signature (ADR 0009 #5) - jamais versionnes
 *.pfx
 *.cer
+
+# runtime server/frontend logs (never commit)
+*.err
+*.log
+serveur/backend.err
+client/src/frontend/frontend.err

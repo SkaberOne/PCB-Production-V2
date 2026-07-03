@@ -44,6 +44,16 @@ export const featureFlags = {
         process.env.REACT_APP_FEATURE_MACHINE_PNP_PLAN,
         true,
     ),
+    /**
+     * Section « Bibliothèque » (onglets Composants / Stock) : inventaire physique
+     * interne des composants (ADR 0010). Demi-fini ⇒ défaut false : masqué en
+     * release, activable par config runtime / env pour tester sur le PC atelier.
+     */
+    libraryStock: resolveFlag(
+        'libraryStock',
+        process.env.REACT_APP_FEATURE_LIBRARY_STOCK,
+        false,
+    ),
 };
 
 export function isFeatureEnabled(name) {
