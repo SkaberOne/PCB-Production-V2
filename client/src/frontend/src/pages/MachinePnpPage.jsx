@@ -1,7 +1,9 @@
 import React from 'react';
+import { Box } from '@mui/material';
 import { featureFlags } from '../utils/featureFlags';
 import MachinePnpPageLegacy from './MachinePnpPageLegacy';
 import MachinePnpWorkspace from '../components/machine/MachinePnpWorkspace';
+import MachineLoadPanel from '../components/machine/MachineLoadPanel';
 
 /**
  * Routeur de la page Machine PnP.
@@ -15,7 +17,16 @@ import MachinePnpWorkspace from '../components/machine/MachinePnpWorkspace';
  * Tant que V2 n'est pas validée, V1 reste le défaut : aucune régression exposée.
  */
 function MachinePnpPage() {
-    return featureFlags.machinePnpPlan ? <MachinePnpWorkspace /> : <MachinePnpPageLegacy />;
+    return (
+        <>
+            {featureFlags.machinePnpPlan ? <MachinePnpWorkspace /> : <MachinePnpPageLegacy />}
+            {featureFlags.libraryStock ? (
+                <Box sx={{ mt: 4 }}>
+                    <MachineLoadPanel />
+                </Box>
+            ) : null}
+        </>
+    );
 }
 
 export default MachinePnpPage;

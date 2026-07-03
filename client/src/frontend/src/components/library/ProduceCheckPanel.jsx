@@ -223,6 +223,7 @@ function ProduceCheckPanel({ productionId = null, productionMachineId = null }) 
                                     <TableCell sx={compactCellSx} align="right">Besoin</TableCell>
                                     <TableCell sx={compactCellSx} align="right">Solde</TableCell>
                                     <TableCell sx={compactCellSx} align="right">Réservé</TableCell>
+                                    <TableCell sx={compactCellSx} align="right">Engagé</TableCell>
                                     <TableCell sx={compactCellSx} align="right">Dispo</TableCell>
                                     <TableCell sx={compactCellSx} align="right">Manque</TableCell>
                                     <TableCell sx={compactCellSx} align="right">À commander</TableCell>
@@ -237,6 +238,7 @@ function ProduceCheckPanel({ productionId = null, productionMachineId = null }) 
                                         <TableCell sx={compactCellSx} align="right">{l.besoin}</TableCell>
                                         <TableCell sx={compactCellSx} align="right">{l.solde}</TableCell>
                                         <TableCell sx={compactCellSx} align="right">{l.reserve}</TableCell>
+                                        <TableCell sx={compactCellSx} align="right">{l.engage ?? 0}</TableCell>
                                         <TableCell sx={compactCellSx} align="right">{l.disponible}</TableCell>
                                         <TableCell sx={compactCellSx} align="right">
                                             {l.manque > 0

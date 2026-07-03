@@ -25,6 +25,8 @@ const ROW = {
     qty_reel: 10,
     qty_bag: 5,
     qty_tube: 2,
+    engaged: 3,
+    libre: 14,
     safety_stock: 0,
     loss_pct: null,
     effective_loss_pct: 2.5,

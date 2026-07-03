@@ -214,6 +214,8 @@ function StockPanel() {
                             <TableCell sx={compactCellSx}>MPN</TableCell>
                             <TableCell sx={compactCellSx}>Empreinte</TableCell>
                             <TableCell sx={compactCellSx} align="right">Solde</TableCell>
+                            <TableCell sx={compactCellSx} align="right">Engagé</TableCell>
+                            <TableCell sx={compactCellSx} align="right">Libre</TableCell>
                             <TableCell sx={compactCellSx} align="right">Bobine</TableCell>
                             <TableCell sx={compactCellSx} align="right">Sachet</TableCell>
                             <TableCell sx={compactCellSx} align="right">Tube</TableCell>
@@ -225,7 +227,7 @@ function StockPanel() {
                     <TableBody>
                         {rows.length === 0 ? (
                             <TableRow>
-                                <TableCell sx={compactCellSx} colSpan={10}>
+                                <TableCell sx={compactCellSx} colSpan={12}>
                                     <Typography variant="body2" sx={{ color: '#a1a1aa', py: 2 }}>
                                         Aucun composant. Le stock se remplit au fil des déclarations
                                         et des réceptions de commande.
@@ -239,6 +241,8 @@ function StockPanel() {
                                     <TableCell sx={compactCellSx}>{row.mpn || '-'}</TableCell>
                                     <TableCell sx={compactCellSx}>{row.footprint_pnp || row.footprint_eagle || '-'}</TableCell>
                                     <TableCell sx={compactCellSx} align="right">{row.qty_pieces}</TableCell>
+                                    <TableCell sx={compactCellSx} align="right">{row.engaged ?? 0}</TableCell>
+                                    <TableCell sx={compactCellSx} align="right">{row.libre ?? row.qty_pieces}</TableCell>
                                     <TableCell sx={compactCellSx} align="right">{row.qty_reel}</TableCell>
                                     <TableCell sx={compactCellSx} align="right">{row.qty_bag}</TableCell>
                                     <TableCell sx={compactCellSx} align="right">{row.qty_tube}</TableCell>

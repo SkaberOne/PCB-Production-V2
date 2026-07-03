@@ -51,6 +51,8 @@ class StockLineOut(BaseModel):
     qty_reel: int
     qty_bag: int
     qty_tube: int
+    engaged: int = 0
+    libre: int = 0
     safety_stock: int
     loss_pct: Optional[float] = None
     effective_loss_pct: float
@@ -130,6 +132,7 @@ class CanProduceLine(BaseModel):
     besoin: int
     solde: int
     reserve: int
+    engage: int = 0
     disponible: int
     manque: int
     a_commander: int
@@ -145,3 +148,21 @@ class CanProduceOut(BaseModel):
     can_produce: bool
     shortage_count: int
     lines: List[CanProduceLine]
+
+
+# ---- Phase 3 : stock engagé sur feeders (ADR 0012) ----
+class SetLoadRequest(BaseModel):
+    """Set-to the loaded quantity for (machine, component). 0 = déchargé."""
+
+    qty_loaded: int = Field(..., ge=0)
+    note: Optional[str] = Field(default=None, max_length=500)
+
+
+class MachineLoadOut(BaseModel):
+    machine_id: int
+    component_id: int
+    value: Optional[str] = None
+    mpn: Optional[str] = None
+    footprint: Optional[str] = None
+    qty_loaded: int
+    note: Optional[str] = None

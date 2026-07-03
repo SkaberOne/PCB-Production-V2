@@ -206,6 +206,7 @@ class ProductionStockService:
         settings = StockService.get_settings(db)
         board_count = int(boards) if boards is not None else cls.board_count(production)
         reserved = cls._reserved_by_others(db, production_id, settings)
+        engaged = StockService.engaged_by_component(db)
 
         stocks = {
             s.component_id: s
@@ -220,7 +221,8 @@ class ProductionStockService:
             besoin = cls._out_qty(per_board, board_count, loss)
             solde = stocks[component_id].qty_pieces if component_id in stocks else 0
             reserve = reserved.get(component_id, 0)
-            disponible = solde - reserve
+            engage = engaged.get(component_id, 0)
+            disponible = solde - reserve - engage
             manque = max(0, besoin - disponible)
             if manque > 0:
                 shortage_count += 1
@@ -236,6 +238,7 @@ class ProductionStockService:
                     "besoin": besoin,
                     "solde": solde,
                     "reserve": reserve,
+                    "engage": engage,
                     "disponible": disponible,
                     "manque": manque,
                     "a_commander": manque,

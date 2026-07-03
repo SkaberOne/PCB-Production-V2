@@ -24,6 +24,7 @@ from sqlalchemy import (
     Integer,
     String,
     Text,
+    UniqueConstraint,
     text,
 )
 from sqlalchemy.orm import relationship
@@ -134,6 +135,33 @@ class StockMovement(Base):
             f"<StockMovement comp={self.component_id} {self.sens.value} "
             f"{self.qty} {self.motif.value}>"
         )
+
+
+class ComponentMachineLoad(Base):
+    """Component quantity physically loaded on a machine's feeders (ADR 0012).
+
+    Annotation (current state, set-to upsert) — does NOT affect the stock balance
+    (qty_pieces). engaged(component) = Σ qty_loaded over machines ;
+    free = solde − engaged. Manual load/unload from Machine PnP.
+    """
+
+    __tablename__ = "COMPONENT_MACHINE_LOADS"
+    __table_args__ = (
+        UniqueConstraint("machine_id", "component_id", name="uq_component_machine_load"),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    machine_id = Column(Integer, ForeignKey("PNP_MACHINES.id"), nullable=False, index=True)
+    component_id = Column(Integer, ForeignKey("COMPONENTS.id"), nullable=False, index=True)
+    qty_loaded = Column(Integer, nullable=False, default=0, server_default="0")
+    note = Column(Text, nullable=True)
+    updated_at = Column(DateTime, default=utcnow, onupdate=utcnow)
+
+    component = relationship("Component")
+    machine = relationship("PnpMachine")
+
+    def __repr__(self):
+        return f"<ComponentMachineLoad m={self.machine_id} c={self.component_id} qty={self.qty_loaded}>"
 
 
 class StockSettings(Base):
