@@ -5,14 +5,15 @@ The auto IN on reception lives in ``ProductionCommandService.set_receipt`` (the 
 write path for ``CommandReceipt``), not here.
 """
 
-from typing import List
+from typing import List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from ..database import get_db
 from ..models.bom import Component
 from ..schemas.stock import (
+    CanProduceOut,
     ComponentParamsRequest,
     ComponentStockOut,
     GlobalSettingsRequest,
@@ -22,8 +23,22 @@ from ..schemas.stock import (
     StockLineOut,
 )
 from ..services.stock_service import StockService, _UNSET
+from ..services.production_stock_service import ProductionStockService
 
 router = APIRouter(tags=["stock"])
+
+
+@router.get("/stock/can-produce/{production_id}", response_model=CanProduceOut)
+def can_produce(
+    production_id: int,
+    boards: Optional[int] = Query(default=None, ge=0),
+    db: Session = Depends(get_db),
+):
+    """« Puis-je produire ? » : besoin vs stock disponible (− réservé) + manques."""
+    try:
+        return ProductionStockService.can_i_produce(db, production_id, boards)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
 
 
 @router.get("/stock", response_model=List[StockLineOut])

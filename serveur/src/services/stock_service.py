@@ -301,6 +301,81 @@ class StockService:
         cls.recompute_solde(db, movement.component_id)
         return movement
 
+    # ----------------------------------------------------- production (OUT)
+    @classmethod
+    def post_production_out(
+        cls, db: Session, run_id: int, component_id: int, qty: int
+    ) -> None:
+        """Reconcile the auto OUT for one (production run, component) to ``qty``.
+
+        Idempotent per (run, component) via the filtered unique index; re-editing
+        the run's board count supersedes the previous OUT and re-posts (ADR 0011 §3).
+        """
+        source_type = "production"
+        source_id = f"{run_id}:{component_id}"
+        target = max(int(qty or 0), 0)
+        active = cls._active_movement(db, source_type, source_id)
+        if active is not None:
+            if (
+                active.sens == StockSens.OUT
+                and active.qty == target
+                and active.component_id == component_id
+            ):
+                return
+            cls._supersede(db, active)
+        if target > 0:
+            cls._insert(
+                db,
+                component_id=component_id,
+                sens=StockSens.OUT,
+                qty=target,
+                motif=StockMotif.production,
+                source_type=source_type,
+                source_id=source_id,
+                production_run_id=run_id,
+                note="Consommation production (auto)",
+            )
+        db.commit()
+        cls.recompute_solde(db, component_id)
+
+    @classmethod
+    def cancel_production_run_movements(cls, db: Session, run_id: int) -> None:
+        """Reverse every active OUT of a production run (append inverses; no delete)."""
+        actives = (
+            db.query(StockMovement)
+            .filter(
+                StockMovement.production_run_id == run_id,
+                StockMovement.source_type == "production",
+                StockMovement.is_reversed == False,  # noqa: E712 (SQL Server: IS 0 invalide)
+            )
+            .all()
+        )
+        components = set()
+        for movement in actives:
+            cls._supersede(db, movement)
+            components.add(movement.component_id)
+        db.commit()
+        for component_id in components:
+            cls.recompute_solde(db, component_id)
+
+    @staticmethod
+    def consumed_by_run_ids(db: Session, run_ids, component_id: int) -> int:
+        """Σ active production OUT magnitude for the given runs and component."""
+        if not run_ids:
+            return 0
+        total = (
+            db.query(func.coalesce(func.sum(StockMovement.qty), 0))
+            .filter(
+                StockMovement.production_run_id.in_(list(run_ids)),
+                StockMovement.source_type == "production",
+                StockMovement.sens == StockSens.OUT,
+                StockMovement.is_reversed == False,  # noqa: E712 (SQL Server: IS 0 invalide)
+                StockMovement.component_id == component_id,
+            )
+            .scalar()
+        )
+        return int(total or 0)
+
     # --------------------------------------------- component get_or_create
     @classmethod
     def get_or_create_component(

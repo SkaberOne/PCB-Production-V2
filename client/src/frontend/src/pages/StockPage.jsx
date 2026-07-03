@@ -4,9 +4,10 @@ import PageHeader from '../components/common/PageHeader';
 import StockPanel from '../components/library/StockPanel';
 
 /**
- * Page « Stock » (ADR 0010) — livrée derrière le flag `libraryStock`.
+ * Page « Stock » (ADR 0010) — derrière le flag `libraryStock`.
  * Inventaire physique interne des composants (soldes, seuils, mouvements).
- * Le référentiel composants reste dans « Base de données → Composants ».
+ * L'anticipation « Puis-je produire ? » vit dans la Revue BOM (« Composants et stock »),
+ * là où l'on fixe le nombre de cartes.
  */
 function StockPage() {
     return (
