@@ -24,6 +24,7 @@ from sqlalchemy.orm import Session
 
 from ..models.bom import Component
 from ..models.stock import (
+    ComponentMachineLoad,
     ComponentStock,
     StockMotif,
     StockMovement,
@@ -419,12 +420,14 @@ class StockService:
         """Library components + balance + breakdown + status."""
         settings = cls.get_settings(db)
         stocks = {s.component_id: s for s in db.query(ComponentStock).all()}
+        engaged = cls.engaged_by_component(db)
         rows: List[Dict] = []
         for component in db.query(Component).all():
             s = stocks.get(component.id)
             qty = s.qty_pieces if s else 0
             safety = s.safety_stock if s else 0
             loss = s.loss_pct if s else None
+            eng = engaged.get(component.id, 0)
             rows.append(
                 {
                     "component_id": component.id,
@@ -438,6 +441,8 @@ class StockService:
                     "qty_reel": s.qty_reel if s else 0,
                     "qty_bag": s.qty_bag if s else 0,
                     "qty_tube": s.qty_tube if s else 0,
+                    "engaged": eng,
+                    "libre": qty - eng,
                     "safety_stock": safety,
                     "loss_pct": loss,
                     "effective_loss_pct": loss if loss is not None else settings.global_loss_pct,
@@ -456,3 +461,79 @@ class StockService:
             .order_by(StockMovement.date.desc(), StockMovement.id.desc())
             .all()
         )
+
+    # ------------------------------------------ engaged on feeders (Phase 3)
+    @staticmethod
+    def engaged_by_component(db: Session) -> Dict[int, int]:
+        """{component_id: Σ qty loaded on all machines} (ADR 0012)."""
+        rows = (
+            db.query(
+                ComponentMachineLoad.component_id,
+                func.coalesce(func.sum(ComponentMachineLoad.qty_loaded), 0),
+            )
+            .group_by(ComponentMachineLoad.component_id)
+            .all()
+        )
+        return {cid: int(total or 0) for cid, total in rows}
+
+    @staticmethod
+    def set_machine_load(
+        db: Session,
+        machine_id: int,
+        component_id: int,
+        qty_loaded: int,
+        note: Optional[str] = None,
+    ) -> Optional[ComponentMachineLoad]:
+        """Set-to the loaded quantity for (machine, component). 0 ⇒ unloaded (row removed)."""
+        row = (
+            db.query(ComponentMachineLoad)
+            .filter(
+                ComponentMachineLoad.machine_id == machine_id,
+                ComponentMachineLoad.component_id == component_id,
+            )
+            .first()
+        )
+        qty = max(int(qty_loaded or 0), 0)
+        if qty <= 0:
+            if row is not None:
+                db.delete(row)
+                db.commit()
+            return None
+        if row is None:
+            row = ComponentMachineLoad(
+                machine_id=machine_id, component_id=component_id, qty_loaded=qty, note=note
+            )
+            db.add(row)
+        else:
+            row.qty_loaded = qty
+            if note is not None:
+                row.note = note
+        db.commit()
+        db.refresh(row)
+        return row
+
+    @staticmethod
+    def list_machine_loads(db: Session, machine_id: int) -> List[Dict]:
+        """Components currently loaded on a machine (with component info)."""
+        rows = (
+            db.query(ComponentMachineLoad)
+            .filter(ComponentMachineLoad.machine_id == machine_id)
+            .all()
+        )
+        comps = {c.id: c for c in db.query(Component).all()}
+        out: List[Dict] = []
+        for r in rows:
+            c = comps.get(r.component_id)
+            out.append(
+                {
+                    "machine_id": r.machine_id,
+                    "component_id": r.component_id,
+                    "value": c.value if c else None,
+                    "mpn": c.mpn if c else None,
+                    "footprint": (c.footprint_pnp or c.footprint_eagle) if c else None,
+                    "qty_loaded": r.qty_loaded,
+                    "note": r.note,
+                }
+            )
+        out.sort(key=lambda x: (x["value"] or ""))
+        return out

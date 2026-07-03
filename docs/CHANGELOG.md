@@ -5,6 +5,39 @@
 
 ---
 
+## 2026-07-02 — Session 9 : Stock Phase 3 (stock engagé sur feeders)
+
+### Contexte
+Phase 3 de l'inventaire : distinguer le stock **libre** (en tiroir) du stock **engagé**
+(physiquement clipsé sur les feeders d'une machine). Phase 2 mergée dans `dev` (PR #24).
+Toujours derrière le flag `libraryStock`. ADR : `docs/adr/0012-stock-engage-feeders.md`.
+Branche `feat/stock-phase3-feeders`.
+
+### Décisions actées (Eric)
+- **Annotation** (pas un transfert) : charger ne consomme pas le solde ; engagé = Σ chargé,
+  libre = solde − engagé. La conso prod (Phase 2) reste inchangée.
+- Granularité **par (machine + composant)**. Déclenchement **manuel** (Charger/Décharger).
+
+### Ajouts backend
+- Modèle `ComponentMachineLoad` (machine_id, component_id, qty_loaded, unique(machine, composant))
+  + migration additive `e5f7b9d1c3a4`.
+- `StockService` : `set_machine_load` (set-to, 0 = déchargé), `engaged_by_component`,
+  `list_machine_loads`. `list_stock` expose **engaged** + **libre**.
+- `can_i_produce` : colonne **engage** ; `disponible = solde − réservé − engagé`.
+- Routes : `GET /marketplace/machines/{id}/loads`, `PUT /marketplace/machines/{id}/loads/{component_id}`.
+
+### Ajouts frontend
+- `components/machine/MachineLoadPanel.jsx` (Charger/Décharger par machine) intégré à la page
+  **Machine PnP** derrière `libraryStock`.
+- Colonnes **Engagé / Libre** dans l'inventaire (`StockPanel`) et **Engagé** dans « Puis-je produire ? ».
+
+### Tests
+- Backend : `tests/test_feeder_load.py` (7) — set/unload, engagé multi-machines, engagé/libre dans
+  list_stock, dispo = solde−réservé−engagé, endpoints HTTP. Suite complète verte.
+- Frontend : `MachineLoadPanel.test.jsx`.
+
+---
+
 ## 2026-07-02 — Session 8 : Stock Phase 2 (clôture production, réservation, « Puis-je produire ? »)
 
 ### Contexte
