@@ -102,9 +102,16 @@ class ProductionStockService:
     ) -> ProductionRun:
         """Create a production run (batch) and post its auto OUT movements."""
         needs, _ = cls.aggregate_needs_per_board(db, production_id)
+        # Coerce an unknown/0 machine to NULL (path segment may be a placeholder) to
+        # avoid a bogus FK on PRODUCTION_RUNS.machine_id (rejected by SQL Server).
+        from ..models.machines import PnpMachine
+
+        valid_machine_id = (
+            machine_id if (machine_id and db.get(PnpMachine, machine_id)) else None
+        )
         run = ProductionRun(
             production_id=production_id,
-            machine_id=machine_id,
+            machine_id=valid_machine_id,
             boards_produced=max(int(boards_produced or 0), 0),
             note=note,
         )

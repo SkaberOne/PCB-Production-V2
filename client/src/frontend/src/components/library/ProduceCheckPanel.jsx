@@ -21,13 +21,18 @@ import apiClient from '../../api/client';
 import { compactCellSx, compactTableContainerSx, compactTableSx } from '../../utils/compactTable';
 
 /**
- * « Puis-je produire ? » (ADR 0011) : sélectionne une production, compare le besoin
- * au stock disponible (− réservé par les autres), liste les manques + quantités à
- * commander, et permet de clôturer un lot (nb réel de cartes → OUT auto).
+ * « Puis-je produire ? » (ADR 0011). Deux modes :
+ *  - autonome (onglet Stock) : menu déroulant de productions + clôture de lot.
+ *  - embarqué (Revue BOM) : `productionId` fixé → anticipation seule (pas de clôture).
+ *
+ * L'analyse s'appuie sur l'INVENTAIRE RÉEL (`ComponentStock`) moins le réservé — à ne
+ * pas confondre avec l'estimation de revue (bobine/sachet/tube) de « Composants et stock ».
  */
-function ProduceCheckPanel() {
+function ProduceCheckPanel({ productionId = null, productionMachineId = null }) {
+    const embedded = productionId != null;
+
     const [productions, setProductions] = React.useState([]);
-    const [selectedId, setSelectedId] = React.useState('');
+    const [selectedId, setSelectedId] = React.useState(embedded ? String(productionId) : '');
     const [report, setReport] = React.useState(null);
     const [runs, setRuns] = React.useState([]);
     const [boards, setBoards] = React.useState('');
@@ -35,28 +40,21 @@ function ProduceCheckPanel() {
     const [error, setError] = React.useState(null);
     const [feedback, setFeedback] = React.useState(null);
 
-    const selected = productions.find((p) => String(p.id) === String(selectedId)) || null;
+    const machineIdFor = React.useCallback((id) => {
+        if (embedded) return productionMachineId || 0;
+        const p = productions.find((x) => String(x.id) === String(id));
+        return (p && p.machine_id) || 0;
+    }, [embedded, productionMachineId, productions]);
 
-    React.useEffect(() => {
-        (async () => {
-            try {
-                const res = await apiClient.get('/marketplace/productions');
-                setProductions(res.data?.items || []);
-            } catch (err) {
-                setError(err?.response?.data?.detail || 'Impossible de charger les productions.');
-            }
-        })();
-    }, []);
-
-    const loadReport = React.useCallback(async (productionId) => {
-        if (!productionId) return;
+    const loadReport = React.useCallback(async (id) => {
+        if (!id) return;
         setLoading(true);
         setError(null);
         try {
-            const machineId = (productions.find((p) => String(p.id) === String(productionId)) || {}).machine_id || 0;
+            const machineId = machineIdFor(id);
             const [rep, runsRes] = await Promise.all([
-                apiClient.get(`/marketplace/stock/can-produce/${productionId}`),
-                apiClient.get(`/marketplace/machines/${machineId}/productions/${productionId}/runs`),
+                apiClient.get(`/marketplace/stock/can-produce/${id}`),
+                apiClient.get(`/marketplace/machines/${machineId}/productions/${id}/runs`),
             ]);
             setReport(rep.data);
             setRuns(Array.isArray(runsRes.data) ? runsRes.data : []);
@@ -66,7 +64,22 @@ function ProduceCheckPanel() {
         } finally {
             setLoading(false);
         }
-    }, [productions]);
+    }, [machineIdFor]);
+
+    React.useEffect(() => {
+        if (embedded) {
+            loadReport(productionId);
+            return;
+        }
+        (async () => {
+            try {
+                const res = await apiClient.get('/marketplace/productions');
+                setProductions(res.data?.items || []);
+            } catch (err) {
+                setError(err?.response?.data?.detail || 'Impossible de charger les productions.');
+            }
+        })();
+    }, [embedded, productionId, loadReport]);
 
     const onSelect = (event) => {
         const id = event.target.value;
@@ -77,27 +90,24 @@ function ProduceCheckPanel() {
     };
 
     const produce = async () => {
-        if (!selected) return;
+        if (!selectedId) return;
         try {
-            const machineId = selected.machine_id || 0;
             await apiClient.post(
-                `/marketplace/machines/${machineId}/productions/${selected.id}/produce`,
+                `/marketplace/machines/${machineIdFor(selectedId)}/productions/${selectedId}/produce`,
                 { boards_produced: Number(boards) || 0 },
             );
             setFeedback('Production clôturée : mouvements de sortie enregistrés.');
-            await loadReport(selected.id);
+            await loadReport(selectedId);
         } catch (err) {
             setError(err?.response?.data?.detail || 'Échec de la clôture de production.');
         }
     };
 
     const cancelRun = async (runId) => {
-        if (!selected) return;
         try {
-            const machineId = selected.machine_id || 0;
-            await apiClient.post(`/marketplace/machines/${machineId}/productions/${selected.id}/runs/${runId}/cancel`);
+            await apiClient.post(`/marketplace/machines/${machineIdFor(selectedId)}/productions/${selectedId}/runs/${runId}/cancel`);
             setFeedback('Lot annulé : sorties contre-passées.');
-            await loadReport(selected.id);
+            await loadReport(selectedId);
         } catch (err) {
             setError(err?.response?.data?.detail || 'Échec de l’annulation du lot.');
         }
@@ -108,19 +118,26 @@ function ProduceCheckPanel() {
             {error ? <Alert severity="error" onClose={() => setError(null)}>{error}</Alert> : null}
             {feedback ? <Alert severity="success" onClose={() => setFeedback(null)}>{feedback}</Alert> : null}
 
-            <TextField
-                select
-                size="small"
-                label="Production"
-                value={selectedId}
-                onChange={onSelect}
-                sx={{ maxWidth: 420 }}
-            >
-                <MenuItem value=""><em>Choisir une production…</em></MenuItem>
-                {productions.map((p) => (
-                    <MenuItem key={p.id} value={p.id}>{p.name} ({p.status})</MenuItem>
-                ))}
-            </TextField>
+            {embedded ? (
+                <Typography variant="body2" sx={{ color: '#a1a1aa' }}>
+                    Anticipation basée sur l’<strong>inventaire réel</strong> (− réservé par les autres
+                    productions) — distincte de l’estimation de revue ci-dessous.
+                </Typography>
+            ) : (
+                <TextField
+                    select
+                    size="small"
+                    label="Production"
+                    value={selectedId}
+                    onChange={onSelect}
+                    sx={{ maxWidth: 420 }}
+                >
+                    <MenuItem value=""><em>Choisir une production…</em></MenuItem>
+                    {productions.map((p) => (
+                        <MenuItem key={p.id} value={p.id}>{p.name} ({p.status})</MenuItem>
+                    ))}
+                </TextField>
+            )}
 
             {loading ? (
                 <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}><CircularProgress /></Box>
@@ -171,41 +188,44 @@ function ProduceCheckPanel() {
                         </Table>
                     </TableContainer>
 
-                    <Divider />
+                    {!embedded ? (
+                        <>
+                            <Divider />
+                            <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>Clôturer un lot de production</Typography>
+                            <Stack direction="row" spacing={1.5} alignItems="center" flexWrap="wrap" useFlexGap>
+                                <TextField
+                                    size="small"
+                                    type="number"
+                                    label="Nb réel de cartes produites"
+                                    value={boards}
+                                    onChange={(e) => setBoards(e.target.value)}
+                                    sx={{ maxWidth: 240 }}
+                                />
+                                <Button variant="contained" onClick={produce}>Clôturer / Produire</Button>
+                                <Typography variant="caption" sx={{ color: '#a1a1aa' }}>
+                                    Poste les sorties de stock (OUT) avec le coefficient de perte.
+                                </Typography>
+                            </Stack>
 
-                    <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>Clôturer un lot de production</Typography>
-                    <Stack direction="row" spacing={1.5} alignItems="center" flexWrap="wrap" useFlexGap>
-                        <TextField
-                            size="small"
-                            type="number"
-                            label="Nb réel de cartes produites"
-                            value={boards}
-                            onChange={(e) => setBoards(e.target.value)}
-                            sx={{ maxWidth: 240 }}
-                        />
-                        <Button variant="contained" onClick={produce}>Clôturer / Produire</Button>
-                        <Typography variant="caption" sx={{ color: '#a1a1aa' }}>
-                            Poste les sorties de stock (OUT) avec le coefficient de perte.
-                        </Typography>
-                    </Stack>
-
-                    {runs.length > 0 ? (
-                        <Stack spacing={0.5}>
-                            <Typography variant="caption" sx={{ color: '#a1a1aa' }}>Lots produits :</Typography>
-                            {runs.map((r) => (
-                                <Stack key={r.id} direction="row" spacing={1} alignItems="center">
-                                    <Chip
-                                        size="small"
-                                        variant="outlined"
-                                        color={r.is_cancelled ? 'default' : 'success'}
-                                        label={`#${r.id} — ${r.boards_produced} carte(s)${r.is_cancelled ? ' (annulé)' : ''}`}
-                                    />
-                                    {!r.is_cancelled ? (
-                                        <Button size="small" color="inherit" onClick={() => cancelRun(r.id)}>Annuler</Button>
-                                    ) : null}
+                            {runs.length > 0 ? (
+                                <Stack spacing={0.5}>
+                                    <Typography variant="caption" sx={{ color: '#a1a1aa' }}>Lots produits :</Typography>
+                                    {runs.map((r) => (
+                                        <Stack key={r.id} direction="row" spacing={1} alignItems="center">
+                                            <Chip
+                                                size="small"
+                                                variant="outlined"
+                                                color={r.is_cancelled ? 'default' : 'success'}
+                                                label={`#${r.id} — ${r.boards_produced} carte(s)${r.is_cancelled ? ' (annulé)' : ''}`}
+                                            />
+                                            {!r.is_cancelled ? (
+                                                <Button size="small" color="inherit" onClick={() => cancelRun(r.id)}>Annuler</Button>
+                                            ) : null}
+                                        </Stack>
+                                    ))}
                                 </Stack>
-                            ))}
-                        </Stack>
+                            ) : null}
+                        </>
                     ) : null}
                 </>
             ) : null}
