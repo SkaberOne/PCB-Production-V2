@@ -5,6 +5,39 @@
 
 ---
 
+## 2026-07-03 — Session 10 : Activation du stock + release 1.0.9 (déploiement atelier)
+
+### Contexte
+Déploiement atelier de l'inventaire stock (Phases 1-3, déjà mergées dans `main`, PR #26).
+Le flag `libraryStock` avait disparu de `client/client.env` lors d'une bascule de branche,
+ce qui masquait le menu **Stock** dans le build packagé alors que le backend n'exposait pas
+non plus les routes (backend embarqué périmé). Réactivation propre + release versionnée.
+
+### Changements
+- **`client/client.env`** : ajout de `REACT_APP_FEATURE_LIBRARY_STOCK=true`. Le flag est **baké
+  au build** (copié en `frontend/.env` par `CONSTRUIRE_CLIENT.bat`) ; le runtime
+  `window.__PCBFLOW_CONFIG__` n'étant pas câblé, l'activation passe **obligatoirement** par ce
+  flag d'environnement (sinon `libraryStock` reste à `false` → menu absent).
+- **Bump version 1.0.8 → 1.0.9** (`client/src/desktop/package.json`).
+
+### Déploiement
+- Backend embarqué reconstruit (`CONSTRUIRE_SERVEUR.bat` → routes stock présentes) puis
+  ré-embarqué dans le client (`CONSTRUIRE_CLIENT.bat`). Rappel : livrer un changement backend
+  au `.exe` impose de reconstruire le serveur **avant** le client.
+- App installée mise à jour en place (remplacement des fichiers de `Program Files`).
+
+### Validation (SQL Server / ECB_Production)
+- Test E2E : 2 productions / 2 machines partageant un composant — déclaration set-to, sortie OUT
+  avec coefficient de perte, réservation entre prods, engagé sur feeders, « Puis-je produire ? »
+  avec conflit de disponibilité (disponible négatif → manque + `can_produce=false`).
+- Cas ambigus : double déclaration idempotente, recomptage à la baisse, correction à total négatif
+  (statut « manque »), DNP exclu, décharge feeder à 0, et **index unique filtré** (`WHERE
+  is_reversed=0`) qui rejette bien un doublon actif sur SQL Server. 23/24 (le 24e = comportement
+  attendu : manque correctement détecté sur un composant non approvisionné). Données `TEST-`
+  intégralement nettoyées, tables revenues à l'état initial.
+
+---
+
 ## 2026-07-02 — Session 9 : Stock Phase 3 (stock engagé sur feeders)
 
 ### Contexte
