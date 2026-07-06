@@ -27,26 +27,43 @@ function resolveBaseUrl() {
     return process.env.REACT_APP_API_URL || 'http://localhost:8000/api';
 }
 
+// ── Clé API (mode web LAN) : saisie une fois par l'utilisateur, mémorisée dans
+// le navigateur (localStorage). Plus de clé bakée dans le build. ────────────────
+const API_KEY_STORAGE = 'pcbflow_api_key';
+
+export function getStoredApiKey() {
+    try {
+        return (typeof localStorage !== 'undefined' && localStorage.getItem(API_KEY_STORAGE)) || null;
+    } catch (e) {
+        return null;
+    }
+}
+
+export function setStoredApiKey(key) {
+    try {
+        if (key) localStorage.setItem(API_KEY_STORAGE, key);
+        else localStorage.removeItem(API_KEY_STORAGE);
+    } catch (e) { /* localStorage indispo — ignore */ }
+}
+
 function resolveApiKey() {
     // Clé X-API-Key injectée par Electron en mode packagé (auth obligatoire).
     if (typeof window !== 'undefined' && window.electronAPI
         && typeof window.electronAPI.getApiKey === 'function') {
         return window.electronAPI.getApiKey() || null;
     }
-    // Mode web LAN (build navigateur) : clé partagée bakée dans le build.
-    return process.env.REACT_APP_API_KEY || null;
+    // Mode web LAN : clé saisie par l'utilisateur (fenêtre ApiKeyGate) et mémorisée.
+    // Repli optionnel sur une clé de build si jamais fournie (par défaut absente).
+    return getStoredApiKey() || process.env.REACT_APP_API_KEY || null;
 }
 
 const BASE_URL = resolveBaseUrl();
-const API_KEY = resolveApiKey();
 
 const apiClient = axios.create({
     baseURL: BASE_URL,
     timeout: 30000,
     headers: {
         'Content-Type': 'application/json',
-        // En mode packagé, toutes les requêtes portent la clé de session.
-        ...(API_KEY ? { 'X-API-Key': API_KEY } : {}),
     },
 });
 
@@ -62,6 +79,9 @@ apiClient.interceptors.request.use(
     (config) => {
         _pendingRequests += 1;
         if (_pendingRequests === 1) _emit('api:loading:start');
+        // Clé injectée à chaque requête (reflète la dernière valeur mémorisée).
+        const key = resolveApiKey();
+        if (key) config.headers['X-API-Key'] = key;
         return config;
     },
     (error) => Promise.reject(error),
@@ -88,6 +108,8 @@ apiClient.interceptors.response.use(
             const status = error.response.status;
             const detail = error.response.data?.detail || error.response.statusText;
             console.error(`API error ${status}:`, detail);
+            // 401 : clé absente/invalide → demander (ou redemander) la clé d'accès.
+            if (status === 401) _emit('api:auth:required');
         } else if (error.request) {
             // Request sent but no response received — backend unreachable
             console.error('API unreachable — no response received:', error.message);
