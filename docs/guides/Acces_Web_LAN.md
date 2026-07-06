@@ -30,20 +30,25 @@ Collègue (navigateur)  ─HTTP :8000─▶  Poste serveur (backend + build web)
    ```
 
 4. **Côté collègue** : ouvrir `http://<nom-ou-IP-du-poste>:8000/` dans le navigateur.
+   À la **première visite**, une petite fenêtre demande la **clé d'accès**. Une fois
+   saisie, elle est **mémorisée sur son navigateur** (localStorage) : il ne la ressaisit
+   plus, il a accès en permanence.
 
-## Clé API partagée
+## Clé d'accès
 
-La clé doit être **identique** aux deux endroits :
-- `client\web.env` → `REACT_APP_API_KEY`
-- `serveur\DEMARRER_SERVEUR_WEB.bat` → `set API_KEY`
+La clé n'est **plus** incluse dans le build. Elle est définie **uniquement côté serveur** :
+- `serveur\DEMARRER_SERVEUR_WEB.bat` → `set "API_KEY=..."`
 
-Pour la changer : modifier les deux, puis **reconstruire le build web** (la clé est
-bakée dans le JS) et relancer le serveur.
+Le collègue la saisit une fois dans la fenêtre d'accès (elle est fournie par
+l'administrateur). Si la clé serveur change, chaque collègue devra la ressaisir à la
+prochaine requête (le serveur renvoie 401 → la fenêtre réapparaît).
 
-⚠️ **Portée sécurité** : la clé est incluse dans le JavaScript du build → c'est une
-**barrière d'accès basique** (évite l'usage accidentel), **pas un secret fort** ni une
-authentification par utilisateur. À réserver à un **LAN interne de confiance** — ne pas
-exposer sur Internet.
+Détails techniques : le client lit la clé dans `localStorage` (`pcbflow_api_key`) et
+l'envoie en en-tête `X-API-Key` ; sur un 401, la fenêtre de saisie se ré-affiche.
+
+⚠️ **Portée sécurité** : clé **partagée** (la même pour tout le monde), pas
+d'utilisateurs individuels. C'est une **barrière d'accès** adaptée à un **LAN interne de
+confiance** — ne pas exposer sur Internet.
 
 ## Ce que ça ne change PAS
 
