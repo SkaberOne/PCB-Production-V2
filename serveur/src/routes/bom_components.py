@@ -11,10 +11,14 @@ from fastapi import APIRouter, Depends, File, HTTPException, Query, Response, Up
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from sqlalchemy import asc, desc, func, or_
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, joinedload
 
 from ..database import utcnow
 from ..models.bom import Component, ComponentTypeRule, FootprintMapping, MachineFootprintRule
+from ..models.commands import PlanAssignment, SupplierOffer
+from ..models.machines import PnpManualPlacement, PnpSlotPin
+from ..models.stock import ComponentMachineLoad, ComponentStock, StockMovement
 from ..utils.uploads import read_upload_capped
 from ..schemas.bom import (
     ComponentLibraryImportResponse,
@@ -362,6 +366,94 @@ def patch_component(component_id: int, patch: ComponentPatchSchema, db: Session 
     db.commit()
     db.refresh(db_component)
     return _serialize_component(db_component)
+
+
+# Tables portant une FK vers COMPONENTS.id (label UI -> modèle). Sert au comptage
+# des références avant suppression et à la cascade optionnelle (force=true).
+_COMPONENT_REFERENCE_TABLES = (
+    ("stock", ComponentStock),
+    ("movements", StockMovement),
+    ("machine_loads", ComponentMachineLoad),
+    ("offers", SupplierOffer),
+    ("plan_assignments", PlanAssignment),
+    ("slot_pins", PnpSlotPin),
+    ("manual_placements", PnpManualPlacement),
+)
+
+
+def _count_component_references(db: Session, component_id: int) -> dict:
+    """Nombre de lignes liées par table (seules les non-nulles sont retournées)."""
+    refs = {}
+    for label, model in _COMPONENT_REFERENCE_TABLES:
+        count = (
+            db.query(func.count())
+            .select_from(model)
+            .filter(model.component_id == component_id)
+            .scalar()
+            or 0
+        )
+        if count:
+            refs[label] = int(count)
+    return refs
+
+
+@router.delete("/components/{component_id}")
+def delete_component(
+    component_id: int,
+    force: bool = Query(False, description="Supprime aussi les données liées (stock, offres, placements…)"),
+    db: Session = Depends(get_db),
+):
+    """Supprime un composant de la bibliothèque (nettoyage de doublons).
+
+    - Aucune référence : suppression directe.
+    - Références présentes et ``force=false`` : HTTP 409 avec le détail des usages
+      (le front propose alors « Supprimer quand même »).
+    - ``force=true`` : supprime d'abord les lignes liées puis le composant.
+    """
+    component = db.query(Component).filter(Component.id == component_id).first()
+    if not component:
+        raise HTTPException(status_code=404, detail="Composant introuvable")
+
+    references = _count_component_references(db, component_id)
+    if references and not force:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "message": "Composant référencé — suppression bloquée.",
+                "references": references,
+            },
+        )
+
+    cascaded = {}
+    reference = component.reference
+    try:
+        if references:
+            for label, model in _COMPONENT_REFERENCE_TABLES:
+                removed = (
+                    db.query(model)
+                    .filter(model.component_id == component_id)
+                    .delete(synchronize_session=False)
+                )
+                if removed:
+                    cascaded[label] = int(removed)
+        db.delete(component)
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "message": "Suppression impossible : le composant est encore référencé par d'autres données.",
+                "references": _count_component_references(db, component_id),
+            },
+        )
+
+    return {
+        "deleted": True,
+        "component_id": component_id,
+        "reference": reference,
+        "cascaded": cascaded,
+    }
 
 
 @router.post("/components/types/refresh", response_model=ComponentTypeRefreshResponse)
