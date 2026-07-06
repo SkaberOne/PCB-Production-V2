@@ -138,6 +138,13 @@ class Settings(BaseSettings):
         "http://127.0.0.1:5173",
     ]
 
+    # Accès web LAN : dossier du build React à servir par le backend (mode serveur
+    # partagé, un seul port sert l'UI + l'API). Vide par défaut → le backend reste
+    # une API pure (dev / app packagée). Défini via l'env WEB_STATIC_DIR par
+    # DEMARRER_SERVEUR_WEB.bat. Le frontend web appelle /api (même origine) → pas
+    # de CORS. Combiner avec API_KEY pour exiger la clé partagée X-API-Key.
+    web_static_dir: Optional[str] = None
+
     # Supplier APIs
     # Farnell / element14 Product Search API (REST). Inactive until api_key is set.
     farnell_api_url: Optional[str] = None
