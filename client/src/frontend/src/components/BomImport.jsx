@@ -1355,6 +1355,40 @@ function BomImport({ showVisualizationAction = true }) {
                         warnings={result.warnings || []}
                         errors={result.errors || []}
                     />
+                    <BomImportResolutionDialogs
+                        result={result}
+                        isBatchResolutionMode={isBatchResolutionMode}
+                        currentMissingComponentGroup={currentMissingComponentGroup}
+                        componentResolutionPaused={componentResolutionPaused}
+                        componentResolutionLoading={componentResolutionLoading}
+                        updateWorkspace={updateWorkspace}
+                        componentResolutionName={componentResolutionName}
+                        setComponentResolutionName={setComponentResolutionName}
+                        componentResolutionError={componentResolutionError}
+                        handleResolveMissingComponents={handleResolveMissingComponents}
+                        missingComponentGroups={missingComponentGroups}
+                        currentMissingFootprintGroup={currentMissingFootprintGroup}
+                        footprintResolutionPaused={footprintResolutionPaused}
+                        footprintResolutionLoading={footprintResolutionLoading}
+                        footprintResolutionValue={footprintResolutionValue}
+                        setFootprintResolutionValue={setFootprintResolutionValue}
+                        footprintResolutionError={footprintResolutionError}
+                        handleResolveMissingFootprints={handleResolveMissingFootprints}
+                        batchComponentResolutionPaused={batchComponentResolutionPaused}
+                        batchMissingComponentGroups={batchMissingComponentGroups}
+                        pauseBatchResolution={pauseBatchResolution}
+                        componentBatchDrafts={componentBatchDrafts}
+                        setComponentBatchDrafts={setComponentBatchDrafts}
+                        handleDeleteBatchMissingComponentGroup={handleDeleteBatchMissingComponentGroup}
+                        handleResolveBatchMissingComponents={handleResolveBatchMissingComponents}
+                        currentBatchMissingComponentGroup={currentBatchMissingComponentGroup}
+                        batchFootprintResolutionPaused={batchFootprintResolutionPaused}
+                        currentBatchMissingFootprintGroup={currentBatchMissingFootprintGroup}
+                        batchMissingFootprintGroups={batchMissingFootprintGroups}
+                        footprintBatchDrafts={footprintBatchDrafts}
+                        setFootprintBatchDrafts={setFootprintBatchDrafts}
+                        handleResolveBatchMissingFootprints={handleResolveBatchMissingFootprints}
+                    />
                     <BomImportPreviewCard
                         effectivePreviewScope={effectivePreviewScope}
                         previewMode={previewMode}
