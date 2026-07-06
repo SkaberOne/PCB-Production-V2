@@ -43,6 +43,21 @@ class SetReceiptRequest(BaseModel):
     qty_received: int = Field(..., ge=0)
 
 
+class SetLineDetailRequest(BaseModel):
+    """Complétion manuelle d'une ligne de commande (popup page Commande)."""
+
+    line_key: str = Field(..., min_length=1, max_length=300)
+    mpn: Optional[str] = Field(default=None, max_length=200)
+    quantity_to_order: Optional[int] = Field(default=None, ge=0)
+    note: Optional[str] = Field(default=None, max_length=1000)
+    supplier: Optional[str] = Field(default=None, max_length=80)
+    supplier_part: Optional[str] = Field(default=None, max_length=200)
+    unit_price: Optional[float] = Field(default=None, ge=0)
+    currency: Optional[str] = Field(default=None, max_length=8)
+    product_url: Optional[str] = Field(default=None, max_length=2000)
+    component_library_id: Optional[int] = Field(default=None, gt=0)
+
+
 class CreateProductionRequest(BaseModel):
     name: str = Field(..., min_length=1, max_length=200)
     machine_id: Optional[int] = Field(default=None, gt=0)

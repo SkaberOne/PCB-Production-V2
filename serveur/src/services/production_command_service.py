@@ -12,7 +12,8 @@ from typing import Dict, List, Optional
 
 from sqlalchemy.orm import Session
 
-from ..models.commands import Command, CommandItem, CommandReceipt
+from ..models.bom import Component
+from ..models.commands import Command, CommandItem, CommandLineDetail, CommandReceipt
 from ..models.production import Production
 from .command_service import CommandService
 from .stock_service import StockService
@@ -166,11 +167,126 @@ class ProductionCommandService:
             qty=receipt.qty_received,
         )
 
+    # -------------------------------------------------- manual line completion
+    @staticmethod
+    def get_line_details(db: Session, command_id: int) -> Dict[str, CommandLineDetail]:
+        rows = (
+            db.query(CommandLineDetail)
+            .filter(CommandLineDetail.command_id == command_id)
+            .all()
+        )
+        return {row.line_key: row for row in rows}
+
+    @staticmethod
+    def _detail_to_offer(detail: CommandLineDetail) -> Optional[Dict]:
+        """Expose the manual supplier offer as an offer dict, or None if empty."""
+        if not (
+            (detail.manual_supplier or "").strip()
+            or detail.manual_unit_price is not None
+            or (detail.manual_product_url or "").strip()
+            or (detail.manual_supplier_part or "").strip()
+        ):
+            return None
+        return {
+            "supplier": (detail.manual_supplier or "").strip() or None,
+            "supplier_part": (detail.manual_supplier_part or "").strip() or None,
+            "unit_price": detail.manual_unit_price,
+            "currency": (detail.manual_currency or "").strip() or "EUR",
+            "product_url": (detail.manual_product_url or "").strip() or None,
+            "manual": True,
+        }
+
+    @classmethod
+    def set_line_detail(
+        cls,
+        db: Session,
+        command_id: int,
+        line_key: str,
+        *,
+        mpn: Optional[str] = None,
+        quantity_to_order: Optional[int] = None,
+        note: Optional[str] = None,
+        supplier: Optional[str] = None,
+        supplier_part: Optional[str] = None,
+        unit_price: Optional[float] = None,
+        currency: Optional[str] = None,
+        product_url: Optional[str] = None,
+        component_library_id: Optional[int] = None,
+    ) -> Dict:
+        """Upsert the manual completion of one command line and return the summary.
+
+        The MPN is written on the library component (COMPONENTS, library-wide) when a
+        ``component_library_id`` is known; otherwise it is stored as a per-line
+        fallback (``manual_mpn``). Quantity/note/manual-offer are always per-line.
+        """
+        row = (
+            db.query(CommandLineDetail)
+            .filter(
+                CommandLineDetail.command_id == command_id,
+                CommandLineDetail.line_key == line_key,
+            )
+            .first()
+        )
+        if row is None:
+            row = CommandLineDetail(command_id=command_id, line_key=line_key)
+            db.add(row)
+
+        # Quantité à commander : None efface l'override (revient à la valeur calculée).
+        if quantity_to_order is None:
+            row.quantity_to_order = None
+        else:
+            row.quantity_to_order = max(int(quantity_to_order), 0)
+
+        row.note = (note or "").strip() or None
+
+        # Offre fournisseur manuelle
+        row.manual_supplier = (supplier or "").strip() or None
+        row.manual_supplier_part = (supplier_part or "").strip() or None
+        row.manual_unit_price = unit_price if unit_price is not None else None
+        row.manual_currency = (currency or "").strip() or None
+        row.manual_product_url = (product_url or "").strip() or None
+
+        # MPN : biblio si composant connu, sinon repli par ligne.
+        clean_mpn = (mpn or "").strip()
+        if clean_mpn and component_library_id:
+            component = (
+                db.query(Component)
+                .filter(Component.id == component_library_id)
+                .first()
+            )
+            if component is not None:
+                component.mpn = clean_mpn
+            row.manual_mpn = None
+        else:
+            row.manual_mpn = clean_mpn or None
+
+        db.commit()
+        return cls.summary_with_receipts(db, command_id)
+
     @classmethod
     def summary_with_receipts(cls, db: Session, command_id: int) -> Dict:
         summary = CommandService.get_command_summary(db=db, command_id=command_id)
         receipts = cls.get_receipts(db, command_id)
+        details = cls.get_line_details(db, command_id)
         for line in summary.get("aggregated_components", []):
-            line["qty_received"] = receipts.get(line.get("key"), 0)
+            key = line.get("key")
+            line["qty_received"] = receipts.get(key, 0)
+
+            detail = details.get(key)
+            if detail is None:
+                line["note"] = ""
+                line["quantity_to_order_override"] = None
+                line["manual_offer"] = None
+                continue
+
+            line["note"] = detail.note or ""
+            line["quantity_to_order_override"] = detail.quantity_to_order
+            line["manual_offer"] = cls._detail_to_offer(detail)
+            # MPN de repli quand la biblio n'en fournit pas.
+            if not (line.get("component_mpn") or "").strip() and detail.manual_mpn:
+                line["component_mpn"] = detail.manual_mpn
+                if not (line.get("component_name") or "").strip() or line.get("component_name") == line.get("value"):
+                    line["component_name"] = detail.manual_mpn
+
         summary["command_id"] = command_id
         return summary
