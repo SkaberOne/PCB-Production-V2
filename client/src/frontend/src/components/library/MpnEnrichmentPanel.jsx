@@ -3,23 +3,21 @@ import apiClient, { extractApiError } from '../../api/client';
 import FactCheckRoundedIcon from '@mui/icons-material/FactCheckRounded';
 import TravelExploreRoundedIcon from '@mui/icons-material/TravelExploreRounded';
 import OpenInNewRoundedIcon from '@mui/icons-material/OpenInNewRounded';
+import SearchRoundedIcon from '@mui/icons-material/SearchRounded';
 import {
     Alert,
     Box,
     Button,
     Card,
     CardContent,
+    Checkbox,
     Chip,
     CircularProgress,
+    FormControlLabel,
     IconButton,
+    InputAdornment,
     MenuItem,
     Stack,
-    Table,
-    TableBody,
-    TableCell,
-    TableContainer,
-    TableHead,
-    TableRow,
     TextField,
     Tooltip,
     Typography,
@@ -44,6 +42,27 @@ const LIVE_CHUNK = 25;
 const LIVE_PAUSE_MS = 1200; // brief pause between chunks to ease Mouser's ~30/min quota
 const LIVE_TIMEOUT_MS = 120000; // per-chunk timeout override (a chunk can still be slow)
 
+// ── Recherche fournisseurs (liens ouverts dans le navigateur, sans quota API) ──
+// Le terme recherché est le MPN saisi si présent, sinon value + package.
+const SUPPLIER_LINKS = [
+    { key: 'mouser', label: 'Mouser', url: (q) => `https://www.mouser.fr/c/?q=${q}` },
+    { key: 'digikey', label: 'Digi-Key', url: (q) => `https://www.digikey.fr/en/products/result?keywords=${q}` },
+    { key: 'farnell', label: 'Farnell', url: (q) => `https://fr.farnell.com/search?st=${q}` },
+    { key: 'octopart', label: 'Octopart', url: (q) => `https://octopart.com/search?q=${q}` },
+];
+
+// Détection d'un passif générique (résistance/condensateur/inductance à valeur
+// standard) : sert au filtre « masquer passifs génériques ». Heuristique volontairement
+// simple, alignée sur la fenêtre de complétion utilisée dans le chat.
+function isGenericPassiveValue(value) {
+    const t = (value || '').trim();
+    if (!t) return false;
+    if (/^\d+(\.\d+)?\s*[rkm]\d*$/i.test(t)) return true; // 10K, 4K7, 0R, 100R, 3M32
+    if (/^\d+(\.\d+)?\s*(nf|uf|pf|µf|nh|uh|mh)(\s*\/.*)?$/i.test(t)) return true; // 100nF, 10uF/50V
+    if (/^\d+(\.\d+)?\s*ohm\b/i.test(t)) return true;
+    return false;
+}
+
 function computeCounts(items) {
     return (items || []).reduce(
         (acc, p) => {
@@ -56,6 +75,15 @@ function computeCounts(items) {
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
+function openSupplierSearch(urlBuilder, term) {
+    const q = encodeURIComponent((term || '').trim());
+    if (!q) return;
+    const url = urlBuilder(q);
+    if (typeof window !== 'undefined' && typeof window.open === 'function') {
+        window.open(url, '_blank', 'noopener,noreferrer');
+    }
+}
+
 function MpnEnrichmentPanel() {
     const [proposals, setProposals] = React.useState([]);
     const [counts, setCounts] = React.useState({ high: 0, medium: 0, manual: 0 });
@@ -65,6 +93,12 @@ function MpnEnrichmentPanel() {
     const [batchBusy, setBatchBusy] = React.useState(false);
     const [feedback, setFeedback] = React.useState(null); // { severity, message }
     const [limit, setLimit] = React.useState(DEFAULT_LIMIT);
+
+    // ── Filtres client (comme la fenêtre du chat) ────────────────────────────────
+    const [query, setQuery] = React.useState('');
+    const [typeFilter, setTypeFilter] = React.useState('');
+    const [hideGeneric, setHideGeneric] = React.useState(false);
+    const [onlyTodo, setOnlyTodo] = React.useState(false);
 
     const initRows = React.useCallback((items) => {
         const next = {};
@@ -244,22 +278,49 @@ function MpnEnrichmentPanel() {
         (p) => p.confidence === 'high' && rows[p.component_id]?.status === 'pending',
     ).length;
 
+    // Types présents (pour le filtre) — dérivés des propositions chargées.
+    const typeOptions = React.useMemo(() => {
+        const set = new Set();
+        proposals.forEach((p) => { if (p.component_type) set.add(p.component_type); });
+        return Array.from(set).sort();
+    }, [proposals]);
+
+    // Application des filtres client (recherche, type, passifs, à valider).
+    const visibleProposals = React.useMemo(() => {
+        const q = query.trim().toLowerCase();
+        return proposals.filter((p) => {
+            const row = rows[p.component_id] || {};
+            if (q) {
+                const hay = `${p.value || ''} ${p.reference || ''} ${p.package || ''} ${p.component_type || ''} ${p.proposed_mpn || ''} ${p.manufacturer || ''}`.toLowerCase();
+                if (!hay.includes(q)) return false;
+            }
+            if (typeFilter && p.component_type !== typeFilter) return false;
+            if (hideGeneric && p.confidence !== 'high' && isGenericPassiveValue(p.value)) return false;
+            if (onlyTodo && (row.status === 'applied' || row.status === 'rejected')) return false;
+            return true;
+        });
+    }, [proposals, rows, query, typeFilter, hideGeneric, onlyTodo]);
+
+    const appliedCount = React.useMemo(
+        () => Object.values(rows).filter((r) => r?.status === 'applied').length,
+        [rows],
+    );
+
     return (
         <Card sx={{ backgroundColor: '#18181b', border: '1px solid #1f2937' }}>
             <CardContent>
                 <Stack spacing={2.5}>
-                    <Stack direction={{ xs: 'column', md: 'row' }} spacing={1.5} alignItems={{ xs: 'stretch', md: 'center' }}>
-                        <Stack direction="row" spacing={1.5} alignItems="center" sx={{ flexGrow: 1 }}>
-                            <FactCheckRoundedIcon sx={{ color: '#10b981' }} />
-                            <Box>
-                                <Typography variant="h6">Enrichissement des MPN</Typography>
-                                <Typography variant="body2" sx={{ color: '#a1a1aa' }}>
-                                    Complète les MPN manquants de la bibliothèque pour fiabiliser la recherche prix/dispo. Rien n'est écrit sans validation ; un MPN existant n'est jamais écrasé.
-                                </Typography>
-                            </Box>
-                        </Stack>
+                    <Stack direction="row" spacing={1.5} alignItems="center">
+                        <FactCheckRoundedIcon sx={{ color: '#10b981' }} />
+                        <Box>
+                            <Typography variant="h6">Enrichissement des MPN</Typography>
+                            <Typography variant="body2" sx={{ color: '#a1a1aa' }}>
+                                Complète les MPN manquants de la bibliothèque pour fiabiliser la recherche prix/dispo. Rien n'est écrit sans validation ; un MPN existant n'est jamais écrasé.
+                            </Typography>
+                        </Box>
                     </Stack>
 
+                    {/* Actions : chargement + recherche en ligne + validation en lot */}
                     <Stack direction={{ xs: 'column', md: 'row' }} spacing={1.5} alignItems={{ xs: 'stretch', md: 'center' }}>
                         <Button variant="outlined" onClick={() => load(false)} disabled={loading || searchingLive}>
                             {loading ? 'Chargement...' : 'Charger (cache)'}
@@ -292,8 +353,52 @@ function MpnEnrichmentPanel() {
                         </Button>
                     </Stack>
 
+                    {/* Filtres client (visibles seulement quand il y a des propositions) */}
                     {proposals.length ? (
-                        <Stack direction="row" spacing={1}>
+                        <Stack direction={{ xs: 'column', md: 'row' }} spacing={1.5} alignItems={{ xs: 'stretch', md: 'center' }} flexWrap="wrap" useFlexGap>
+                            <TextField
+                                size="small"
+                                placeholder="Filtrer par value, MPN, boîtier…"
+                                value={query}
+                                onChange={(e) => setQuery(e.target.value)}
+                                sx={{ flexGrow: 1, minWidth: 200 }}
+                                InputProps={{
+                                    startAdornment: (
+                                        <InputAdornment position="start">
+                                            <SearchRoundedIcon fontSize="small" sx={{ color: '#71717a' }} />
+                                        </InputAdornment>
+                                    ),
+                                }}
+                            />
+                            <TextField
+                                select
+                                size="small"
+                                label="Type"
+                                value={typeFilter}
+                                onChange={(e) => setTypeFilter(e.target.value)}
+                                sx={{ minWidth: 150 }}
+                            >
+                                <MenuItem value="">Tous types</MenuItem>
+                                {typeOptions.map((t) => (
+                                    <MenuItem key={t} value={t}>{t}</MenuItem>
+                                ))}
+                            </TextField>
+                            <FormControlLabel
+                                control={<Checkbox size="small" checked={hideGeneric} onChange={(e) => setHideGeneric(e.target.checked)} />}
+                                label={<Typography variant="body2" sx={{ color: '#a1a1aa' }}>masquer passifs génériques</Typography>}
+                            />
+                            <FormControlLabel
+                                control={<Checkbox size="small" checked={onlyTodo} onChange={(e) => setOnlyTodo(e.target.checked)} />}
+                                label={<Typography variant="body2" sx={{ color: '#a1a1aa' }}>seulement à valider</Typography>}
+                            />
+                        </Stack>
+                    ) : null}
+
+                    {/* Compteurs : affichés / validés + répartition par confiance */}
+                    {proposals.length ? (
+                        <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+                            <Chip size="small" variant="outlined" label={`Affichés : ${visibleProposals.length}`} sx={{ borderColor: '#3f3f46', color: '#e4e4e7' }} />
+                            <Chip size="small" variant="outlined" label={`Validés : ${appliedCount}`} sx={{ borderColor: '#10b981', color: '#10b981' }} />
                             {['high', 'medium', 'manual'].map((tier) => (
                                 <Chip
                                     key={tier}
@@ -313,101 +418,124 @@ function MpnEnrichmentPanel() {
                     ) : null}
 
                     {proposals.length ? (
-                        <TableContainer sx={{ maxHeight: 460, overflowY: 'auto' }}>
-                            <Table stickyHeader size="small">
-                                <TableHead>
-                                    <TableRow>
-                                        <TableCell sx={{ width: '6%' }}>Conf.</TableCell>
-                                        <TableCell sx={{ width: '14%' }}>Référence</TableCell>
-                                        <TableCell sx={{ width: '12%' }}>Value</TableCell>
-                                        <TableCell sx={{ width: '10%' }}>Package</TableCell>
-                                        <TableCell sx={{ width: '30%' }}>MPN proposé</TableCell>
-                                        <TableCell sx={{ width: '14%' }}>Fournisseur</TableCell>
-                                        <TableCell sx={{ width: '14%' }}>Action</TableCell>
-                                    </TableRow>
-                                </TableHead>
-                                <TableBody>
-                                    {proposals.map((p) => {
-                                        const meta = CONFIDENCE_META[p.confidence] || CONFIDENCE_META.manual;
-                                        const row = rows[p.component_id] || { mpn: '', status: 'pending', busy: false };
-                                        const applied = row.status === 'applied';
-                                        const rejected = row.status === 'rejected';
-                                        const hasCandidates = (p.candidates || []).length > 1;
-                                        return (
-                                            <TableRow key={p.component_id} sx={{ opacity: applied || rejected ? 0.5 : 1 }}>
-                                                <TableCell>
-                                                    <Tooltip title={meta.help}>
-                                                        <Chip size="small" label={meta.label} sx={{ backgroundColor: meta.color, color: '#0a0a0a', fontWeight: 600 }} />
+                        <Stack spacing={1.25}>
+                            {visibleProposals.map((p) => {
+                                const meta = CONFIDENCE_META[p.confidence] || CONFIDENCE_META.manual;
+                                const row = rows[p.component_id] || { mpn: '', status: 'pending', busy: false };
+                                const applied = row.status === 'applied';
+                                const rejected = row.status === 'rejected';
+                                const hasCandidates = (p.candidates || []).length > 1;
+                                const searchTerm = (row.mpn || '').trim()
+                                    || `${p.value || ''}${p.package ? ` ${p.package}` : ''}`;
+                                const prefilled = Boolean(p.proposed_mpn);
+                                return (
+                                    <Box
+                                        key={p.component_id}
+                                        sx={{
+                                            border: '1px solid',
+                                            borderColor: applied ? '#10b981' : '#1f2937',
+                                            backgroundColor: applied ? '#0e1b16' : '#141417',
+                                            borderRadius: 2,
+                                            p: 1.5,
+                                            opacity: rejected ? 0.5 : 1,
+                                        }}
+                                    >
+                                        {/* En-tête : value + type + package + confiance */}
+                                        <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap sx={{ mb: 1 }}>
+                                            <Typography sx={{ fontWeight: 600, fontSize: 15 }}>{p.value || '—'}</Typography>
+                                            {p.component_type ? (
+                                                <Chip size="small" label={p.component_type} sx={{ backgroundColor: '#1c1c1f', color: '#a1a1aa' }} />
+                                            ) : null}
+                                            {p.package ? (
+                                                <Chip size="small" label={p.package} sx={{ backgroundColor: '#1c1c1f', color: '#a1a1aa' }} />
+                                            ) : null}
+                                            <Tooltip title={meta.help}>
+                                                <Chip
+                                                    size="small"
+                                                    label={prefilled ? `pré-rempli · ${meta.label}` : `à chercher · ${meta.label}`}
+                                                    sx={{ backgroundColor: meta.color, color: '#0a0a0a', fontWeight: 600 }}
+                                                />
+                                            </Tooltip>
+                                            <Box sx={{ flexGrow: 1 }} />
+                                            <Typography variant="caption" sx={{ color: '#52525b' }}>
+                                                {p.reference} · #{p.component_id}
+                                            </Typography>
+                                        </Stack>
+
+                                        {applied ? (
+                                            <Chip size="small" color="success" variant="outlined" label={`Appliqué : ${row.mpn}`} />
+                                        ) : (
+                                            <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap>
+                                                {/* Boutons de recherche fournisseurs (ouvrent le navigateur) */}
+                                                {SUPPLIER_LINKS.map((s) => (
+                                                    <Button
+                                                        key={s.key}
+                                                        size="small"
+                                                        variant="outlined"
+                                                        color="inherit"
+                                                        sx={{ minWidth: 0, px: 1, borderColor: '#2b3444', color: '#d4d4d8' }}
+                                                        onClick={() => openSupplierSearch(s.url, searchTerm)}
+                                                    >
+                                                        {s.label}
+                                                    </Button>
+                                                ))}
+                                                {hasCandidates ? (
+                                                    <TextField
+                                                        select
+                                                        size="small"
+                                                        value=""
+                                                        onChange={(e) => updateRow(p.component_id, { mpn: e.target.value })}
+                                                        sx={{ width: 56 }}
+                                                        SelectProps={{ displayEmpty: true, renderValue: () => '⋮' }}
+                                                    >
+                                                        {(p.candidates || []).map((c) => (
+                                                            <MenuItem key={c.mpn} value={c.mpn}>
+                                                                {c.mpn} — {c.manufacturer || '?'}{(c.stock_qty || 0) > 0 ? ' ✓' : ''}
+                                                            </MenuItem>
+                                                        ))}
+                                                    </TextField>
+                                                ) : null}
+                                                <TextField
+                                                    size="small"
+                                                    placeholder="Saisir / coller un MPN"
+                                                    value={row.mpn}
+                                                    onChange={(e) => updateRow(p.component_id, { mpn: e.target.value })}
+                                                    sx={{ flexGrow: 1, minWidth: 140 }}
+                                                />
+                                                {p.product_url ? (
+                                                    <Tooltip title={`Voir sur ${p.supplier || 'fournisseur'}`}>
+                                                        <IconButton size="small" component="a" href={p.product_url} target="_blank" rel="noopener noreferrer">
+                                                            <OpenInNewRoundedIcon fontSize="inherit" />
+                                                        </IconButton>
                                                     </Tooltip>
-                                                </TableCell>
-                                                <TableCell>{p.reference}</TableCell>
-                                                <TableCell>{p.value}</TableCell>
-                                                <TableCell>{p.package || '—'}</TableCell>
-                                                <TableCell>
-                                                    {applied ? (
-                                                        <Chip size="small" color="success" variant="outlined" label={`Appliqué : ${row.mpn}`} />
-                                                    ) : (
-                                                        <Stack direction="row" spacing={1} alignItems="center">
-                                                            {hasCandidates ? (
-                                                                <TextField
-                                                                    select
-                                                                    size="small"
-                                                                    value=""
-                                                                    onChange={(e) => updateRow(p.component_id, { mpn: e.target.value })}
-                                                                    sx={{ width: 56 }}
-                                                                    SelectProps={{ displayEmpty: true, renderValue: () => '⋮' }}
-                                                                >
-                                                                    {(p.candidates || []).map((c) => (
-                                                                        <MenuItem key={c.mpn} value={c.mpn}>
-                                                                            {c.mpn} — {c.manufacturer || '?'}{(c.stock_qty || 0) > 0 ? ' ✓' : ''}
-                                                                        </MenuItem>
-                                                                    ))}
-                                                                </TextField>
-                                                            ) : null}
-                                                            <TextField
-                                                                size="small"
-                                                                fullWidth
-                                                                placeholder="Saisir / coller un MPN"
-                                                                value={row.mpn}
-                                                                onChange={(e) => updateRow(p.component_id, { mpn: e.target.value })}
-                                                            />
-                                                        </Stack>
-                                                    )}
-                                                </TableCell>
-                                                <TableCell>
-                                                    <Stack direction="row" spacing={0.5} alignItems="center">
-                                                        <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-                                                            {p.supplier || '—'}
-                                                        </Typography>
-                                                        {p.product_url ? (
-                                                            <IconButton size="small" component="a" href={p.product_url} target="_blank" rel="noopener noreferrer">
-                                                                <OpenInNewRoundedIcon fontSize="inherit" />
-                                                            </IconButton>
-                                                        ) : null}
-                                                    </Stack>
-                                                </TableCell>
-                                                <TableCell>
-                                                    {applied || rejected ? (
-                                                        <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-                                                            {applied ? 'Validé' : 'Ignoré'}
-                                                        </Typography>
-                                                    ) : (
-                                                        <Stack direction="row" spacing={0.5}>
-                                                            <Button size="small" variant="contained" onClick={() => applyOne(p.component_id)} disabled={row.busy || !row.mpn?.trim()}>
-                                                                {row.busy ? '...' : 'Valider'}
-                                                            </Button>
-                                                            <Button size="small" variant="text" color="inherit" onClick={() => updateRow(p.component_id, { status: 'rejected' })}>
-                                                                Ignorer
-                                                            </Button>
-                                                        </Stack>
-                                                    )}
-                                                </TableCell>
-                                            </TableRow>
-                                        );
-                                    })}
-                                </TableBody>
-                            </Table>
-                        </TableContainer>
+                                                ) : null}
+                                                <Button
+                                                    size="small"
+                                                    variant="contained"
+                                                    onClick={() => applyOne(p.component_id)}
+                                                    disabled={row.busy || !row.mpn?.trim()}
+                                                >
+                                                    {row.busy ? '...' : 'Valider'}
+                                                </Button>
+                                                <Button
+                                                    size="small"
+                                                    variant="text"
+                                                    color="inherit"
+                                                    onClick={() => updateRow(p.component_id, { status: rejected ? 'pending' : 'rejected' })}
+                                                >
+                                                    {rejected ? 'Rétablir' : 'Ignorer'}
+                                                </Button>
+                                            </Stack>
+                                        )}
+                                    </Box>
+                                );
+                            })}
+                            {visibleProposals.length === 0 ? (
+                                <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+                                    Aucun composant ne correspond aux filtres.
+                                </Typography>
+                            ) : null}
+                        </Stack>
                     ) : (
                         <Typography variant="body2" sx={{ color: 'text.secondary' }}>
                             Clique sur « Charger (cache) » pour lister les composants au MPN vide, puis « Rechercher en ligne » pour interroger les fournisseurs par lot.
