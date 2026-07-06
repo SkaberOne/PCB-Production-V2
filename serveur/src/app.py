@@ -9,6 +9,7 @@ from contextlib import asynccontextmanager
 from fastapi import Depends, FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 
 from .auth import require_api_key
 from .config import settings
@@ -120,16 +121,30 @@ def create_app() -> FastAPI:
             "service": API_TITLE,
         }
 
-    @app.get("/")
-    async def root():
-        return {
-            "message": API_TITLE,
-            "docs_url": "/docs",
-            "redoc_url": "/redoc",
-            "health_check": "/api/health",
-        }
+    # Mode serveur web LAN : quand WEB_STATIC_DIR pointe un build React valide, le
+    # backend sert aussi l'UI (montée plus bas). Sinon, "/" renvoie l'info API.
+    web_dir = settings.web_static_dir
+    serve_web = bool(web_dir) and os.path.isdir(web_dir)
+
+    if not serve_web:
+        @app.get("/")
+        async def root():
+            return {
+                "message": API_TITLE,
+                "docs_url": "/docs",
+                "redoc_url": "/redoc",
+                "health_check": "/api/health",
+            }
 
     register_routes(app)
+
+    # Monté EN DERNIER pour que /api/* et /docs gardent la priorité. html=True
+    # sert index.html sur "/". L'app utilise un HashRouter (routes en /#/...), donc
+    # servir "/" + les assets suffit (aucune route profonde côté serveur).
+    if serve_web:
+        app.mount("/", StaticFiles(directory=web_dir, html=True), name="webapp")
+        logger.info("Mode serveur web LAN : UI servie depuis %s", web_dir)
+
     return app
 
 
