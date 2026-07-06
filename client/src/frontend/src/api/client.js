@@ -33,7 +33,8 @@ function resolveApiKey() {
         && typeof window.electronAPI.getApiKey === 'function') {
         return window.electronAPI.getApiKey() || null;
     }
-    return null;
+    // Mode web LAN (build navigateur) : clé partagée bakée dans le build.
+    return process.env.REACT_APP_API_KEY || null;
 }
 
 const BASE_URL = resolveBaseUrl();

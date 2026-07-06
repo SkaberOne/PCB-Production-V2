@@ -29,6 +29,7 @@ package-lock.json
 
 # --- Build artifacts ---
 build/
+build-web/
 dist/
 *.tsbuildinfo
 # .NET launcher (si réintroduit)
