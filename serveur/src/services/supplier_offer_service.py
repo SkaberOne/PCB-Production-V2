@@ -410,6 +410,7 @@ class SupplierOfferService:
             "reference": component.reference,
             "value": component.value,
             "package": component.package,
+            "component_type": component.component_type,
             "current_mpn": component.mpn,
             "proposed_mpn": chosen.get("mpn"),
             "manufacturer": chosen.get("manufacturer"),
