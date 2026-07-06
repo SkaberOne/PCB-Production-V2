@@ -4,6 +4,8 @@ import DownloadRoundedIcon from '@mui/icons-material/DownloadRounded';
 import LibraryBooksRoundedIcon from '@mui/icons-material/LibraryBooksRounded';
 import UploadFileRoundedIcon from '@mui/icons-material/UploadFileRounded';
 import ExpandMoreRoundedIcon from '@mui/icons-material/ExpandMoreRounded';
+import DeleteOutlineRoundedIcon from '@mui/icons-material/DeleteOutlineRounded';
+import DeleteComponentDialog from './DeleteComponentDialog';
 import {
     Accordion,
     AccordionDetails,
@@ -128,6 +130,7 @@ function ComposantsPanel() {
     const [libraryExporting, setLibraryExporting] = React.useState(false);
     const [componentTypeRefreshing, setComponentTypeRefreshing] = React.useState(false);
     const [componentSaving, setComponentSaving] = React.useState(false);
+    const [deleteDialogOpen, setDeleteDialogOpen] = React.useState(false);
     const [totalComponents, setTotalComponents] = React.useState(0);
     const [ambiguousComponentIds, setAmbiguousComponentIds] = React.useState([]);
     const [libraryFeedback, setLibraryFeedback] = React.useState(emptyFeedback);
@@ -418,6 +421,13 @@ function ComposantsPanel() {
         scheduleBackgroundComponentReload,
         selectedComponentId,
     ]);
+    const handleComponentDeleted = React.useCallback((deletedId) => {
+        setComponents((current) => current.filter((item) => item.id !== deletedId));
+        setSelectedComponentId((current) => (current === deletedId ? null : current));
+        setTotalComponents((current) => Math.max(0, current - 1));
+        setEditorFeedback({ status: 'success', message: 'Composant supprimé de la base de données.', details: [] });
+        scheduleBackgroundComponentReload();
+    }, [scheduleBackgroundComponentReload]);
     const importLibrary = async () => {
         if (!libraryFile) {
             setLibraryFeedback({ status: 'error', message: "Choisissez un fichier Excel avant de lancer l'import.", details: [] });
@@ -830,13 +840,25 @@ function ComposantsPanel() {
                                                 </AccordionDetails>
                                             </Accordion>
 
-                                            <Stack direction="row" spacing={1} justifyContent="flex-end" flexWrap="wrap" useFlexGap>
-                                                <Button size="small" variant="outlined" onClick={resetComponentForm} disabled={!selectedComponentId} sx={{ minWidth: 94 }}>
-                                                    Annuler
+                                            <Stack direction="row" spacing={1} justifyContent="space-between" alignItems="center" flexWrap="wrap" useFlexGap>
+                                                <Button
+                                                    size="small"
+                                                    variant="outlined"
+                                                    color="error"
+                                                    startIcon={<DeleteOutlineRoundedIcon />}
+                                                    onClick={() => setDeleteDialogOpen(true)}
+                                                    disabled={!selectedComponentId}
+                                                >
+                                                    Supprimer
                                                 </Button>
-                                                <Button size="small" variant="contained" onClick={saveComponent} disabled={!selectedComponentId || componentSaving} sx={{ minWidth: 110 }}>
-                                                    {componentSaving ? 'Enregistrement...' : 'Enregistrer'}
-                                                </Button>
+                                                <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+                                                    <Button size="small" variant="outlined" onClick={resetComponentForm} disabled={!selectedComponentId} sx={{ minWidth: 94 }}>
+                                                        Annuler
+                                                    </Button>
+                                                    <Button size="small" variant="contained" onClick={saveComponent} disabled={!selectedComponentId || componentSaving} sx={{ minWidth: 110 }}>
+                                                        {componentSaving ? 'Enregistrement...' : 'Enregistrer'}
+                                                    </Button>
+                                                </Stack>
                                             </Stack>
                                         </Stack>
                                     </CardContent>
@@ -846,6 +868,15 @@ function ComposantsPanel() {
                     </Stack>
                 </CardContent>
             </Card>
+            <DeleteComponentDialog
+                open={deleteDialogOpen}
+                component={selectedComponentId ? {
+                    id: selectedComponentId,
+                    label: componentForm.value || componentForm.reference || `#${selectedComponentId}`,
+                } : null}
+                onClose={() => setDeleteDialogOpen(false)}
+                onDeleted={handleComponentDeleted}
+            />
         </Stack>
     );
 }

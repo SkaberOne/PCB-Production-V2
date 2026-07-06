@@ -9,6 +9,7 @@ import {
     DialogActions,
     DialogContent,
     DialogTitle,
+    IconButton,
     Stack,
     Table,
     TableBody,
@@ -17,10 +18,13 @@ import {
     TableHead,
     TableRow,
     TextField,
+    Tooltip,
     Typography,
 } from '@mui/material';
+import DeleteOutlineRoundedIcon from '@mui/icons-material/DeleteOutlineRounded';
 import apiClient from '../../api/client';
 import BomStockDialog from '../bom/BomStockDialog';
+import DeleteComponentDialog from './DeleteComponentDialog';
 import { buildStockSummary } from '../../utils/bomPlanning';
 import { compactCellSx, compactTableContainerSx, compactTableSx } from '../../utils/compactTable';
 
@@ -47,6 +51,9 @@ function StockPanel() {
     // Déclaration (BomStockDialog réutilisé, motif declaration set-to).
     const [declareRow, setDeclareRow] = React.useState(null);
     const [draft, setDraft] = React.useState({});
+
+    // Suppression d'un composant en doublon (dialogue partagé).
+    const [deleteRow, setDeleteRow] = React.useState(null);
 
     // Correction d'inventaire + seuils (motif correction + params).
     const [paramsRow, setParamsRow] = React.useState(null);
@@ -249,9 +256,14 @@ function StockPanel() {
                                     <TableCell sx={compactCellSx} align="right">{row.safety_stock}</TableCell>
                                     <TableCell sx={compactCellSx}>{statusChip(row.status)}</TableCell>
                                     <TableCell sx={compactCellSx} align="right">
-                                        <Stack direction="row" spacing={0.5} justifyContent="flex-end">
+                                        <Stack direction="row" spacing={0.5} justifyContent="flex-end" alignItems="center">
                                             <Button size="small" onClick={() => openDeclare(row)}>Saisir</Button>
                                             <Button size="small" color="inherit" onClick={() => openParams(row)}>Corriger</Button>
+                                            <Tooltip title="Supprimer le composant (doublon)">
+                                                <IconButton size="small" color="error" onClick={() => setDeleteRow(row)}>
+                                                    <DeleteOutlineRoundedIcon fontSize="inherit" />
+                                                </IconButton>
+                                            </Tooltip>
                                         </Stack>
                                     </TableCell>
                                 </TableRow>
@@ -260,6 +272,19 @@ function StockPanel() {
                     </TableBody>
                 </Table>
             </TableContainer>
+
+            <DeleteComponentDialog
+                open={Boolean(deleteRow)}
+                component={deleteRow ? {
+                    id: deleteRow.component_id,
+                    label: deleteRow.value || deleteRow.mpn || `#${deleteRow.component_id}`,
+                } : null}
+                onClose={() => setDeleteRow(null)}
+                onDeleted={(deletedId) => {
+                    setRows((prev) => prev.filter((r) => r.component_id !== deletedId));
+                    setFeedback('Composant supprimé de la base de données.');
+                }}
+            />
 
             <BomStockDialog
                 line={declareLine}
