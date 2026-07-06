@@ -545,13 +545,25 @@ function CommandPage() {
                 footprint: line.footprint,
                 requiredQuantity: merged?.requiredQuantity ?? line.quantity ?? 0,
                 stockAvailableQty: merged?.stockAvailableQty ?? 0,
-                quantityToOrder: quantityOverrides[line.key] ?? merged?.quantityToOrder ?? line.quantity ?? 0,
+                quantityToOrder: quantityOverrides[line.key]
+                    ?? line.quantity_to_order_override
+                    ?? merged?.quantityToOrder
+                    ?? line.quantity
+                    ?? 0,
                 componentLibraryId: line.component_library_id,
                 mpn: line.component_mpn,
+                note: line.note || '',
+                manualOffer: line.manual_offer || null,
                 qtyReceived: line.qty_received ?? 0,
             };
         });
     }, [effectiveSummaryLines, commandLines, quantityOverrides]);
+
+    // Rafraîchit la commande implicite après une complétion manuelle de ligne.
+    // set_line_detail renvoie déjà le summary à jour : on l'applique directement.
+    const handleLineSaved = React.useCallback((summary) => {
+        if (summary?.id) setCommandSummary(summary);
+    }, []);
 
     const exportCommandToErp = async () => {
         if (!stockValidation.isValidated) {
@@ -797,6 +809,7 @@ function CommandPage() {
                         commandId={commandSummary?.command_id || commandSummary?.id}
                         refreshNonce={refreshNonce}
                         onRefreshState={setRefreshState}
+                        onLineSaved={handleLineSaved}
                     />
                 </CardContent>
             </Card>

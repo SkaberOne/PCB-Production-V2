@@ -2,7 +2,17 @@
 
 import enum
 
-from sqlalchemy import Column, DateTime, Enum, Float, ForeignKey, Integer, String, Text
+from sqlalchemy import (
+    Column,
+    DateTime,
+    Enum,
+    Float,
+    ForeignKey,
+    Integer,
+    String,
+    Text,
+    UniqueConstraint,
+)
 from sqlalchemy.orm import relationship
 
 from ..database import Base, utcnow
@@ -140,6 +150,43 @@ class CommandReceipt(Base):
 
     def __repr__(self):
         return f"<CommandReceipt cmd={self.command_id} {self.line_key} recu={self.qty_received}>"
+
+
+class CommandLineDetail(Base):
+    """Manual per-line completion for a command (aggregate key).
+
+    Lets an operator complete/override a command line from the Commande page popup:
+    a quantity-to-order override, a free note, and a manual supplier offer
+    (supplier/price/URL) for parts the supplier APIs don't cover. ``manual_mpn`` is
+    only used as a fallback when the line has no library component to write the MPN
+    onto; when ``component_library_id`` exists the MPN is written directly on
+    COMPONENTS (library-wide). Keyed by the aggregated line key so it survives
+    re-aggregation, exactly like COMMAND_RECEIPTS.
+    """
+
+    __tablename__ = "COMMAND_LINE_DETAILS"
+    __table_args__ = (
+        UniqueConstraint("command_id", "line_key", name="uq_command_line_detail"),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    command_id = Column(Integer, ForeignKey("COMMANDS.id"), nullable=False, index=True)
+    line_key = Column(String(300), nullable=False)
+
+    quantity_to_order = Column(Integer, nullable=True)  # None => quantité calculée
+    note = Column(Text, nullable=True)
+
+    manual_mpn = Column(String(200), nullable=True)  # fallback si pas de composant biblio
+    manual_supplier = Column(String(80), nullable=True)
+    manual_supplier_part = Column(String(200), nullable=True)
+    manual_unit_price = Column(Float, nullable=True)
+    manual_currency = Column(String(8), nullable=True)
+    manual_product_url = Column(Text, nullable=True)
+
+    updated_at = Column(DateTime, default=utcnow, onupdate=utcnow)
+
+    def __repr__(self):
+        return f"<CommandLineDetail cmd={self.command_id} {self.line_key}>"
 
 
 class PlanAssignment(Base):

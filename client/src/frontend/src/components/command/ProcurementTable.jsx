@@ -1,9 +1,15 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
     Box,
+    Button,
     Chip,
     CircularProgress,
+    Dialog,
+    DialogActions,
+    DialogContent,
+    DialogTitle,
     FormControl,
+    Grid,
     InputLabel,
     MenuItem,
     Select,
@@ -18,6 +24,7 @@ import {
     Tooltip,
     Typography,
 } from '@mui/material';
+import EditNoteRoundedIcon from '@mui/icons-material/EditNoteRounded';
 import apiClient from '../../api/client';
 import { colors } from '../../theme';
 import {
@@ -39,16 +46,74 @@ const GREEN_BG = 'rgba(5, 150, 105, 0.16)';
  * Props:
  *   - rows: [{ key, componentName, value, footprint, requiredQuantity,
  *              stockAvailableQty, quantityToOrder, componentLibraryId, mpn, qtyReceived }]
- *   - commandId: number (pour persister la qté reçue)
+ *   - commandId: number (pour persister la qté reçue + complétion manuelle)
  *   - refreshNonce: number — incrémente pour forcer une actualisation temps réel
  *   - onRefreshState: (state) => void — remonte {loading, error} au parent (bouton Actualiser)
+ *   - onLineSaved: (summary) => void — remonte le summary à jour après complétion manuelle
  */
-function ProcurementTable({ rows = [], commandId, refreshNonce = 0, onRefreshState }) {
+const EMPTY_FORM = {
+    mpn: '', quantityToOrder: '', note: '',
+    supplier: '', supplierPart: '', unitPrice: '', currency: 'EUR', productUrl: '',
+};
+
+function ProcurementTable({ rows = [], commandId, refreshNonce = 0, onRefreshState, onLineSaved }) {
     const [offersByComponent, setOffersByComponent] = useState({});
     const [strategy, setStrategy] = useState('cheapest');
     const [prioritySupplier, setPrioritySupplier] = useState('MOUSER');
     const [received, setReceived] = useState({});
     const [loading, setLoading] = useState(false);
+
+    // Popup de complétion manuelle d'une ligne.
+    const [editRow, setEditRow] = useState(null);
+    const [form, setForm] = useState(EMPTY_FORM);
+    const [saving, setSaving] = useState(false);
+    const [saveError, setSaveError] = useState(null);
+
+    const openEditor = useCallback((row) => {
+        setSaveError(null);
+        setForm({
+            mpn: row.mpn || '',
+            quantityToOrder: row.quantityToOrder != null ? String(row.quantityToOrder) : '',
+            note: row.note || '',
+            supplier: row.manualOffer?.supplier || '',
+            supplierPart: row.manualOffer?.supplier_part || '',
+            unitPrice: row.manualOffer?.unit_price != null ? String(row.manualOffer.unit_price) : '',
+            currency: row.manualOffer?.currency || 'EUR',
+            productUrl: row.manualOffer?.product_url || '',
+        });
+        setEditRow(row);
+    }, []);
+
+    const closeEditor = useCallback(() => { setEditRow(null); setSaving(false); }, []);
+
+    const setFormField = (field) => (e) => setForm((prev) => ({ ...prev, [field]: e.target.value }));
+
+    const saveLineDetail = useCallback(async () => {
+        if (!commandId || !editRow) return;
+        setSaving(true);
+        setSaveError(null);
+        const qtyRaw = form.quantityToOrder.trim();
+        const priceRaw = form.unitPrice.trim();
+        try {
+            const res = await apiClient.put(`/marketplace/commands/${commandId}/line-details`, {
+                line_key: editRow.key,
+                mpn: form.mpn.trim() || null,
+                quantity_to_order: qtyRaw === '' ? null : Math.max(parseInt(qtyRaw, 10) || 0, 0),
+                note: form.note.trim() || null,
+                supplier: form.supplier.trim() || null,
+                supplier_part: form.supplierPart.trim() || null,
+                unit_price: priceRaw === '' ? null : Math.max(parseFloat(priceRaw.replace(',', '.')) || 0, 0),
+                currency: form.currency.trim() || null,
+                product_url: form.productUrl.trim() || null,
+                component_library_id: Number.isInteger(editRow.componentLibraryId) ? editRow.componentLibraryId : null,
+            });
+            onLineSaved?.(res.data);
+            closeEditor();
+        } catch (e) {
+            setSaveError(e.response?.data?.detail || e.message || 'Erreur lors de l’enregistrement.');
+            setSaving(false);
+        }
+    }, [commandId, editRow, form, onLineSaved, closeEditor]);
 
     const componentIds = useMemo(
         () => rows.map((r) => r.componentLibraryId).filter((id) => Number.isInteger(id)),
@@ -171,6 +236,7 @@ function ProcurementTable({ rows = [], commandId, refreshNonce = 0, onRefreshSta
                     <TableHead>
                         <TableRow>
                             <TableCell>Composant</TableCell>
+                            <TableCell>MPN</TableCell>
                             <TableCell>Valeur</TableCell>
                             <TableCell>Empreinte</TableCell>
                             <TableCell align="right">Besoin</TableCell>
@@ -190,27 +256,43 @@ function ProcurementTable({ rows = [], commandId, refreshNonce = 0, onRefreshSta
                             const offers = offersByComponent[row.componentLibraryId] || [];
                             const opts = sortOptsFor(toOrder || row.requiredQuantity);
                             const sorted = sortOffers(offers, opts);
-                            const best = selectBest(offers, opts);
+                            // Une offre saisie à la main prime sur le cache fournisseur.
+                            const manual = row.manualOffer;
+                            const best = manual || selectBest(offers, opts);
                             const qty = best ? (toOrder || row.requiredQuantity || 1) : 0;
                             const unit = best ? effectivePrice(best, qty) : null;
                             const total = unit != null && Number.isFinite(unit) ? unit * qty : null;
                             const currency = best?.currency || 'EUR';
                             const recu = received[row.key] || 0;
                             const isCovered = toOrder > 0 && recu >= toOrder;
-                            const stock = best?.stock_qty;
+                            const stock = manual ? null : best?.stock_qty;
                             return (
                                 <TableRow
                                     key={row.key}
                                     hover
-                                    sx={isCovered ? { backgroundColor: GREEN_BG, '&:hover': { backgroundColor: GREEN_BG } } : undefined}
+                                    onClick={() => openEditor(row)}
+                                    sx={{
+                                        cursor: 'pointer',
+                                        ...(isCovered ? { backgroundColor: GREEN_BG, '&:hover': { backgroundColor: GREEN_BG } } : {}),
+                                    }}
                                 >
-                                    <TableCell>{row.componentName || row.value}</TableCell>
+                                    <TableCell>
+                                        <Stack direction="row" spacing={0.5} alignItems="center">
+                                            <span>{row.componentName || row.value}</span>
+                                            {row.note ? (
+                                                <Tooltip title={row.note}>
+                                                    <EditNoteRoundedIcon fontSize="small" sx={{ color: colors.textSecondary }} />
+                                                </Tooltip>
+                                            ) : null}
+                                        </Stack>
+                                    </TableCell>
+                                    <TableCell>{row.mpn || '—'}</TableCell>
                                     <TableCell>{row.value}</TableCell>
                                     <TableCell>{row.footprint}</TableCell>
                                     <TableCell align="right">{row.requiredQuantity}</TableCell>
                                     <TableCell align="right">{row.stockAvailableQty || 0}</TableCell>
                                     <TableCell align="right" sx={{ fontWeight: 600 }}>{toOrder}</TableCell>
-                                    <TableCell align="right">
+                                    <TableCell align="right" onClick={(e) => e.stopPropagation()}>
                                         <TextField
                                             type="number"
                                             size="small"
@@ -223,11 +305,12 @@ function ProcurementTable({ rows = [], commandId, refreshNonce = 0, onRefreshSta
                                     <TableCell>
                                         {best ? (
                                             best.product_url ? (
-                                                <a href={best.product_url} target="_blank" rel="noreferrer" style={{ color: colors.textPrimary }}>
+                                                <a href={best.product_url} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()} style={{ color: colors.textPrimary }}>
                                                     {supplierLabel(best.supplier)}
                                                 </a>
                                             ) : supplierLabel(best.supplier)
                                         ) : '—'}
+                                        {manual ? <Chip size="small" label="manuel" sx={{ ml: 0.5 }} variant="outlined" /> : null}
                                     </TableCell>
                                     <TableCell align="right">
                                         {best && stock != null ? (
@@ -253,7 +336,7 @@ function ProcurementTable({ rows = [], commandId, refreshNonce = 0, onRefreshSta
                         })}
                         {rows.length === 0 && (
                             <TableRow>
-                                <TableCell colSpan={12} sx={{ py: 3, textAlign: 'center', color: colors.textSecondary }}>
+                                <TableCell colSpan={13} sx={{ py: 3, textAlign: 'center', color: colors.textSecondary }}>
                                     Valide le stock dans BOM › Composants et stock pour afficher la liste à commander.
                                 </TableCell>
                             </TableRow>
@@ -261,6 +344,85 @@ function ProcurementTable({ rows = [], commandId, refreshNonce = 0, onRefreshSta
                     </TableBody>
                 </Table>
             </TableContainer>
+
+            {/* ── Popup de complétion manuelle d'une ligne ── */}
+            <Dialog open={Boolean(editRow)} onClose={closeEditor} maxWidth="sm" fullWidth>
+                <DialogTitle>
+                    Compléter la ligne
+                    {editRow ? (
+                        <Typography variant="body2" sx={{ color: colors.textSecondary }}>
+                            {editRow.componentName || editRow.value} · {editRow.value} · {editRow.footprint}
+                        </Typography>
+                    ) : null}
+                </DialogTitle>
+                <DialogContent dividers>
+                    <Grid container spacing={2} sx={{ mt: 0 }}>
+                        <Grid item xs={12} sm={8}>
+                            <TextField
+                                fullWidth size="small" label="MPN (réf. fabricant)"
+                                value={form.mpn} onChange={setFormField('mpn')}
+                                helperText={
+                                    Number.isInteger(editRow?.componentLibraryId)
+                                        ? 'Met à jour le composant en bibliothèque (toutes les BOM).'
+                                        : 'Composant hors bibliothèque : MPN mémorisé pour cette commande.'
+                                }
+                            />
+                        </Grid>
+                        <Grid item xs={12} sm={4}>
+                            <TextField
+                                fullWidth size="small" type="number" label="Quantité à commander"
+                                value={form.quantityToOrder} onChange={setFormField('quantityToOrder')}
+                                inputProps={{ min: 0 }}
+                                helperText="Vide = quantité calculée"
+                            />
+                        </Grid>
+                        <Grid item xs={12}>
+                            <TextField
+                                fullWidth size="small" label="Note" multiline minRows={2}
+                                value={form.note} onChange={setFormField('note')}
+                            />
+                        </Grid>
+                        <Grid item xs={12}>
+                            <Typography variant="caption" sx={{ color: colors.textMuted }}>
+                                Offre fournisseur manuelle (si aucune offre API)
+                            </Typography>
+                        </Grid>
+                        <Grid item xs={12} sm={6}>
+                            <TextField fullWidth size="small" label="Fournisseur" value={form.supplier} onChange={setFormField('supplier')} />
+                        </Grid>
+                        <Grid item xs={12} sm={6}>
+                            <TextField fullWidth size="small" label="Réf. fournisseur" value={form.supplierPart} onChange={setFormField('supplierPart')} />
+                        </Grid>
+                        <Grid item xs={6} sm={4}>
+                            <TextField fullWidth size="small" label="Prix unitaire" value={form.unitPrice} onChange={setFormField('unitPrice')} inputProps={{ inputMode: 'decimal' }} />
+                        </Grid>
+                        <Grid item xs={6} sm={2}>
+                            <FormControl fullWidth size="small">
+                                <InputLabel>Devise</InputLabel>
+                                <Select label="Devise" value={form.currency} onChange={setFormField('currency')}>
+                                    <MenuItem value="EUR">EUR</MenuItem>
+                                    <MenuItem value="USD">USD</MenuItem>
+                                    <MenuItem value="GBP">GBP</MenuItem>
+                                </Select>
+                            </FormControl>
+                        </Grid>
+                        <Grid item xs={12} sm={6}>
+                            <TextField fullWidth size="small" label="Lien produit (URL)" value={form.productUrl} onChange={setFormField('productUrl')} />
+                        </Grid>
+                        {saveError ? (
+                            <Grid item xs={12}>
+                                <Typography variant="body2" color="error">{saveError}</Typography>
+                            </Grid>
+                        ) : null}
+                    </Grid>
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={closeEditor} color="inherit" disabled={saving}>Annuler</Button>
+                    <Button onClick={saveLineDetail} variant="contained" disabled={saving || !commandId}>
+                        {saving ? 'Enregistrement…' : 'Enregistrer'}
+                    </Button>
+                </DialogActions>
+            </Dialog>
         </Box>
     );
 }
