@@ -52,7 +52,7 @@ from src.models.bom import (  # noqa: F401
 )
 from src.models.commands import (  # noqa: F401
     Command, CommandItem, ProductionPlan, PlanAssignment, SupplierOffer, ErpDefaults,
-    CommandReceipt,
+    CommandReceipt, CommandLineDetail,
 )
 from src.models.machines import PnpCart, PnpFeeder, PnpMachine  # noqa: F401
 from src.models.production import Production, ProductionBomRevision  # noqa: F401
