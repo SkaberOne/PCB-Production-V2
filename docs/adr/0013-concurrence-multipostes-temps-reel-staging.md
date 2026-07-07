@@ -1,7 +1,7 @@
 # ADR 0013 — Concurrence multi-postes : temps réel scopé, concurrence optimiste, présence, et staging LAN
 
 **Date** : 2026-07-07
-**Statut** : 🟡 Accepté — implémentation par phases (non démarrée)
+**Statut** : 🟢 Accepté — phases 0 à 3 réalisées (2026-07-07) ; phase 4 (temps réel complet) optionnelle, non démarrée
 **Décideurs** : Eric (décisions métier actées) · Claude (architecture)
 **Contexte** : le logiciel est **déployé et utilisé en production** sur le LAN (backend unique
 `192.168.5.44:8000` servant l'UI web `build-web`, clé partagée `pcbflow-lan-2026`, base SQL Server
@@ -100,15 +100,20 @@ trace inutile).
 
 ---
 
-## Plan par phases (proposé)
+## Plan par phases
 
-0. **Staging** : base copie `ECB_Production_STAGING` + scripts build/lancement `:8001`. Socle de test.
-1. **Bouton « Valider quantité stock »** (version A) + « Tout valider » en Revue BOM. Petit,
-   valeur immédiate, testable seul en staging.
-2. **Concurrence optimiste** sur les entités éditables sensibles (production, stock) : jeton de
-   version + 409 + UI « recharger ? ».
-3. **Présence** par production (SSE + heartbeat) + icône compteur sur la Revue BOM.
-4. **Temps réel** complet des deux canaux (`production:{id}` et `stock`), branché sur les écrans.
+- ✅ **Phase 0 — Staging** (2026-07-07) : base copie `ECB_Production_STAGING` + scripts
+  `CONSTRUIRE_WEB_STAGING.bat` / `DEMARRER_SERVEUR_WEB_STAGING.bat` (`:8001`). Socle de test.
+- ✅ **Phase 1 — « Valider quantité stock »** (version A) + « Tout valider » en Revue BOM
+  (`ProduceCheckPanel`). `ComponentStock.verified_at/verified_qty`. **Promue en prod.**
+- ✅ **Phase 2 — Concurrence optimiste** (pilote) : `Component.version`, `PUT` renvoie 409
+  `version_conflict` + données à jour ; UI `ComposantsPanel` alerte + « Recharger ». *(Extension
+  aux autres écritures — BOM, production, stock — à faire ultérieurement.)*
+- ✅ **Phase 3 — Présence** par production : registre en mémoire + heartbeat (POST périodique,
+  pas encore SSE) + puce « N postes » dans l'en-tête Revue BOM (`usePresence`).
+- ⬜ **Phase 4 — Temps réel** complet des deux canaux (`production:{id}` et `stock`) via SSE :
+  optionnelle, non démarrée. Le heartbeat de la phase 3 pourra être remplacé/complété par le
+  canal `production:{id}`.
 
 Chaque phase est livrée sur branche courte, testée en staging (`:8001`), puis promue.
 

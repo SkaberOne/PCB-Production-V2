@@ -38,6 +38,7 @@ class ComponentSchema(OrmBaseModel):
     fixed_cart_name: Optional[str] = None
     description: Optional[str] = None
     notes: Optional[str] = None
+    version: Optional[int] = None
 
 
 class ComponentLibraryImportResponse(BaseModel):

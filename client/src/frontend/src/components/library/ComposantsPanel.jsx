@@ -131,6 +131,7 @@ function ComposantsPanel() {
     const [componentTypeRefreshing, setComponentTypeRefreshing] = React.useState(false);
     const [componentSaving, setComponentSaving] = React.useState(false);
     const [deleteDialogOpen, setDeleteDialogOpen] = React.useState(false);
+    const [conflict, setConflict] = React.useState(null); // données serveur à jour si conflit de version
     const [totalComponents, setTotalComponents] = React.useState(0);
     const [ambiguousComponentIds, setAmbiguousComponentIds] = React.useState([]);
     const [libraryFeedback, setLibraryFeedback] = React.useState(emptyFeedback);
@@ -378,6 +379,7 @@ function ComposantsPanel() {
         try {
             const response = await apiClient.put(`/bom/components/${selectedComponentId}`, {
                 id: selectedComponentId,
+                version: selectedComponent?.version ?? null,
                 reference: componentForm.reference,
                 value: componentForm.value || null,
                 mpn: componentForm.mpn || null,
@@ -398,9 +400,27 @@ function ComposantsPanel() {
             )));
             setAmbiguousComponentIds((current) => current.filter((value) => Number(value) !== Number(selectedComponentId)));
             setEditorFeedback({ status: 'success', message: 'Composant mis à jour dans la base de données.', details: [] });
+            setConflict(null);
             scheduleBackgroundComponentReload();
         } catch (error) {
-            setEditorFeedback({ status: 'error', message: error.response?.data?.detail || error.message || 'Erreur lors de la mise à jour du composant', details: [] });
+            const status = error.response?.status;
+            const detail = error.response?.data?.detail;
+            if (status === 409 && detail && typeof detail === 'object' && detail.code === 'version_conflict') {
+                // Concurrence optimiste : un autre poste a modifié entre-temps.
+                const fresh = normalizeComponentsPayload([detail.current])[0] || detail.current;
+                setConflict(fresh);
+                setEditorFeedback({
+                    status: 'warning',
+                    message: detail.message || 'Ce composant a été modifié par un autre poste. Recharge les valeurs à jour avant d\'enregistrer.',
+                    details: [],
+                });
+            } else {
+                setEditorFeedback({
+                    status: 'error',
+                    message: (typeof detail === 'string' && detail) || error.message || 'Erreur lors de la mise à jour du composant',
+                    details: [],
+                });
+            }
         } finally {
             setComponentSaving(false);
         }
@@ -419,6 +439,7 @@ function ComposantsPanel() {
         componentForm.tape_width_mm,
         componentForm.value,
         scheduleBackgroundComponentReload,
+        selectedComponent,
         selectedComponentId,
     ]);
     const handleComponentDeleted = React.useCallback((deletedId) => {
@@ -428,6 +449,12 @@ function ComposantsPanel() {
         setEditorFeedback({ status: 'success', message: 'Composant supprimé de la base de données.', details: [] });
         scheduleBackgroundComponentReload();
     }, [scheduleBackgroundComponentReload]);
+    const reloadConflict = React.useCallback(() => {
+        if (!conflict) return;
+        setComponents((current) => current.map((item) => (item.id === conflict.id ? conflict : item)));
+        setConflict(null);
+        setEditorFeedback({ status: 'info', message: 'Valeurs à jour rechargées. Tu peux ré-appliquer tes modifications puis enregistrer.', details: [] });
+    }, [conflict]);
     const importLibrary = async () => {
         if (!libraryFile) {
             setLibraryFeedback({ status: 'error', message: "Choisissez un fichier Excel avant de lancer l'import.", details: [] });
@@ -501,6 +528,15 @@ function ComposantsPanel() {
                     {editorFeedback.status !== 'idle' ? (
                         <Alert severity={editorFeedback.status} onClose={() => setEditorFeedback(emptyFeedback)}>
                             {editorFeedback.message}
+                        </Alert>
+                    ) : null}
+                    {conflict ? (
+                        <Alert
+                            severity="warning"
+                            action={<Button color="inherit" size="small" onClick={reloadConflict}>Recharger</Button>}
+                        >
+                            Un autre poste a modifié « {conflict.value || conflict.reference} » depuis ton ouverture.
+                            Recharge les valeurs à jour, puis ré-applique ta modification avant d'enregistrer.
                         </Alert>
                     ) : null}
                     {libraryFeedback.status !== 'idle' ? (
