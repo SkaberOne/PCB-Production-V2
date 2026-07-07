@@ -255,6 +255,22 @@ def update_component(component_id: int, component: ComponentSchema, db: Session 
     if not db_component:
         raise HTTPException(status_code=404, detail="Component not found")
 
+    # Concurrence optimiste (ADR 0013 phase 2) : si le client a lu une version
+    # différente de celle en base, un autre poste a modifié entre-temps -> 409.
+    if (
+        component.version is not None
+        and db_component.version is not None
+        and component.version != db_component.version
+    ):
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "code": "version_conflict",
+                "message": "Ce composant a été modifié par un autre poste depuis votre ouverture. Rechargez pour voir la version à jour.",
+                "current": _serialize_component(db_component).model_dump(),
+            },
+        )
+
     normalized_reference = component.reference.strip()
     duplicate = db.query(Component).filter(
         Component.id != component_id,
@@ -308,6 +324,7 @@ def update_component(component_id: int, component: ComponentSchema, db: Session 
             bom_service.normalize_footprint_name(db_component.footprint_eagle),
             normalized_footprint_pnp,
         )
+    db_component.version = (db_component.version or 1) + 1
     db.commit()
     db.refresh(db_component)
     return _serialize_component(db_component)
@@ -363,6 +380,7 @@ def patch_component(component_id: int, patch: ComponentPatchSchema, db: Session 
                 normalized_footprint_pnp,
             )
 
+    db_component.version = (db_component.version or 1) + 1
     db.commit()
     db.refresh(db_component)
     return _serialize_component(db_component)

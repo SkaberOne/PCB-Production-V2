@@ -58,6 +58,8 @@ class StockLineOut(BaseModel):
     effective_loss_pct: float
     has_stock_row: bool
     status: str
+    verified_at: Optional[str] = None
+    verified_qty: Optional[int] = None
 
 
 class ComponentStockOut(BaseModel):
@@ -139,6 +141,8 @@ class CanProduceLine(BaseModel):
     qty_reel: int = 0
     qty_bag: int = 0
     qty_tube: int = 0
+    verified_at: Optional[str] = None
+    verified_qty: Optional[int] = None
 
 
 class CanProduceOut(BaseModel):

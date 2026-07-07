@@ -120,6 +120,9 @@ class Component(Base):
     fixed_cart_id = Column(Integer, ForeignKey("PNP_CARTS.id"), nullable=True, index=True)
     description = Column(Text, nullable=True)
     notes = Column(Text, nullable=True)
+    # Concurrence optimiste (ADR 0013, phase 2) : incrémenté à chaque écriture.
+    # Le client renvoie la version lue ; si elle diffère à l'écriture -> HTTP 409.
+    version = Column(Integer, nullable=False, default=1, server_default="1")
 
     fixed_cart = relationship("PnpCart", back_populates="components")
 

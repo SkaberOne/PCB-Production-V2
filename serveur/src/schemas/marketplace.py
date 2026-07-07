@@ -69,6 +69,9 @@ class UpdateProductionRequest(BaseModel):
     machine_id: Optional[int] = Field(default=None, gt=0)
     status: Optional[str] = Field(default=None, max_length=50)
     notes: Optional[str] = Field(default=None, max_length=500)
+    # Concurrence optimiste (ADR 0013 extension B) : optionnel. Si fourni et
+    # différent de la version en base -> 409 (un autre poste a modifié entre-temps).
+    version: Optional[int] = Field(default=None, ge=0)
 
 
 class UpdateErpContextRequest(BaseModel):

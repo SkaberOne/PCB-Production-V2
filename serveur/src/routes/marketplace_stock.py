@@ -8,6 +8,7 @@ write path for ``CommandReceipt``), not here.
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from ..database import get_db
@@ -24,6 +25,7 @@ from ..schemas.stock import (
 )
 from ..services.stock_service import StockService, _UNSET
 from ..services.production_stock_service import ProductionStockService
+from ..services import event_bus
 
 router = APIRouter(tags=["stock"])
 
@@ -47,6 +49,42 @@ def list_stock(db: Session = Depends(get_db)):
     return StockService.list_stock(db)
 
 
+class _VerifyBatchRequest(BaseModel):
+    component_ids: List[int]
+
+
+def _verify_out(row) -> dict:
+    return {
+        "component_id": row.component_id,
+        "verified_at": row.verified_at.isoformat() if row.verified_at else None,
+        "verified_qty": row.verified_qty,
+    }
+
+
+@router.post("/stock/{component_id}/verify")
+def verify_stock(component_id: int, db: Session = Depends(get_db)):
+    """Marque la quantité stock du composant comme vérifiée (version A : ne touche pas au solde)."""
+    out = _verify_out(StockService.set_verified(db, component_id, True))
+    event_bus.publish("stock", {"kind": "verify", "component_id": component_id})
+    return out
+
+
+@router.delete("/stock/{component_id}/verify")
+def unverify_stock(component_id: int, db: Session = Depends(get_db)):
+    """Annule la vérification d'un composant."""
+    out = _verify_out(StockService.set_verified(db, component_id, False))
+    event_bus.publish("stock", {"kind": "unverify", "component_id": component_id})
+    return out
+
+
+@router.post("/stock/verify-batch")
+def verify_stock_batch(request: _VerifyBatchRequest, db: Session = Depends(get_db)):
+    """Marque plusieurs composants comme vérifiés (« Tout valider » en Revue BOM)."""
+    verified = StockService.verify_batch(db, request.component_ids)
+    event_bus.publish("stock", {"kind": "verify_batch", "count": verified})
+    return {"verified": verified}
+
+
 @router.get("/stock/settings", response_model=SettingsOut)
 def get_settings(db: Session = Depends(get_db)):
     return StockService.get_settings(db)
@@ -54,7 +92,9 @@ def get_settings(db: Session = Depends(get_db)):
 
 @router.put("/stock/settings", response_model=SettingsOut)
 def update_settings(request: GlobalSettingsRequest, db: Session = Depends(get_db)):
-    return StockService.set_global_loss_pct(db, request.global_loss_pct)
+    out = StockService.set_global_loss_pct(db, request.global_loss_pct)
+    event_bus.publish("stock", {"kind": "settings"})
+    return out
 
 
 @router.post("/stock/movements", response_model=ComponentStockOut)
@@ -82,6 +122,7 @@ def create_movement(request: MovementCreateRequest, db: Session = Depends(get_db
             new_total=request.new_total,
             note=request.note,
         )
+    event_bus.publish("stock", {"kind": "movement", "component_id": request.component_id, "motif": request.motif})
     return stock
 
 
@@ -101,12 +142,14 @@ def set_component_params(
     if db.get(Component, component_id) is None:
         raise HTTPException(status_code=404, detail="Composant introuvable")
     fields = request.model_fields_set
-    return StockService.set_component_params(
+    out = StockService.set_component_params(
         db,
         component_id,
         safety_stock=request.safety_stock,
         loss_pct=(request.loss_pct if "loss_pct" in fields else _UNSET),
     )
+    event_bus.publish("stock", {"kind": "params", "component_id": component_id})
+    return out
 
 
 @router.get("/stock/{component_id}/journal", response_model=List[MovementOut])

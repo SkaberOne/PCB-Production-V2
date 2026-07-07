@@ -135,6 +135,7 @@ def _serialize_component(component: Component) -> ComponentSchema:
         fixed_cart_name=component.fixed_cart.name if component.fixed_cart else None,
         description=component.description,
         notes=component.notes,
+        version=component.version,
     )
 
 

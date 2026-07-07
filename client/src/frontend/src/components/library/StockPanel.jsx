@@ -25,6 +25,7 @@ import DeleteOutlineRoundedIcon from '@mui/icons-material/DeleteOutlineRounded';
 import apiClient from '../../api/client';
 import BomStockDialog from '../bom/BomStockDialog';
 import DeleteComponentDialog from './DeleteComponentDialog';
+import useEventStream from '../../hooks/useEventStream';
 import { buildStockSummary } from '../../utils/bomPlanning';
 import { compactCellSx, compactTableContainerSx, compactTableSx } from '../../utils/compactTable';
 
@@ -61,8 +62,8 @@ function StockPanel() {
     const [safetyStock, setSafetyStock] = React.useState('');
     const [lossOverride, setLossOverride] = React.useState('');
 
-    const refresh = React.useCallback(async () => {
-        setLoading(true);
+    const refresh = React.useCallback(async (silent = false) => {
+        if (!silent) setLoading(true);
         setError(null);
         try {
             const [stockRes, settingsRes] = await Promise.all([
@@ -72,15 +73,18 @@ function StockPanel() {
             setRows(Array.isArray(stockRes.data) ? stockRes.data : []);
             setGlobalLoss(String(settingsRes.data?.global_loss_pct ?? 0));
         } catch (err) {
-            setError(err?.response?.data?.detail || 'Impossible de charger le stock.');
+            if (!silent) setError(err?.response?.data?.detail || 'Impossible de charger le stock.');
         } finally {
-            setLoading(false);
+            if (!silent) setLoading(false);
         }
     }, []);
 
     React.useEffect(() => {
         refresh();
     }, [refresh]);
+
+    // Temps réel : rafraîchit silencieusement quand un autre poste modifie le stock.
+    useEventStream('stock', React.useCallback(() => { refresh(true); }, [refresh]));
 
     const saveGlobalLoss = async () => {
         try {
@@ -215,6 +219,22 @@ function StockPanel() {
 
             <TableContainer sx={compactTableContainerSx}>
                 <Table sx={compactTableSx} size="small">
+                    {/* Largeurs fixes : la colonne Actions garde assez de place (Saisir + Corriger + supprimer)
+                        quelle que soit la taille de la fenêtre, sans rogner « Saisir ». */}
+                    <colgroup>
+                        <col style={{ width: '13%' }} />
+                        <col style={{ width: '14%' }} />
+                        <col style={{ width: '12%' }} />
+                        <col style={{ width: '7%' }} />
+                        <col style={{ width: '7%' }} />
+                        <col style={{ width: '7%' }} />
+                        <col style={{ width: '7%' }} />
+                        <col style={{ width: '7%' }} />
+                        <col style={{ width: '6%' }} />
+                        <col style={{ width: '6%' }} />
+                        <col style={{ width: '8%' }} />
+                        <col style={{ width: '186px' }} />
+                    </colgroup>
                     <TableHead>
                         <TableRow>
                             <TableCell sx={compactCellSx}>Value</TableCell>
@@ -228,7 +248,7 @@ function StockPanel() {
                             <TableCell sx={compactCellSx} align="right">Tube</TableCell>
                             <TableCell sx={compactCellSx} align="right">Seuil</TableCell>
                             <TableCell sx={compactCellSx}>Statut</TableCell>
-                            <TableCell sx={compactCellSx} align="right">Actions</TableCell>
+                            <TableCell sx={{ whiteSpace: 'nowrap' }} align="right">Actions</TableCell>
                         </TableRow>
                     </TableHead>
                     <TableBody>
@@ -255,12 +275,12 @@ function StockPanel() {
                                     <TableCell sx={compactCellSx} align="right">{row.qty_tube}</TableCell>
                                     <TableCell sx={compactCellSx} align="right">{row.safety_stock}</TableCell>
                                     <TableCell sx={compactCellSx}>{statusChip(row.status)}</TableCell>
-                                    <TableCell sx={compactCellSx} align="right">
-                                        <Stack direction="row" spacing={0.5} justifyContent="flex-end" alignItems="center">
-                                            <Button size="small" onClick={() => openDeclare(row)}>Saisir</Button>
-                                            <Button size="small" color="inherit" onClick={() => openParams(row)}>Corriger</Button>
+                                    <TableCell sx={{ whiteSpace: 'nowrap', overflow: 'visible' }} align="right">
+                                        <Stack direction="row" spacing={0.5} justifyContent="flex-end" alignItems="center" flexWrap="nowrap">
+                                            <Button size="small" onClick={() => openDeclare(row)} sx={{ minWidth: 0, px: 1 }}>Saisir</Button>
+                                            <Button size="small" color="inherit" onClick={() => openParams(row)} sx={{ minWidth: 0, px: 1 }}>Corriger</Button>
                                             <Tooltip title="Supprimer le composant (doublon)">
-                                                <IconButton size="small" color="error" onClick={() => setDeleteRow(row)}>
+                                                <IconButton size="small" color="error" onClick={() => setDeleteRow(row)} sx={{ p: 0.5 }}>
                                                     <DeleteOutlineRoundedIcon fontSize="inherit" />
                                                 </IconButton>
                                             </Tooltip>

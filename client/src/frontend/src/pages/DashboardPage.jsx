@@ -670,12 +670,30 @@ function DashboardPage() {
         if (!trimmed) return;
         setActionLoadingId(production.id);
         try {
-            await apiClient.patch(`/marketplace/productions/${production.id}`, { name: trimmed });
+            const payload = { name: trimmed };
+            // Concurrence optimiste opt-in (ADR 0013 extension B) : on transmet la
+            // version lue pour détecter un renommage concurrent par un autre poste.
+            if (production.version != null) payload.version = production.version;
+            await apiClient.patch(`/marketplace/productions/${production.id}`, payload);
             setRenameDialog({ open: false, production: null, name: '' });
             setFeedback({ type: 'success', message: `Production renommée en « ${trimmed} ».` });
             await loadProductions({ preserveFeedback: true });
         } catch (requestError) {
-            setFeedback({ type: 'error', message: requestError.response?.data?.detail || 'Erreur lors du renommage' });
+            const detail = requestError.response?.data?.detail;
+            if (requestError.response?.status === 409) {
+                setRenameDialog({ open: false, production: null, name: '' });
+                setFeedback({
+                    type: 'error',
+                    message: (detail && detail.message)
+                        || 'Cette production a été modifiée par un autre poste. La liste a été rafraîchie.',
+                });
+                await loadProductions({ preserveFeedback: true });
+            } else {
+                setFeedback({
+                    type: 'error',
+                    message: (typeof detail === 'string' ? detail : detail?.message) || 'Erreur lors du renommage',
+                });
+            }
         } finally {
             setActionLoadingId(null);
         }
