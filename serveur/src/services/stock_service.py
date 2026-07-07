@@ -22,6 +22,7 @@ from typing import Dict, List, Optional
 from sqlalchemy import case, func
 from sqlalchemy.orm import Session
 
+from ..database import utcnow
 from ..models.bom import Component
 from ..models.stock import (
     ComponentMachineLoad,
@@ -74,6 +75,37 @@ class StockService:
             db.commit()
             db.refresh(row)
         return row
+
+    @classmethod
+    def set_verified(cls, db: Session, component_id: int, verified: bool) -> ComponentStock:
+        """Marque (ou dé-marque) la quantité stock comme vérifiée physiquement.
+
+        Version A (ADR 0013) : n'affecte PAS le solde. ``verified_qty`` mémorise le
+        solde confirmé au moment de la validation.
+        """
+        row = cls.get_or_create_stock(db, component_id)
+        if verified:
+            row.verified_at = utcnow().replace(tzinfo=None)
+            row.verified_qty = row.qty_pieces
+        else:
+            row.verified_at = None
+            row.verified_qty = None
+        db.commit()
+        db.refresh(row)
+        return row
+
+    @classmethod
+    def verify_batch(cls, db: Session, component_ids: List[int]) -> int:
+        """Marque plusieurs composants comme vérifiés d'un coup. Retourne le nombre traité."""
+        now = utcnow().replace(tzinfo=None)
+        count = 0
+        for cid in component_ids:
+            row = cls.get_or_create_stock(db, cid)
+            row.verified_at = now
+            row.verified_qty = row.qty_pieces
+            count += 1
+        db.commit()
+        return count
 
     @classmethod
     def set_component_params(
@@ -448,6 +480,8 @@ class StockService:
                     "effective_loss_pct": loss if loss is not None else settings.global_loss_pct,
                     "has_stock_row": s is not None,
                     "status": cls._status(qty, safety),
+                    "verified_at": s.verified_at.isoformat() if s and s.verified_at else None,
+                    "verified_qty": s.verified_qty if s else None,
                 }
             )
         rows.sort(key=lambda r: ((r["value"] or "").upper(), (r["footprint_pnp"] or "")))

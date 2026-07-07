@@ -8,6 +8,7 @@ write path for ``CommandReceipt``), not here.
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from ..database import get_db
@@ -45,6 +46,36 @@ def can_produce(
 def list_stock(db: Session = Depends(get_db)):
     """Library components + balance + breakdown + status (OK / bas / manque)."""
     return StockService.list_stock(db)
+
+
+class _VerifyBatchRequest(BaseModel):
+    component_ids: List[int]
+
+
+def _verify_out(row) -> dict:
+    return {
+        "component_id": row.component_id,
+        "verified_at": row.verified_at.isoformat() if row.verified_at else None,
+        "verified_qty": row.verified_qty,
+    }
+
+
+@router.post("/stock/{component_id}/verify")
+def verify_stock(component_id: int, db: Session = Depends(get_db)):
+    """Marque la quantité stock du composant comme vérifiée (version A : ne touche pas au solde)."""
+    return _verify_out(StockService.set_verified(db, component_id, True))
+
+
+@router.delete("/stock/{component_id}/verify")
+def unverify_stock(component_id: int, db: Session = Depends(get_db)):
+    """Annule la vérification d'un composant."""
+    return _verify_out(StockService.set_verified(db, component_id, False))
+
+
+@router.post("/stock/verify-batch")
+def verify_stock_batch(request: _VerifyBatchRequest, db: Session = Depends(get_db)):
+    """Marque plusieurs composants comme vérifiés (« Tout valider » en Revue BOM)."""
+    return {"verified": StockService.verify_batch(db, request.component_ids)}
 
 
 @router.get("/stock/settings", response_model=SettingsOut)

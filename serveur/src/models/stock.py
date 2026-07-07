@@ -76,6 +76,11 @@ class ComponentStock(Base):
     safety_stock = Column(Integer, nullable=False, default=0, server_default="0")
     # Per-component override of the global production loss coefficient (null => global).
     loss_pct = Column(Float, nullable=True)
+    # Vérification physique (ADR 0013, phase 1 — version A) : marque que la quantité
+    # stock a été confirmée sur le terrain. N'affecte PAS le solde (annotation légère).
+    # verified_qty = solde au moment de la validation (trace de la valeur confirmée).
+    verified_at = Column(DateTime, nullable=True)
+    verified_qty = Column(Integer, nullable=True)
     updated_at = Column(DateTime, default=utcnow, onupdate=utcnow)
 
     component = relationship("Component")
