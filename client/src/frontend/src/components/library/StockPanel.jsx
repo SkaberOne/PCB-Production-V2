@@ -25,7 +25,7 @@ import DeleteOutlineRoundedIcon from '@mui/icons-material/DeleteOutlineRounded';
 import apiClient from '../../api/client';
 import BomStockDialog from '../bom/BomStockDialog';
 import DeleteComponentDialog from './DeleteComponentDialog';
-import useStockEvents from '../../hooks/useStockEvents';
+import useEventStream from '../../hooks/useEventStream';
 import { buildStockSummary } from '../../utils/bomPlanning';
 import { compactCellSx, compactTableContainerSx, compactTableSx } from '../../utils/compactTable';
 
@@ -84,7 +84,7 @@ function StockPanel() {
     }, [refresh]);
 
     // Temps réel : rafraîchit silencieusement quand un autre poste modifie le stock.
-    useStockEvents(React.useCallback(() => { refresh(true); }, [refresh]));
+    useEventStream('stock', React.useCallback(() => { refresh(true); }, [refresh]));
 
     const saveGlobalLoss = async () => {
         try {

@@ -117,6 +117,7 @@ class ProductionWorkspaceService:
             ),
             "created_at": production.created_at.isoformat() if production.created_at else None,
             "updated_at": production.updated_at.isoformat() if production.updated_at else None,
+            "version": production.version if production.version is not None else 1,
             "bom_count": len(bom_links),
             "total_boards_to_produce": total_boards_to_produce,
             "linked_references": linked_references,
@@ -311,6 +312,9 @@ class ProductionWorkspaceService:
         if notes is not None:
             production.notes = notes.strip() or None
 
+        # Concurrence optimiste (ADR 0013 extension B) : chaque écriture incrémente
+        # la version pour que les postes ayant une vue périmée reçoivent un 409.
+        production.version = (production.version or 1) + 1
         production.updated_at = utcnow()
         db.commit()
         db.refresh(production)

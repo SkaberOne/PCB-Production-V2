@@ -23,7 +23,7 @@ import CheckCircleRoundedIcon from '@mui/icons-material/CheckCircleRounded';
 import RadioButtonUncheckedRoundedIcon from '@mui/icons-material/RadioButtonUncheckedRounded';
 import apiClient from '../../api/client';
 import BomStockDialog from '../bom/BomStockDialog';
-import useStockEvents from '../../hooks/useStockEvents';
+import useEventStream from '../../hooks/useEventStream';
 import { buildStockSummary } from '../../utils/bomPlanning';
 import { compactCellSx, compactTableContainerSx, compactTableSx } from '../../utils/compactTable';
 
@@ -80,7 +80,7 @@ function ProduceCheckPanel({ productionId = null, productionMachineId = null }) 
     // Temps réel (ADR 0013 phase 4) : recharge silencieusement le rapport de dispo
     // quand un autre poste modifie le stock (déclaration, vérif, correction…).
     const currentReportId = embedded ? productionId : selectedId;
-    useStockEvents(React.useCallback(() => {
+    useEventStream('stock', React.useCallback(() => {
         if (currentReportId) loadReport(currentReportId, true);
     }, [currentReportId, loadReport]));
 

@@ -1,10 +1,11 @@
 import React from 'react';
 import apiClient, { getStoredApiKey } from '../api/client';
 
-// Temps réel du canal « stock » (ADR 0013 phase 4) via Server-Sent Events.
-// On utilise fetch + ReadableStream (et non EventSource) afin de pouvoir envoyer
-// l'en-tête X-API-Key. À chaque événement `stock`, le callback est appelé — les
-// écrans concernés se rafraîchissent alors silencieusement. Reconnexion auto.
+// Flux d'événements temps réel générique (ADR 0013 phase 4 + extensions) via SSE.
+// On utilise fetch + ReadableStream (et non EventSource) pour pouvoir envoyer
+// l'en-tête X-API-Key. `topics` est une chaîne (ou un tableau) de sujets, ex.
+// 'stock' ou `production:${id}`. À chaque événement reçu, `onEvent(eventName, data)`
+// est appelé. Reconnexion auto ; no-op hors navigateur (tests jsdom, SSR).
 
 function resolveApiKey() {
     try {
@@ -17,13 +18,13 @@ function resolveApiKey() {
     return getStoredApiKey() || null;
 }
 
-export default function useStockEvents(onStockEvent) {
-    const cbRef = React.useRef(onStockEvent);
-    cbRef.current = onStockEvent;
+export default function useEventStream(topics, onEvent) {
+    const cbRef = React.useRef(onEvent);
+    cbRef.current = onEvent;
+    const topicsParam = Array.isArray(topics) ? topics.filter(Boolean).join(',') : (topics || '');
 
     React.useEffect(() => {
-        // Environnements sans streaming (tests jsdom, SSR) : ne rien faire.
-        if (typeof fetch !== 'function' || typeof AbortController !== 'function') {
+        if (!topicsParam || typeof fetch !== 'function' || typeof AbortController !== 'function') {
             return undefined;
         }
         let cancelled = false;
@@ -34,7 +35,7 @@ export default function useStockEvents(onStockEvent) {
             try {
                 const base = apiClient.defaults.baseURL || '';
                 const key = resolveApiKey();
-                const res = await fetch(`${base}/marketplace/events?topics=stock`, {
+                const res = await fetch(`${base}/marketplace/events?topics=${encodeURIComponent(topicsParam)}`, {
                     headers: key ? { 'X-API-Key': key } : {},
                     signal: controller.signal,
                 });
@@ -58,17 +59,16 @@ export default function useStockEvents(onStockEvent) {
                             if (line.startsWith('event:')) event = line.slice(6).trim();
                             else if (line.startsWith('data:')) data += line.slice(5).trim();
                         });
-                        if (event === 'stock' && cbRef.current) {
+                        if (event !== 'message' && cbRef.current) {
                             let parsed = {};
                             try { parsed = data ? JSON.parse(data) : {}; } catch (e) { /* ignore */ }
-                            cbRef.current(parsed);
+                            cbRef.current(event, parsed);
                         }
                     }
                 }
             } catch (e) {
                 /* connexion perdue / abandonnée */
             }
-            // Reconnexion après un court délai, sauf si le composant est démonté.
             if (!cancelled) {
                 await new Promise((r) => setTimeout(r, 3000));
                 if (!cancelled) connect();
@@ -80,5 +80,5 @@ export default function useStockEvents(onStockEvent) {
             cancelled = true;
             if (controller) controller.abort();
         };
-    }, []);
+    }, [topicsParam]);
 }
