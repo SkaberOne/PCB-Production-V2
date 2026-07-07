@@ -13,6 +13,7 @@ from pydantic import BaseModel, Field
 from ..database import get_db
 from ..schemas.marketplace import SupplierOfferRefreshRequest
 from ..services import supplier_credentials
+from ..services.command_service import CommandService
 from ..services.supplier_offer_service import SupplierOfferService
 from ..services.suppliers import (
     MouserConnector,
@@ -177,6 +178,9 @@ def best_offers(
 @router.get("/mpn-proposals")
 def mpn_proposals(
     component_ids: Optional[str] = Query(None, description="Optional comma-separated component ids"),
+    command_id: Optional[int] = Query(
+        None, description="Optional: restrict to the ComponentLibrary components of a command"
+    ),
     live: bool = Query(False, description="Query supplier APIs (else cache-only, no quota cost)"),
     limit: int = Query(
         25, ge=1, le=200, description="Max empty-MPN components examined per run (quota guard)"
@@ -187,8 +191,22 @@ def mpn_proposals(
 
     Cache-only by default. Pass ``live=true`` to hit the supplier APIs; ``limit``
     bounds how many components are examined so we stay under supplier quotas.
+    ``command_id`` restricts the candidate set to the components of that command
+    (used by the MPN section of the Command tab); combined with ``component_ids``
+    the two are intersected.
     """
     ids = _parse_ids(component_ids) if component_ids else None
+    if command_id is not None:
+        command_ids = CommandService.component_library_ids_for_command(db, command_id)
+        if ids is None:
+            ids = command_ids
+        else:
+            allowed = set(command_ids)
+            ids = [cid for cid in ids if cid in allowed]
+        if not ids:
+            # Command has no library-linked components (or empty intersection):
+            # nothing to enrich — return an empty, well-formed payload.
+            return {"proposals": [], "counts": {"high": 0, "medium": 0, "manual": 0}, "live": live, "limit": limit}
     proposals = SupplierOfferService.build_mpn_proposals(
         db, component_ids=ids, live=live, limit=limit
     )

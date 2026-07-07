@@ -865,7 +865,27 @@ class CommandService:
             "component_breakdown": component_breakdown,
             "aggregation_rule": "value_harmonized + footprint + component_type"
         }
-    
+
+    @staticmethod
+    def component_library_ids_for_command(db: Session, command_id: int) -> List[int]:
+        """Return the distinct ComponentLibrary ids referenced by a command.
+
+        Reuses the command summary aggregation so the "components of a command"
+        definition stays single-sourced. Lines not matched to a library
+        component (``component_library_id`` None) are skipped. Returns an empty
+        list if the command does not exist.
+        """
+        try:
+            summary = CommandService.get_command_summary(db, command_id)
+        except Exception:
+            return []
+        ids = {
+            line.get("component_library_id")
+            for line in summary.get("aggregated_components", [])
+            if line.get("component_library_id")
+        }
+        return sorted(ids)
+
     @staticmethod
     def duplicate_command(
         db: Session,

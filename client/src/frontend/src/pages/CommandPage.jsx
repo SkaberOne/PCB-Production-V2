@@ -33,6 +33,7 @@ import PageHeader from '../components/common/PageHeader';
 import ErpContextForm, { EMPTY_ERP } from '../components/command/ErpContextForm';
 import ProcurementTable from '../components/command/ProcurementTable';
 import StockStatusChip from '../components/command/StockStatusChip';
+import MpnEnrichmentPanel from '../components/library/MpnEnrichmentPanel';
 import { useBomSession } from '../context/BomSessionContext';
 import { colors } from '../theme';
 import {
@@ -540,7 +541,11 @@ function CommandPage() {
             const merged = byKey.get(line.key);
             return {
                 key: line.key,
-                componentName: merged?.componentName || line.component_name || line.value,
+                // Colonne « Composant » : la valeur du composant (identité stable et
+                // lisible). NE PAS utiliser component_name qui vaut « mpn or value »
+                // côté backend — sinon saisir un MPN change cette colonne, alors que
+                // seule la colonne MPN doit refléter le MPN (bug remonté 2026-07-07).
+                componentName: line.value || line.component_reference,
                 value: line.value,
                 footprint: line.footprint,
                 requiredQuantity: merged?.requiredQuantity ?? line.quantity ?? 0,
@@ -564,6 +569,26 @@ function CommandPage() {
     const handleLineSaved = React.useCallback((summary) => {
         if (summary?.id) setCommandSummary(summary);
     }, []);
+
+    // Recharge le résumé commande (colonne MPN + données dérivées) depuis le backend.
+    const reloadCommandSummary = React.useCallback(async () => {
+        if (!activeProduction?.id) return;
+        try {
+            const response = await apiClient.get(`/marketplace/productions/${activeProduction.id}/command`);
+            if (response?.data) {
+                setCommandSummary(response.data);
+                if (response.data.name) setCommandName(response.data.name);
+            }
+        } catch { /* silencieux : on garde l'affichage courant */ }
+    }, [activeProduction?.id]);
+
+    // Bouton « Actualiser » : recharge le résumé (pour refléter les MPN mis à jour
+    // manuellement ou via la section MPN) PUIS ré-actualise les offres/prix (le
+    // refresh backend ré-interroge les fournisseurs avec le MPN à jour).
+    const handleRefreshCommand = React.useCallback(() => {
+        reloadCommandSummary();
+        setRefreshNonce((n) => n + 1);
+    }, [reloadCommandSummary]);
 
     const exportCommandToErp = async () => {
         if (!stockValidation.isValidated) {
@@ -702,7 +727,7 @@ function CommandPage() {
                             color="secondary"
                             startIcon={<RefreshRoundedIcon />}
                             disabled={!isCommandCurrent || refreshState.loading}
-                            onClick={() => setRefreshNonce((n) => n + 1)}
+                            onClick={handleRefreshCommand}
                         >
                             {refreshState.loading ? 'Actualisation...' : 'Actualiser'}
                         </Button>
@@ -813,6 +838,24 @@ function CommandPage() {
                     />
                 </CardContent>
             </Card>
+
+            {/* ── Enrichissement MPN limité aux composants de cette commande ── */}
+            {(commandSummary?.command_id || commandSummary?.id) ? (
+                <Card sx={CARD_SX}>
+                    <CardContent>
+                        <Typography variant="subtitle1" sx={{ color: colors.textPrimary, fontWeight: 600, mb: 0.5 }}>
+                            Enrichissement MPN — composants de cette commande
+                        </Typography>
+                        <Typography variant="caption" sx={{ color: colors.textMuted, display: 'block', mb: 2 }}>
+                            Renseigne les MPN manquants des composants de la commande. Le MPN validé est écrit dans la bibliothèque (visible partout).
+                        </Typography>
+                        <MpnEnrichmentPanel
+                            commandId={commandSummary?.command_id || commandSummary?.id}
+                            onApplied={handleRefreshCommand}
+                        />
+                    </CardContent>
+                </Card>
+            ) : null}
 
             {/* ── Champs pour le fichier ERP (pleine largeur, sous le tableau) ── */}
             <ErpContextForm

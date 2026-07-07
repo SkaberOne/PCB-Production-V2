@@ -84,7 +84,13 @@ function openSupplierSearch(urlBuilder, term) {
     }
 }
 
-function MpnEnrichmentPanel() {
+// `commandId` (optionnel) restreint l'enrichissement aux composants d'une commande
+// (section MPN de l'onglet Commande). Sans prop → toute la bibliothèque (onglet
+// Base de données). L'écriture reste globale (Component.mpn) dans les deux cas.
+// `onApplied` (optionnel) est appelé après chaque écriture réussie de MPN
+// (unitaire ou en lot) : l'onglet Commande s'en sert pour recharger le résumé et
+// ré-actualiser les prix des composants concernés.
+function MpnEnrichmentPanel({ commandId = null, onApplied = null }) {
     const [proposals, setProposals] = React.useState([]);
     const [counts, setCounts] = React.useState({ high: 0, medium: 0, manual: 0 });
     const [rows, setRows] = React.useState({}); // component_id -> { mpn, status, busy }
@@ -118,7 +124,7 @@ function MpnEnrichmentPanel() {
         setFeedback(null);
         try {
             const response = await apiClient.get(PROPOSALS_URL, {
-                params: { live, limit },
+                params: { live, limit, ...(commandId ? { command_id: commandId } : {}) },
             });
             const data = response.data || {};
             const items = data.proposals || [];
@@ -139,7 +145,7 @@ function MpnEnrichmentPanel() {
         } finally {
             setBusy(false);
         }
-    }, [initRows, limit]);
+    }, [initRows, limit, commandId]);
 
     // Live search: process the loaded components in sub-batches so each request
     // stays under the HTTP timeout and supplier quotas are spread out. Results are
@@ -152,7 +158,7 @@ function MpnEnrichmentPanel() {
             // from "Charger (cache)"; otherwise fetch the cache list first.
             let baseItems = proposals;
             if (!baseItems.length) {
-                const resp = await apiClient.get(PROPOSALS_URL, { params: { live: false, limit } });
+                const resp = await apiClient.get(PROPOSALS_URL, { params: { live: false, limit, ...(commandId ? { command_id: commandId } : {}) } });
                 baseItems = resp.data?.proposals || [];
                 setProposals(baseItems);
                 setCounts(resp.data?.counts || { high: 0, medium: 0, manual: 0 });
@@ -213,7 +219,7 @@ function MpnEnrichmentPanel() {
         } finally {
             setSearchingLive(false);
         }
-    }, [proposals, limit, initRows]);
+    }, [proposals, limit, initRows, commandId]);
 
     const updateRow = (componentId, patch) => {
         setRows((prev) => ({ ...prev, [componentId]: { ...prev[componentId], ...patch } }));
@@ -231,6 +237,7 @@ function MpnEnrichmentPanel() {
         try {
             await apiClient.post(APPLY_URL, { component_id: componentId, mpn });
             updateRow(componentId, { busy: false, status: 'applied' });
+            if (onApplied) onApplied([componentId]);
         } catch (error) {
             updateRow(componentId, { busy: false });
             setFeedback({
@@ -264,6 +271,7 @@ function MpnEnrichmentPanel() {
                 severity: 'success',
                 message: `${applied.length} MPN exact(s) appliqué(s)${response.data?.skipped?.length ? `, ${response.data.skipped.length} ignoré(s).` : '.'}`,
             });
+            if (onApplied && applied.length) onApplied(applied.map((a) => a.component_id));
         } catch (error) {
             setFeedback({
                 severity: 'error',
