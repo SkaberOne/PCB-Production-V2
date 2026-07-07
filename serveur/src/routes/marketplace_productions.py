@@ -15,6 +15,7 @@ from ..schemas.marketplace import (
     UpdateProductionRequest,
 )
 from ..services.production_workspace_service import ProductionWorkspaceService
+from ..services import event_bus
 
 
 def _build_duplicate_name(db: Session, source_name: str) -> str:
@@ -122,6 +123,23 @@ def update_production(
     db: Session = Depends(get_db),
 ):
     """Rename or update the status of a production workspace."""
+    # Concurrence optimiste opt-in (ADR 0013 extension B) : si le client fournit
+    # une version et qu'elle diffère de la base, un autre poste a modifié entre-temps.
+    if request.version is not None:
+        db_prod = db.get(Production, production_id)
+        if (
+            db_prod is not None
+            and db_prod.version is not None
+            and db_prod.version != request.version
+        ):
+            raise HTTPException(
+                status_code=409,
+                detail={
+                    "code": "version_conflict",
+                    "message": "Cette production a été modifiée par un autre poste depuis votre ouverture. Rechargez pour voir la version à jour.",
+                    "current": ProductionWorkspaceService.get_production_detail(db, production_id),
+                },
+            )
     try:
         return ProductionWorkspaceService.update_production(
             db=db,
@@ -146,11 +164,13 @@ def attach_bom_revisions_to_production(
 ):
     """Attach one or more stored BOM revisions to a production workspace."""
     try:
-        return ProductionWorkspaceService.attach_bom_revisions(
+        result = ProductionWorkspaceService.attach_bom_revisions(
             db=db,
             production_id=production_id,
             bom_revision_ids=request.bom_revision_ids,
         )
+        event_bus.publish(f"production:{production_id}", {"kind": "bom_attach"})
+        return result
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
@@ -165,11 +185,13 @@ def detach_bom_revisions_from_production(
 ):
     """Detach one or more stored BOM revisions from a production workspace."""
     try:
-        return ProductionWorkspaceService.detach_bom_revisions(
+        result = ProductionWorkspaceService.detach_bom_revisions(
             db=db,
             production_id=production_id,
             bom_revision_ids=request.bom_revision_ids,
         )
+        event_bus.publish(f"production:{production_id}", {"kind": "bom_detach"})
+        return result
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
@@ -184,7 +206,7 @@ def update_production_bom_quantities(
 ):
     """Persist the board quantity to produce for linked BOM revisions."""
     try:
-        return ProductionWorkspaceService.update_bom_revision_quantities(
+        result = ProductionWorkspaceService.update_bom_revision_quantities(
             db=db,
             production_id=production_id,
             quantity_items=[
@@ -195,6 +217,8 @@ def update_production_bom_quantities(
                 for item in request.items
             ],
         )
+        event_bus.publish(f"production:{production_id}", {"kind": "bom_quantities"})
+        return result
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:

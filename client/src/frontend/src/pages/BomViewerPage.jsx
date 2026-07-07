@@ -17,6 +17,7 @@ import {
 import GroupsRoundedIcon from '@mui/icons-material/GroupsRounded';
 import apiClient from '../api/client';
 import usePresence from '../hooks/usePresence';
+import useEventStream from '../hooks/useEventStream';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 
 // ── Sub-components ────────────────────────────────────────────────────────────
@@ -87,6 +88,14 @@ function BomViewerPage() {
     } = useBomSession();
     // Présence : nombre de postes travaillant sur cette production (ADR 0013 phase 3).
     const presenceCount = usePresence(activeProduction?.id);
+    // Temps réel de la production (extension) : un autre poste a modifié la BOM/les
+    // quantités de cette production -> on avertit (bandeau) sans écraser le travail en cours.
+    const [prodChanged, setProdChanged] = React.useState(false);
+    React.useEffect(() => { setProdChanged(false); }, [activeProduction?.id]);
+    useEventStream(
+        activeProduction?.id ? `production:${activeProduction.id}` : null,
+        React.useCallback(() => { setProdChanged(true); }, []),
+    );
 
     // selectedBomEntries est stocké dans bomWorkspace, pas directement dans le context
     const selectedBomEntries = bomWorkspace.selectedRevisionEntries ?? [];
@@ -616,6 +625,20 @@ function BomViewerPage() {
 
     return (
         <Stack spacing={4}>
+            {prodChanged ? (
+                <Alert
+                    severity="info"
+                    onClose={() => setProdChanged(false)}
+                    action={(
+                        <Button color="inherit" size="small" onClick={() => window.location.reload()}>
+                            Recharger
+                        </Button>
+                    )}
+                >
+                    Un autre poste a modifié la BOM ou les quantités de cette production.
+                    Recharge pour voir la version à jour.
+                </Alert>
+            ) : null}
             <PageHeader
                 eyebrow="Revue multi-BOM"
                 title="BOM"

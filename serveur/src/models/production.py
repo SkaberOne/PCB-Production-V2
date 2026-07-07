@@ -39,6 +39,9 @@ class Production(Base):
     manufacturing_order_validated_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=utcnow)
     updated_at = Column(DateTime, default=utcnow, onupdate=utcnow)
+    # Concurrence optimiste (ADR 0013 extension B) : incrémentée à chaque écriture,
+    # vérifiée côté route seulement si le client envoie une version (opt-in).
+    version = Column(Integer, nullable=False, default=1, server_default="1")
 
     bom_links = relationship(
         "ProductionBomRevision",

@@ -1,7 +1,7 @@
 # ADR 0013 — Concurrence multi-postes : temps réel scopé, concurrence optimiste, présence, et staging LAN
 
 **Date** : 2026-07-07
-**Statut** : 🟢 Accepté — phases 0 à 4 réalisées (2026-07-07), le temps réel couvrant le canal `stock` ; canal `production:{id}` et extension de la concurrence optimiste restent optionnels
+**Statut** : 🟢 Accepté — phases 0 à 4 + extensions A (canal `production:{id}`) et B (concurrence optimiste sur `Production`) réalisées (2026-07-07), validées sur staging
 **Décideurs** : Eric (décisions métier actées) · Claude (architecture)
 **Contexte** : le logiciel est **déployé et utilisé en production** sur le LAN (backend unique
 `192.168.5.44:8000` servant l'UI web `build-web`, clé partagée `pcbflow-lan-2026`, base SQL Server
@@ -115,10 +115,17 @@ trace inutile).
   (`event_bus`) + endpoint `GET /marketplace/events?topics=stock` (SSE, poll interne 1.5 s) ;
   les écritures stock publient un événement ; front `useStockEvents` (fetch + stream) →
   auto-refresh silencieux de l'écran Stock et de la dispo en Revue BOM. Validé sur staging.
-- ⬜ **Canal `production:{id}`** (optionnel) : pousser les changements d'une production à ses
-  postes et remplacer le heartbeat de présence par ce canal. Non démarré.
-- ⬜ **Extension concurrence optimiste** (optionnel) : appliquer le motif `version` + 409 aux
-  autres écritures sensibles (revue BOM, production, stock). Non démarré.
+- ✅ **Extension A — Canal `production:{id}`** via SSE : les écritures d'une production
+  (attach/detach de BOM, quantités) publient un événement `production:{id}` ; hook front
+  générique `useEventStream(topics, onEvent)` (remplace `useStockEvents`) ; en Revue BOM, un
+  bandeau « Recharger » prévient quand un autre poste a modifié la production ouverte. Validé
+  sur staging.
+- ✅ **Extension B — Concurrence optimiste sur `Production`** (opt-in) : colonne `version`
+  (migration `c3d4e5f6a7b8`), incrémentée à chaque écriture ; le `PATCH /productions/{id}`
+  vérifie la version **uniquement si le client en fournit une** (les appels machine/statut
+  restent tolérés) → 409 `version_conflict` + données à jour ; le renommage dans le tableau de
+  bord transmet la version et gère le conflit. Validé sur staging (version 1→2→3, 409 sur
+  version périmée, nom non écrasé).
 
 Chaque phase est livrée sur branche courte, testée en staging (`:8001`), puis promue.
 
