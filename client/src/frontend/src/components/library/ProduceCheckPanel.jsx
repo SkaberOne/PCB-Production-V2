@@ -23,6 +23,7 @@ import CheckCircleRoundedIcon from '@mui/icons-material/CheckCircleRounded';
 import RadioButtonUncheckedRoundedIcon from '@mui/icons-material/RadioButtonUncheckedRounded';
 import apiClient from '../../api/client';
 import BomStockDialog from '../bom/BomStockDialog';
+import useStockEvents from '../../hooks/useStockEvents';
 import { buildStockSummary } from '../../utils/bomPlanning';
 import { compactCellSx, compactTableContainerSx, compactTableSx } from '../../utils/compactTable';
 
@@ -56,9 +57,9 @@ function ProduceCheckPanel({ productionId = null, productionMachineId = null }) 
         return (p && p.machine_id) || 0;
     }, [embedded, productionMachineId, productions]);
 
-    const loadReport = React.useCallback(async (id) => {
+    const loadReport = React.useCallback(async (id, silent = false) => {
         if (!id) return;
-        setLoading(true);
+        if (!silent) setLoading(true);
         setError(null);
         try {
             const machineId = machineIdFor(id);
@@ -68,13 +69,20 @@ function ProduceCheckPanel({ productionId = null, productionMachineId = null }) 
             ]);
             setReport(rep.data);
             setRuns(Array.isArray(runsRes.data) ? runsRes.data : []);
-            setBoards(String(rep.data?.board_count ?? ''));
+            if (!silent) setBoards(String(rep.data?.board_count ?? ''));
         } catch (err) {
-            setError(err?.response?.data?.detail || 'Impossible de charger l’analyse.');
+            if (!silent) setError(err?.response?.data?.detail || 'Impossible de charger l’analyse.');
         } finally {
-            setLoading(false);
+            if (!silent) setLoading(false);
         }
     }, [machineIdFor]);
+
+    // Temps réel (ADR 0013 phase 4) : recharge silencieusement le rapport de dispo
+    // quand un autre poste modifie le stock (déclaration, vérif, correction…).
+    const currentReportId = embedded ? productionId : selectedId;
+    useStockEvents(React.useCallback(() => {
+        if (currentReportId) loadReport(currentReportId, true);
+    }, [currentReportId, loadReport]));
 
     React.useEffect(() => {
         if (embedded) {

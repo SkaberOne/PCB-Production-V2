@@ -25,6 +25,7 @@ import DeleteOutlineRoundedIcon from '@mui/icons-material/DeleteOutlineRounded';
 import apiClient from '../../api/client';
 import BomStockDialog from '../bom/BomStockDialog';
 import DeleteComponentDialog from './DeleteComponentDialog';
+import useStockEvents from '../../hooks/useStockEvents';
 import { buildStockSummary } from '../../utils/bomPlanning';
 import { compactCellSx, compactTableContainerSx, compactTableSx } from '../../utils/compactTable';
 
@@ -61,8 +62,8 @@ function StockPanel() {
     const [safetyStock, setSafetyStock] = React.useState('');
     const [lossOverride, setLossOverride] = React.useState('');
 
-    const refresh = React.useCallback(async () => {
-        setLoading(true);
+    const refresh = React.useCallback(async (silent = false) => {
+        if (!silent) setLoading(true);
         setError(null);
         try {
             const [stockRes, settingsRes] = await Promise.all([
@@ -72,15 +73,18 @@ function StockPanel() {
             setRows(Array.isArray(stockRes.data) ? stockRes.data : []);
             setGlobalLoss(String(settingsRes.data?.global_loss_pct ?? 0));
         } catch (err) {
-            setError(err?.response?.data?.detail || 'Impossible de charger le stock.');
+            if (!silent) setError(err?.response?.data?.detail || 'Impossible de charger le stock.');
         } finally {
-            setLoading(false);
+            if (!silent) setLoading(false);
         }
     }, []);
 
     React.useEffect(() => {
         refresh();
     }, [refresh]);
+
+    // Temps réel : rafraîchit silencieusement quand un autre poste modifie le stock.
+    useStockEvents(React.useCallback(() => { refresh(true); }, [refresh]));
 
     const saveGlobalLoss = async () => {
         try {
