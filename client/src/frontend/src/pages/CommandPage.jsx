@@ -13,6 +13,7 @@ import {
     Grid,
     InputAdornment,
     Stack,
+    Tab,
     Table,
     TableBody,
     TableCell,
@@ -21,6 +22,7 @@ import {
     TablePagination,
     TableRow,
     TableSortLabel,
+    Tabs,
     TextField,
     Tooltip,
     Typography,
@@ -92,6 +94,7 @@ function CommandPage() {
     // ── State ──
     const [commandName, setCommandName] = React.useState('');
     const [commandSummary, setCommandSummary] = React.useState(null);
+    const [commandTab, setCommandTab] = React.useState(0); // 0 = à commander, 1 = enrichissement MPN
     const [feedback, setFeedback] = React.useState({ type: 'info', message: '' });
     const [isGenerating, setIsGenerating] = React.useState(false);
     const [isExporting, setIsExporting] = React.useState(false);
@@ -825,44 +828,58 @@ function CommandPage() {
                 </CardContent>
             </Card>
 
-            {/* ── Tableau unique : BOM prod + fournisseur + tri + qté reçue ── */}
-            {refreshState.error ? <Alert severity="warning">{refreshState.error}</Alert> : null}
-            <Card sx={CARD_SX}>
-                <CardContent>
-                    <ProcurementTable
-                        rows={procurementRows}
-                        commandId={commandSummary?.command_id || commandSummary?.id}
-                        refreshNonce={refreshNonce}
-                        onRefreshState={setRefreshState}
-                        onLineSaved={handleLineSaved}
-                    />
-                </CardContent>
-            </Card>
+            {/* ── Deux onglets : Composants à commander | Enrichissement MPN ── */}
+            <Box>
+                <Tabs
+                    value={commandTab}
+                    onChange={(event, value) => setCommandTab(value)}
+                    sx={{ borderBottom: `1px solid ${colors.border}`, mb: 3 }}
+                >
+                    <Tab label="Composants à commander" />
+                    <Tab label="Enrichissement MPN" />
+                </Tabs>
 
-            {/* ── Enrichissement MPN limité aux composants de cette commande ── */}
-            {(commandSummary?.command_id || commandSummary?.id) ? (
-                <Card sx={CARD_SX}>
-                    <CardContent>
-                        <Typography variant="subtitle1" sx={{ color: colors.textPrimary, fontWeight: 600, mb: 0.5 }}>
-                            Enrichissement MPN — composants de cette commande
-                        </Typography>
-                        <Typography variant="caption" sx={{ color: colors.textMuted, display: 'block', mb: 2 }}>
-                            Renseigne les MPN manquants des composants de la commande. Le MPN validé est écrit dans la bibliothèque (visible partout).
-                        </Typography>
-                        <MpnEnrichmentPanel
-                            commandId={commandSummary?.command_id || commandSummary?.id}
-                            onApplied={handleRefreshCommand}
+                {commandTab === 0 ? (
+                    <Stack spacing={4}>
+                        {refreshState.error ? <Alert severity="warning">{refreshState.error}</Alert> : null}
+                        <Card sx={CARD_SX}>
+                            <CardContent>
+                                <ProcurementTable
+                                    rows={procurementRows}
+                                    commandId={commandSummary?.command_id || commandSummary?.id}
+                                    refreshNonce={refreshNonce}
+                                    onRefreshState={setRefreshState}
+                                    onLineSaved={handleLineSaved}
+                                />
+                            </CardContent>
+                        </Card>
+                        {/* Champs pour le fichier ERP (liés au flux de commande/export) */}
+                        <ErpContextForm
+                            exportContext={exportContext}
+                            onFieldChange={handleExportContextChange}
+                            isExporting={isExporting}
                         />
-                    </CardContent>
-                </Card>
-            ) : null}
-
-            {/* ── Champs pour le fichier ERP (pleine largeur, sous le tableau) ── */}
-            <ErpContextForm
-                exportContext={exportContext}
-                onFieldChange={handleExportContextChange}
-                isExporting={isExporting}
-            />
+                    </Stack>
+                ) : (
+                    <Card sx={CARD_SX}>
+                        <CardContent>
+                            <Typography variant="caption" sx={{ color: colors.textMuted, display: 'block', mb: 2 }}>
+                                Renseigne les MPN manquants des composants de cette commande. Le MPN validé est écrit dans la bibliothèque (visible partout).
+                            </Typography>
+                            {(commandSummary?.command_id || commandSummary?.id) ? (
+                                <MpnEnrichmentPanel
+                                    commandId={commandSummary?.command_id || commandSummary?.id}
+                                    onApplied={handleRefreshCommand}
+                                />
+                            ) : (
+                                <Typography variant="body2" sx={{ color: colors.textMuted }}>
+                                    Génère d'abord la commande pour enrichir ses composants.
+                                </Typography>
+                            )}
+                        </CardContent>
+                    </Card>
+                )}
+            </Box>
         </Stack>
     );
 }
