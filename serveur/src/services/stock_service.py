@@ -480,6 +480,8 @@ class StockService:
                     "effective_loss_pct": loss if loss is not None else settings.global_loss_pct,
                     "has_stock_row": s is not None,
                     "status": cls._status(qty, safety),
+                    "lifecycle_status": component.lifecycle_status,
+                    "lifecycle_checked_at": component.lifecycle_checked_at.isoformat() if component.lifecycle_checked_at else None,
                     "verified_at": s.verified_at.isoformat() if s and s.verified_at else None,
                     "verified_qty": s.verified_qty if s else None,
                 }

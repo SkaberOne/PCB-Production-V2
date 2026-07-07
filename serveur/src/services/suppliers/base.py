@@ -27,6 +27,7 @@ class OfferDTO:
     unit_price: Optional[float] = None  # price at smallest break (indicative)
     stock_qty: Optional[int] = None
     lead_time_days: Optional[int] = None
+    lifecycle_status: Optional[str] = None  # brut fournisseur (normalisé plus tard, ADR 0014)
     price_breaks: List[dict] = field(default_factory=list)  # [{"qty": int, "price": float}]
 
     def price_for(self, quantity: int) -> Optional[float]:

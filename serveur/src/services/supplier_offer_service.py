@@ -19,6 +19,7 @@ from ..config import settings
 from ..database import utcnow
 from ..models.bom import Component
 from ..models.commands import SupplierOffer
+from . import lifecycle
 from .suppliers import build_connectors
 from .suppliers.base import OfferDTO, price_at_quantity
 
@@ -158,6 +159,7 @@ class SupplierOfferService:
         for component in components:
             query_mpn = (component.mpn or "").strip()
             query_keyword = (component.value or "").strip()
+            lifecycle_raw: List[str] = []  # statuts bruts collectés (ADR 0014)
             for connector in connectors:
                 try:
                     offers = (
@@ -168,9 +170,18 @@ class SupplierOfferService:
                 except Exception as exc:  # never let one supplier break the loop
                     logger.warning("Connector %s failed: %s", connector.name, exc)
                     continue
+                for offer in offers:
+                    if getattr(offer, "lifecycle_status", None):
+                        lifecycle_raw.append(offer.lifecycle_status)
                 best = cls._pick_primary_offer(offers)
                 if best is not None:
                     cls._upsert_offer(db, component.id, best)
+            # Cycle de vie (ADR 0014) : agrégation pire-cas. On ne clobber pas un
+            # statut connu si aucune donnée n'est revenue ; on horodate le check.
+            normalized = [lifecycle.normalize_lifecycle(r) for r in lifecycle_raw]
+            if any(s != lifecycle.UNKNOWN for s in normalized):
+                component.lifecycle_status = lifecycle.worst_case(normalized)
+            component.lifecycle_checked_at = utcnow()
         db.commit()
         return cls.get_offers(db, component_ids)
 

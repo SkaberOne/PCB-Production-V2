@@ -39,6 +39,8 @@ class ComponentSchema(OrmBaseModel):
     description: Optional[str] = None
     notes: Optional[str] = None
     version: Optional[int] = None
+    lifecycle_status: Optional[str] = None
+    lifecycle_checked_at: Optional[datetime] = None
 
 
 class ComponentLibraryImportResponse(BaseModel):

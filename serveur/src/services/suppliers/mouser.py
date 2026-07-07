@@ -154,6 +154,7 @@ class MouserConnector(SupplierConnector):
                     unit_price=breaks[0]["price"] if breaks else None,
                     stock_qty=_parse_int(part.get("AvailabilityInStock") or part.get("Availability")),
                     lead_time_days=_parse_int(part.get("LeadTime")),
+                    lifecycle_status=part.get("LifecycleStatus"),  # ADR 0014
                     price_breaks=breaks,
                 )
             )

@@ -752,6 +752,7 @@ class CommandService:
                         "supplier_link": None,
                         "feeder_type": normalize_component_feeder_type(library_match.feeder_type) if library_match else None,
                         "component_library_id": library_match.id if library_match else None,
+                        "lifecycle_status": library_match.lifecycle_status if library_match else None,
                         "manual_placement": False,
                         "quantity": 0,
                         "references": [],
@@ -771,6 +772,7 @@ class CommandService:
                     aggregated_components[aggregate_key]["supplier_code"] = library_match.supplier_code
                     aggregated_components[aggregate_key]["feeder_type"] = normalize_component_feeder_type(library_match.feeder_type)
                     aggregated_components[aggregate_key]["component_library_id"] = library_match.id
+                    aggregated_components[aggregate_key]["lifecycle_status"] = library_match.lifecycle_status
                 aggregated_components[aggregate_key]["references"].append(bom_item.reference_item)
                 aggregated_components[aggregate_key]["sources"].append(
                     {
@@ -824,6 +826,7 @@ class CommandService:
                     "supplier_link": line["supplier_link"],
                     "feeder_type": line["feeder_type"],
                     "component_library_id": line["component_library_id"],
+                    "lifecycle_status": line["lifecycle_status"],
                     "manual_placement": line["manual_placement"],
                     "quantity": line["quantity"],
                     "references": references,
