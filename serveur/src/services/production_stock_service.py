@@ -245,6 +245,8 @@ class ProductionStockService:
                     "qty_reel": s.qty_reel if s else 0,
                     "qty_bag": s.qty_bag if s else 0,
                     "qty_tube": s.qty_tube if s else 0,
+                    "verified_at": s.verified_at.isoformat() if s and s.verified_at else None,
+                    "verified_qty": s.verified_qty if s else None,
                 }
             )
         lines.sort(key=lambda r: (-r["manque"], (r["value"] or "")))

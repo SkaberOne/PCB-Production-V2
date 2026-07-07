@@ -6,6 +6,7 @@ import {
     Chip,
     CircularProgress,
     Divider,
+    IconButton,
     MenuItem,
     Stack,
     Table,
@@ -15,8 +16,11 @@ import {
     TableHead,
     TableRow,
     TextField,
+    Tooltip,
     Typography,
 } from '@mui/material';
+import CheckCircleRoundedIcon from '@mui/icons-material/CheckCircleRounded';
+import RadioButtonUncheckedRoundedIcon from '@mui/icons-material/RadioButtonUncheckedRounded';
 import apiClient from '../../api/client';
 import BomStockDialog from '../bom/BomStockDialog';
 import { buildStockSummary } from '../../utils/bomPlanning';
@@ -174,6 +178,44 @@ function ProduceCheckPanel({ productionId = null, productionMachineId = null }) 
         }
     };
 
+    // ---- Vérification de la quantité stock (ADR 0013 phase 1, version A) ----
+    // Confirme en un clic la quantité déjà connue, sans re-saisir. N'affecte pas le solde.
+    const toggleVerify = async (line) => {
+        const makeVerified = !line.verified_at;
+        try {
+            const res = makeVerified
+                ? await apiClient.post(`/marketplace/stock/${line.component_id}/verify`)
+                : await apiClient.delete(`/marketplace/stock/${line.component_id}/verify`);
+            const { verified_at = null, verified_qty = null } = res.data || {};
+            setReport((prev) => (prev ? {
+                ...prev,
+                lines: prev.lines.map((l) => (
+                    l.component_id === line.component_id ? { ...l, verified_at, verified_qty } : l
+                )),
+            } : prev));
+        } catch (err) {
+            setError(err?.response?.data?.detail || 'Échec de la vérification du stock.');
+        }
+    };
+
+    const notVerifiedCount = report ? report.lines.filter((l) => !l.verified_at).length : 0;
+
+    const verifyAll = async () => {
+        if (!report) return;
+        const ids = report.lines.filter((l) => !l.verified_at).map((l) => l.component_id);
+        if (!ids.length) {
+            setFeedback('Toutes les lignes sont déjà vérifiées.');
+            return;
+        }
+        try {
+            await apiClient.post('/marketplace/stock/verify-batch', { component_ids: ids });
+            setFeedback(`${ids.length} ligne(s) marquée(s) comme vérifiée(s).`);
+            await loadReport(embedded ? productionId : selectedId);
+        } catch (err) {
+            setError(err?.response?.data?.detail || 'Échec de la validation en lot.');
+        }
+    };
+
     return (
         <Stack spacing={2}>
             {error ? <Alert severity="error" onClose={() => setError(null)}>{error}</Alert> : null}
@@ -213,6 +255,16 @@ function ProduceCheckPanel({ productionId = null, productionMachineId = null }) 
                             : `${report.shortage_count} composant(s) en manque pour ${report.board_count} carte(s).`}
                     </Alert>
 
+                    <Stack direction="row" spacing={1.5} alignItems="center" flexWrap="wrap" useFlexGap>
+                        <Typography variant="caption" sx={{ color: '#a1a1aa' }}>
+                            Confirme la quantité stock déjà connue sans la re-saisir (validation physique).
+                        </Typography>
+                        <Box sx={{ flexGrow: 1 }} />
+                        <Button size="small" variant="outlined" color="success" onClick={verifyAll} disabled={!notVerifiedCount}>
+                            Tout valider ({notVerifiedCount})
+                        </Button>
+                    </Stack>
+
                     <TableContainer sx={compactTableContainerSx}>
                         <Table sx={compactTableSx} size="small">
                             <TableHead>
@@ -227,6 +279,7 @@ function ProduceCheckPanel({ productionId = null, productionMachineId = null }) 
                                     <TableCell sx={compactCellSx} align="right">Dispo</TableCell>
                                     <TableCell sx={compactCellSx} align="right">Manque</TableCell>
                                     <TableCell sx={compactCellSx} align="right">À commander</TableCell>
+                                    <TableCell sx={compactCellSx} align="center">Vérifié</TableCell>
                                 </TableRow>
                             </TableHead>
                             <TableBody>
@@ -246,6 +299,21 @@ function ProduceCheckPanel({ productionId = null, productionMachineId = null }) 
                                                 : l.manque}
                                         </TableCell>
                                         <TableCell sx={compactCellSx} align="right">{l.a_commander || 0}</TableCell>
+                                        <TableCell sx={compactCellSx} align="center" onClick={(e) => e.stopPropagation()}>
+                                            <Tooltip title={l.verified_at
+                                                ? `Vérifié le ${new Date(l.verified_at).toLocaleString()} (qté ${l.verified_qty ?? l.solde}) — cliquer pour annuler`
+                                                : 'Marquer la quantité comme vérifiée'}>
+                                                <IconButton
+                                                    size="small"
+                                                    sx={{ p: 0.25, color: l.verified_at ? '#10b981' : '#52525b' }}
+                                                    onClick={(e) => { e.stopPropagation(); toggleVerify(l); }}
+                                                >
+                                                    {l.verified_at
+                                                        ? <CheckCircleRoundedIcon fontSize="small" />
+                                                        : <RadioButtonUncheckedRoundedIcon fontSize="small" />}
+                                                </IconButton>
+                                            </Tooltip>
+                                        </TableCell>
                                     </TableRow>
                                 ))}
                             </TableBody>
