@@ -870,6 +870,7 @@ function CommandPage() {
                                 <MpnEnrichmentPanel
                                     commandId={commandSummary?.command_id || commandSummary?.id}
                                     onApplied={handleRefreshCommand}
+                                    autoLoad
                                 />
                             ) : (
                                 <Typography variant="body2" sx={{ color: colors.textMuted }}>

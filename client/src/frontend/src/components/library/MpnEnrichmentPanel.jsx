@@ -90,7 +90,9 @@ function openSupplierSearch(urlBuilder, term) {
 // `onApplied` (optionnel) est appelé après chaque écriture réussie de MPN
 // (unitaire ou en lot) : l'onglet Commande s'en sert pour recharger le résumé et
 // ré-actualiser les prix des composants concernés.
-function MpnEnrichmentPanel({ commandId = null, onApplied = null }) {
+// `autoLoad` (optionnel) : charge automatiquement la liste (cache) à l'affichage
+// du panneau, sans clic sur « Charger (cache) ». Utilisé dans l'onglet Commande.
+function MpnEnrichmentPanel({ commandId = null, onApplied = null, autoLoad = false }) {
     const [proposals, setProposals] = React.useState([]);
     const [counts, setCounts] = React.useState({ high: 0, medium: 0, manual: 0 });
     const [rows, setRows] = React.useState({}); // component_id -> { mpn, status, busy }
@@ -146,6 +148,12 @@ function MpnEnrichmentPanel({ commandId = null, onApplied = null }) {
             setBusy(false);
         }
     }, [initRows, limit, commandId]);
+
+    // Chargement auto (cache) à l'affichage du panneau et si la commande change.
+    React.useEffect(() => {
+        if (autoLoad) load(false);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [autoLoad, commandId]);
 
     // Live search: process the loaded components in sub-batches so each request
     // stays under the HTTP timeout and supplier quotas are spread out. Results are
