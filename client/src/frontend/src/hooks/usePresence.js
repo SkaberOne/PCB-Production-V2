@@ -39,7 +39,7 @@ export default function usePresence(productionId) {
                     production_id: productionId,
                     session_id: sessionId,
                 });
-                if (!stopped) setCount(res.data?.count || 0);
+                if (!stopped) setCount(res?.data?.count || 0);
             } catch (e) {
                 /* présence best-effort : on ignore les erreurs réseau */
             }
@@ -52,9 +52,16 @@ export default function usePresence(productionId) {
             stopped = true;
             clearInterval(interval);
             // Départ (best-effort) pour libérer la place sans attendre le TTL.
-            apiClient
-                .post('/marketplace/presence/leave', { production_id: productionId, session_id: sessionId })
-                .catch(() => {});
+            // Robuste si apiClient.post ne renvoie pas de promesse (tests mockés).
+            try {
+                const leaving = apiClient.post('/marketplace/presence/leave', {
+                    production_id: productionId,
+                    session_id: sessionId,
+                });
+                if (leaving && typeof leaving.catch === 'function') leaving.catch(() => {});
+            } catch (e) {
+                /* ignore */
+            }
         };
     }, [productionId]);
 
