@@ -1,7 +1,7 @@
 # ADR 0013 — Concurrence multi-postes : temps réel scopé, concurrence optimiste, présence, et staging LAN
 
 **Date** : 2026-07-07
-**Statut** : 🟢 Accepté — phases 0 à 3 réalisées (2026-07-07) ; phase 4 (temps réel complet) optionnelle, non démarrée
+**Statut** : 🟢 Accepté — phases 0 à 4 réalisées (2026-07-07), le temps réel couvrant le canal `stock` ; canal `production:{id}` et extension de la concurrence optimiste restent optionnels
 **Décideurs** : Eric (décisions métier actées) · Claude (architecture)
 **Contexte** : le logiciel est **déployé et utilisé en production** sur le LAN (backend unique
 `192.168.5.44:8000` servant l'UI web `build-web`, clé partagée `pcbflow-lan-2026`, base SQL Server
@@ -111,9 +111,14 @@ trace inutile).
   aux autres écritures — BOM, production, stock — à faire ultérieurement.)*
 - ✅ **Phase 3 — Présence** par production : registre en mémoire + heartbeat (POST périodique,
   pas encore SSE) + puce « N postes » dans l'en-tête Revue BOM (`usePresence`).
-- ⬜ **Phase 4 — Temps réel** complet des deux canaux (`production:{id}` et `stock`) via SSE :
-  optionnelle, non démarrée. Le heartbeat de la phase 3 pourra être remplacé/complété par le
-  canal `production:{id}`.
+- ✅ **Phase 4 — Temps réel (canal `stock`)** via SSE : bus d'événements en mémoire
+  (`event_bus`) + endpoint `GET /marketplace/events?topics=stock` (SSE, poll interne 1.5 s) ;
+  les écritures stock publient un événement ; front `useStockEvents` (fetch + stream) →
+  auto-refresh silencieux de l'écran Stock et de la dispo en Revue BOM. Validé sur staging.
+- ⬜ **Canal `production:{id}`** (optionnel) : pousser les changements d'une production à ses
+  postes et remplacer le heartbeat de présence par ce canal. Non démarré.
+- ⬜ **Extension concurrence optimiste** (optionnel) : appliquer le motif `version` + 409 aux
+  autres écritures sensibles (revue BOM, production, stock). Non démarré.
 
 Chaque phase est livrée sur branche courte, testée en staging (`:8001`), puis promue.
 
