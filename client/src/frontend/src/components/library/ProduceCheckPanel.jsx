@@ -292,8 +292,19 @@ function ProduceCheckPanel({ productionId = null, productionMachineId = null }) 
                                 </TableRow>
                             </TableHead>
                             <TableBody>
-                                {report.lines.map((l) => (
-                                    <TableRow key={l.component_id} hover onClick={() => openDeclare(l)} sx={{ cursor: 'pointer' }}>
+                                {report.lines.map((l) => {
+                                    // Stock suffisant pour la production (aucun manque) -> ligne verte.
+                                    const stockOk = (Number(l.manque) || 0) <= 0 && (Number(l.besoin) || 0) > 0;
+                                    return (
+                                    <TableRow
+                                        key={l.component_id}
+                                        hover
+                                        onClick={() => openDeclare(l)}
+                                        sx={{
+                                            cursor: 'pointer',
+                                            ...(stockOk ? { backgroundColor: 'rgba(16,185,129,0.14)', '&:hover': { backgroundColor: 'rgba(16,185,129,0.22)' } } : {}),
+                                        }}
+                                    >
                                         <TableCell sx={compactCellSx}>{l.value || '-'}<LifecycleBadge status={l.lifecycle_status} checkedAt={l.lifecycle_checked_at} /></TableCell>
                                         <TableCell sx={compactCellSx}>{l.mpn || '-'}</TableCell>
                                         <TableCell sx={compactCellSx}>{l.footprint || '-'}</TableCell>
@@ -324,7 +335,8 @@ function ProduceCheckPanel({ productionId = null, productionMachineId = null }) 
                                             </Tooltip>
                                         </TableCell>
                                     </TableRow>
-                                ))}
+                                    );
+                                })}
                             </TableBody>
                         </Table>
                     </TableContainer>
