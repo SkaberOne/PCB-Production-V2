@@ -542,6 +542,21 @@ function CommandPage() {
         const byKey = new Map(commandLines.map((line) => [line.key, line]));
         return effectiveSummaryLines.map((line) => {
             const merged = byKey.get(line.key);
+            const requiredQuantity = merged?.requiredQuantity ?? line.quantity ?? 0;
+            // Stock RÉEL disponible fourni par le backend (même calcul que la Revue BOM).
+            // null = stock inconnu (composant hors stock) -> on commande tout le besoin.
+            const stockAvailable = line.stock_available;
+            const autoToOrder = stockAvailable == null
+                ? requiredQuantity
+                : Math.max(requiredQuantity - stockAvailable, 0);
+            // À commander : override explicite de session > sinon, si le stock couvre le
+            // besoin (autoToOrder===0) on masque (on ignore un override persisté devenu
+            // obsolète, ex. généré avant la prise en compte du stock) > sinon override
+            // persisté > sinon calcul stock.
+            const sessionOverride = quantityOverrides[line.key];
+            const quantityToOrder = sessionOverride != null
+                ? sessionOverride
+                : (autoToOrder === 0 ? 0 : (line.quantity_to_order_override ?? autoToOrder));
             return {
                 key: line.key,
                 // Colonne « Composant » : la valeur du composant (identité stable et
@@ -551,13 +566,9 @@ function CommandPage() {
                 componentName: line.value || line.component_reference,
                 value: line.value,
                 footprint: line.footprint,
-                requiredQuantity: merged?.requiredQuantity ?? line.quantity ?? 0,
-                stockAvailableQty: merged?.stockAvailableQty ?? 0,
-                quantityToOrder: quantityOverrides[line.key]
-                    ?? line.quantity_to_order_override
-                    ?? merged?.quantityToOrder
-                    ?? line.quantity
-                    ?? 0,
+                requiredQuantity,
+                stockAvailableQty: stockAvailable != null ? Math.max(stockAvailable, 0) : 0,
+                quantityToOrder,
                 componentLibraryId: line.component_library_id,
                 lifecycleStatus: line.lifecycle_status,
                 mpn: line.component_mpn,
@@ -565,7 +576,11 @@ function CommandPage() {
                 manualOffer: line.manual_offer || null,
                 qtyReceived: line.qty_received ?? 0,
             };
-        });
+        })
+            // Choix 2 (2026-07-09) : ne lister que ce qui reste à commander ; les
+            // composants entièrement couverts par le stock sont masqués (et exclus de
+            // l'export ERP côté backend).
+            .filter((row) => (Number(row.quantityToOrder) || 0) > 0);
     }, [effectiveSummaryLines, commandLines, quantityOverrides]);
 
     // Rafraîchit la commande implicite après une complétion manuelle de ligne.
