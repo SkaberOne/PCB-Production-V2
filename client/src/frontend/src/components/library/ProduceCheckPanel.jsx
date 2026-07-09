@@ -23,6 +23,7 @@ import CheckCircleRoundedIcon from '@mui/icons-material/CheckCircleRounded';
 import RadioButtonUncheckedRoundedIcon from '@mui/icons-material/RadioButtonUncheckedRounded';
 import apiClient from '../../api/client';
 import BomStockDialog from '../bom/BomStockDialog';
+import LifecycleBadge from '../common/LifecycleBadge';
 import useEventStream from '../../hooks/useEventStream';
 import { buildStockSummary } from '../../utils/bomPlanning';
 import { compactCellSx, compactTableContainerSx, compactTableSx } from '../../utils/compactTable';
@@ -293,7 +294,7 @@ function ProduceCheckPanel({ productionId = null, productionMachineId = null }) 
                             <TableBody>
                                 {report.lines.map((l) => (
                                     <TableRow key={l.component_id} hover onClick={() => openDeclare(l)} sx={{ cursor: 'pointer' }}>
-                                        <TableCell sx={compactCellSx}>{l.value || '-'}</TableCell>
+                                        <TableCell sx={compactCellSx}>{l.value || '-'}<LifecycleBadge status={l.lifecycle_status} checkedAt={l.lifecycle_checked_at} /></TableCell>
                                         <TableCell sx={compactCellSx}>{l.mpn || '-'}</TableCell>
                                         <TableCell sx={compactCellSx}>{l.footprint || '-'}</TableCell>
                                         <TableCell sx={compactCellSx} align="right">{l.besoin}</TableCell>

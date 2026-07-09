@@ -141,6 +141,7 @@ class FarnellConnector(SupplierConnector):
                     unit_price=breaks[0]["price"] if breaks else None,
                     stock_qty=_to_int(stock.get("level")),
                     lead_time_days=_to_int(stock.get("leastLeadTime")),
+                    lifecycle_status=product.get("productStatus"),  # ADR 0014
                     price_breaks=breaks,
                 )
             )

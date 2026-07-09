@@ -559,6 +559,7 @@ function CommandPage() {
                     ?? line.quantity
                     ?? 0,
                 componentLibraryId: line.component_library_id,
+                lifecycleStatus: line.lifecycle_status,
                 mpn: line.component_mpn,
                 note: line.note || '',
                 manualOffer: line.manual_offer || null,
