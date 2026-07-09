@@ -84,7 +84,15 @@ function openSupplierSearch(urlBuilder, term) {
     }
 }
 
-function MpnEnrichmentPanel() {
+// `commandId` (optionnel) restreint l'enrichissement aux composants d'une commande
+// (section MPN de l'onglet Commande). Sans prop → toute la bibliothèque (onglet
+// Base de données). L'écriture reste globale (Component.mpn) dans les deux cas.
+// `onApplied` (optionnel) est appelé après chaque écriture réussie de MPN
+// (unitaire ou en lot) : l'onglet Commande s'en sert pour recharger le résumé et
+// ré-actualiser les prix des composants concernés.
+// `autoLoad` (optionnel) : charge automatiquement la liste (cache) à l'affichage
+// du panneau, sans clic sur « Charger (cache) ». Utilisé dans l'onglet Commande.
+function MpnEnrichmentPanel({ commandId = null, onApplied = null, autoLoad = false }) {
     const [proposals, setProposals] = React.useState([]);
     const [counts, setCounts] = React.useState({ high: 0, medium: 0, manual: 0 });
     const [rows, setRows] = React.useState({}); // component_id -> { mpn, status, busy }
@@ -92,7 +100,9 @@ function MpnEnrichmentPanel() {
     const [searchingLive, setSearchingLive] = React.useState(false);
     const [batchBusy, setBatchBusy] = React.useState(false);
     const [feedback, setFeedback] = React.useState(null); // { severity, message }
-    const [limit, setLimit] = React.useState(DEFAULT_LIMIT);
+    // En mode commande (autoLoad), on charge d'emblée tous les composants de la
+    // commande (le périmètre est déjà borné) ; sinon défaut 25 pour la bibliothèque.
+    const [limit, setLimit] = React.useState(autoLoad ? 200 : DEFAULT_LIMIT);
 
     // ── Filtres client (comme la fenêtre du chat) ────────────────────────────────
     const [query, setQuery] = React.useState('');
@@ -118,7 +128,7 @@ function MpnEnrichmentPanel() {
         setFeedback(null);
         try {
             const response = await apiClient.get(PROPOSALS_URL, {
-                params: { live, limit },
+                params: { live, limit, ...(commandId ? { command_id: commandId } : {}) },
             });
             const data = response.data || {};
             const items = data.proposals || [];
@@ -139,7 +149,13 @@ function MpnEnrichmentPanel() {
         } finally {
             setBusy(false);
         }
-    }, [initRows, limit]);
+    }, [initRows, limit, commandId]);
+
+    // Chargement auto (cache) à l'affichage du panneau et si la commande change.
+    React.useEffect(() => {
+        if (autoLoad) load(false);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [autoLoad, commandId]);
 
     // Live search: process the loaded components in sub-batches so each request
     // stays under the HTTP timeout and supplier quotas are spread out. Results are
@@ -152,7 +168,7 @@ function MpnEnrichmentPanel() {
             // from "Charger (cache)"; otherwise fetch the cache list first.
             let baseItems = proposals;
             if (!baseItems.length) {
-                const resp = await apiClient.get(PROPOSALS_URL, { params: { live: false, limit } });
+                const resp = await apiClient.get(PROPOSALS_URL, { params: { live: false, limit, ...(commandId ? { command_id: commandId } : {}) } });
                 baseItems = resp.data?.proposals || [];
                 setProposals(baseItems);
                 setCounts(resp.data?.counts || { high: 0, medium: 0, manual: 0 });
@@ -213,7 +229,7 @@ function MpnEnrichmentPanel() {
         } finally {
             setSearchingLive(false);
         }
-    }, [proposals, limit, initRows]);
+    }, [proposals, limit, initRows, commandId]);
 
     const updateRow = (componentId, patch) => {
         setRows((prev) => ({ ...prev, [componentId]: { ...prev[componentId], ...patch } }));
@@ -231,6 +247,7 @@ function MpnEnrichmentPanel() {
         try {
             await apiClient.post(APPLY_URL, { component_id: componentId, mpn });
             updateRow(componentId, { busy: false, status: 'applied' });
+            if (onApplied) onApplied([componentId]);
         } catch (error) {
             updateRow(componentId, { busy: false });
             setFeedback({
@@ -264,6 +281,7 @@ function MpnEnrichmentPanel() {
                 severity: 'success',
                 message: `${applied.length} MPN exact(s) appliqué(s)${response.data?.skipped?.length ? `, ${response.data.skipped.length} ignoré(s).` : '.'}`,
             });
+            if (onApplied && applied.length) onApplied(applied.map((a) => a.component_id));
         } catch (error) {
             setFeedback({
                 severity: 'error',
@@ -310,30 +328,36 @@ function MpnEnrichmentPanel() {
         <Card sx={{ backgroundColor: '#18181b', border: '1px solid #1f2937' }}>
             <CardContent>
                 <Stack spacing={2.5}>
-                    <Stack direction="row" spacing={1.5} alignItems="center">
-                        <FactCheckRoundedIcon sx={{ color: '#10b981' }} />
-                        <Box>
-                            <Typography variant="h6">Enrichissement des MPN</Typography>
-                            <Typography variant="body2" sx={{ color: '#a1a1aa' }}>
-                                Complète les MPN manquants de la bibliothèque pour fiabiliser la recherche prix/dispo. Rien n'est écrit sans validation ; un MPN existant n'est jamais écrasé.
-                            </Typography>
-                        </Box>
-                    </Stack>
+                    {!autoLoad ? (
+                        <Stack direction="row" spacing={1.5} alignItems="center">
+                            <FactCheckRoundedIcon sx={{ color: '#10b981' }} />
+                            <Box>
+                                <Typography variant="h6">Enrichissement des MPN</Typography>
+                                <Typography variant="body2" sx={{ color: '#a1a1aa' }}>
+                                    Complète les MPN manquants de la bibliothèque pour fiabiliser la recherche prix/dispo. Rien n'est écrit sans validation ; un MPN existant n'est jamais écrasé.
+                                </Typography>
+                            </Box>
+                        </Stack>
+                    ) : null}
 
                     {/* Actions : chargement + recherche en ligne + validation en lot */}
                     <Stack direction={{ xs: 'column', md: 'row' }} spacing={1.5} alignItems={{ xs: 'stretch', md: 'center' }}>
-                        <Button variant="outlined" onClick={() => load(false)} disabled={loading || searchingLive}>
-                            {loading ? 'Chargement...' : 'Charger (cache)'}
-                        </Button>
-                        <TextField
-                            label="Lot"
-                            type="number"
-                            size="small"
-                            value={limit}
-                            onChange={(e) => setLimit(Math.max(1, Math.min(200, Number(e.target.value) || DEFAULT_LIMIT)))}
-                            sx={{ width: 96 }}
-                            inputProps={{ min: 1, max: 200 }}
-                        />
+                        {!autoLoad ? (
+                            <Button variant="outlined" onClick={() => load(false)} disabled={loading || searchingLive}>
+                                {loading ? 'Chargement...' : 'Charger (cache)'}
+                            </Button>
+                        ) : null}
+                        {!autoLoad ? (
+                            <TextField
+                                label="Lot"
+                                type="number"
+                                size="small"
+                                value={limit}
+                                onChange={(e) => setLimit(Math.max(1, Math.min(200, Number(e.target.value) || DEFAULT_LIMIT)))}
+                                sx={{ width: 96 }}
+                                inputProps={{ min: 1, max: 200 }}
+                            />
+                        ) : null}
                         <Tooltip title="Interroge les API fournisseurs (quota limité — par lots).">
                             <span>
                                 <Button
@@ -538,7 +562,11 @@ function MpnEnrichmentPanel() {
                         </Stack>
                     ) : (
                         <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                            Clique sur « Charger (cache) » pour lister les composants au MPN vide, puis « Rechercher en ligne » pour interroger les fournisseurs par lot.
+                            {autoLoad
+                                ? (loading
+                                    ? 'Chargement des composants de la commande…'
+                                    : 'Aucun composant à enrichir : tous les composants de cette commande ont déjà un MPN.')
+                                : 'Clique sur « Charger (cache) » pour lister les composants au MPN vide, puis « Rechercher en ligne » pour interroger les fournisseurs par lot.'}
                         </Typography>
                     )}
                 </Stack>

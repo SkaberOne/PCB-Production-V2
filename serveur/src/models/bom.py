@@ -123,6 +123,10 @@ class Component(Base):
     # Concurrence optimiste (ADR 0013, phase 2) : incrémenté à chaque écriture.
     # Le client renvoie la version lue ; si elle diffère à l'écriture -> HTTP 409.
     version = Column(Integer, nullable=False, default=1, server_default="1")
+    # Cycle de vie (ADR 0014) : enum normalisé agrégé pire-cas des offres fournisseurs
+    # (ACTIVE / NRND / EOL / UNKNOWN) + date de dernière vérification.
+    lifecycle_status = Column(String(16), nullable=False, default="UNKNOWN", server_default="UNKNOWN")
+    lifecycle_checked_at = Column(DateTime, nullable=True)
 
     fixed_cart = relationship("PnpCart", back_populates="components")
 

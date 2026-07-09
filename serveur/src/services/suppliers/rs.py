@@ -304,6 +304,11 @@ class RsConnector(SupplierConnector):
                        "stock", "quantity")
             ),
             lead_time_days=_to_int(_first(product, "leadTimeDays", "leadTime")),
+            # ADR 0014 : statut de cycle de vie (clés RS variables selon locale/API).
+            lifecycle_status=_first(
+                product, "LifecycleStatus", "lifecycleStatus", "ProductStatus",
+                "productStatus", "lifeCycleStatus", "status",
+            ),
             price_breaks=breaks,
         )
 

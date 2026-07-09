@@ -27,6 +27,7 @@ import {
 import EditNoteRoundedIcon from '@mui/icons-material/EditNoteRounded';
 import apiClient from '../../api/client';
 import { colors } from '../../theme';
+import LifecycleBadge from '../common/LifecycleBadge';
 import {
     SUPPLIER_LABELS,
     effectivePrice,
@@ -279,6 +280,7 @@ function ProcurementTable({ rows = [], commandId, refreshNonce = 0, onRefreshSta
                                     <TableCell>
                                         <Stack direction="row" spacing={0.5} alignItems="center">
                                             <span>{row.componentName || row.value}</span>
+                                            <LifecycleBadge status={row.lifecycleStatus} />
                                             {row.note ? (
                                                 <Tooltip title={row.note}>
                                                     <EditNoteRoundedIcon fontSize="small" sx={{ color: colors.textSecondary }} />

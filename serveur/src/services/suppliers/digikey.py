@@ -139,10 +139,19 @@ class DigiKeyConnector(SupplierConnector):
                     unit_price=breaks[0]["price"] if breaks else None,
                     stock_qty=_to_int(product.get("QuantityAvailable")),
                     lead_time_days=_to_int(product.get("ManufacturerLeadWeeks")),
+                    lifecycle_status=self._product_status(product),  # ADR 0014
                     price_breaks=breaks,
                 )
             )
         return offers
+
+    @staticmethod
+    def _product_status(product: dict) -> Optional[str]:
+        """Extrait le statut produit v4 (``ProductStatus.Status`` — objet ou chaîne)."""
+        status = product.get("ProductStatus")
+        if isinstance(status, dict):
+            return status.get("Status")
+        return status if isinstance(status, str) else None
 
     @staticmethod
     def _variation_breaks(variation: Optional[dict]) -> List[dict]:

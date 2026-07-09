@@ -13,6 +13,7 @@ import {
     Grid,
     InputAdornment,
     Stack,
+    Tab,
     Table,
     TableBody,
     TableCell,
@@ -21,6 +22,7 @@ import {
     TablePagination,
     TableRow,
     TableSortLabel,
+    Tabs,
     TextField,
     Tooltip,
     Typography,
@@ -33,6 +35,7 @@ import PageHeader from '../components/common/PageHeader';
 import ErpContextForm, { EMPTY_ERP } from '../components/command/ErpContextForm';
 import ProcurementTable from '../components/command/ProcurementTable';
 import StockStatusChip from '../components/command/StockStatusChip';
+import MpnEnrichmentPanel from '../components/library/MpnEnrichmentPanel';
 import { useBomSession } from '../context/BomSessionContext';
 import { colors } from '../theme';
 import {
@@ -91,6 +94,7 @@ function CommandPage() {
     // ── State ──
     const [commandName, setCommandName] = React.useState('');
     const [commandSummary, setCommandSummary] = React.useState(null);
+    const [commandTab, setCommandTab] = React.useState(0); // 0 = à commander, 1 = enrichissement MPN
     const [feedback, setFeedback] = React.useState({ type: 'info', message: '' });
     const [isGenerating, setIsGenerating] = React.useState(false);
     const [isExporting, setIsExporting] = React.useState(false);
@@ -540,7 +544,11 @@ function CommandPage() {
             const merged = byKey.get(line.key);
             return {
                 key: line.key,
-                componentName: merged?.componentName || line.component_name || line.value,
+                // Colonne « Composant » : la valeur du composant (identité stable et
+                // lisible). NE PAS utiliser component_name qui vaut « mpn or value »
+                // côté backend — sinon saisir un MPN change cette colonne, alors que
+                // seule la colonne MPN doit refléter le MPN (bug remonté 2026-07-07).
+                componentName: line.value || line.component_reference,
                 value: line.value,
                 footprint: line.footprint,
                 requiredQuantity: merged?.requiredQuantity ?? line.quantity ?? 0,
@@ -551,6 +559,7 @@ function CommandPage() {
                     ?? line.quantity
                     ?? 0,
                 componentLibraryId: line.component_library_id,
+                lifecycleStatus: line.lifecycle_status,
                 mpn: line.component_mpn,
                 note: line.note || '',
                 manualOffer: line.manual_offer || null,
@@ -564,6 +573,26 @@ function CommandPage() {
     const handleLineSaved = React.useCallback((summary) => {
         if (summary?.id) setCommandSummary(summary);
     }, []);
+
+    // Recharge le résumé commande (colonne MPN + données dérivées) depuis le backend.
+    const reloadCommandSummary = React.useCallback(async () => {
+        if (!activeProduction?.id) return;
+        try {
+            const response = await apiClient.get(`/marketplace/productions/${activeProduction.id}/command`);
+            if (response?.data) {
+                setCommandSummary(response.data);
+                if (response.data.name) setCommandName(response.data.name);
+            }
+        } catch { /* silencieux : on garde l'affichage courant */ }
+    }, [activeProduction?.id]);
+
+    // Bouton « Actualiser » : recharge le résumé (pour refléter les MPN mis à jour
+    // manuellement ou via la section MPN) PUIS ré-actualise les offres/prix (le
+    // refresh backend ré-interroge les fournisseurs avec le MPN à jour).
+    const handleRefreshCommand = React.useCallback(() => {
+        reloadCommandSummary();
+        setRefreshNonce((n) => n + 1);
+    }, [reloadCommandSummary]);
 
     const exportCommandToErp = async () => {
         if (!stockValidation.isValidated) {
@@ -702,7 +731,7 @@ function CommandPage() {
                             color="secondary"
                             startIcon={<RefreshRoundedIcon />}
                             disabled={!isCommandCurrent || refreshState.loading}
-                            onClick={() => setRefreshNonce((n) => n + 1)}
+                            onClick={handleRefreshCommand}
                         >
                             {refreshState.loading ? 'Actualisation...' : 'Actualiser'}
                         </Button>
@@ -800,26 +829,59 @@ function CommandPage() {
                 </CardContent>
             </Card>
 
-            {/* ── Tableau unique : BOM prod + fournisseur + tri + qté reçue ── */}
-            {refreshState.error ? <Alert severity="warning">{refreshState.error}</Alert> : null}
-            <Card sx={CARD_SX}>
-                <CardContent>
-                    <ProcurementTable
-                        rows={procurementRows}
-                        commandId={commandSummary?.command_id || commandSummary?.id}
-                        refreshNonce={refreshNonce}
-                        onRefreshState={setRefreshState}
-                        onLineSaved={handleLineSaved}
-                    />
-                </CardContent>
-            </Card>
+            {/* ── Deux onglets : Composants à commander | Enrichissement MPN ── */}
+            <Box>
+                <Tabs
+                    value={commandTab}
+                    onChange={(event, value) => setCommandTab(value)}
+                    sx={{ borderBottom: `1px solid ${colors.border}`, mb: 3 }}
+                >
+                    <Tab label="Composants à commander" />
+                    <Tab label="Enrichissement MPN" />
+                </Tabs>
 
-            {/* ── Champs pour le fichier ERP (pleine largeur, sous le tableau) ── */}
-            <ErpContextForm
-                exportContext={exportContext}
-                onFieldChange={handleExportContextChange}
-                isExporting={isExporting}
-            />
+                {commandTab === 0 ? (
+                    <Stack spacing={4}>
+                        {refreshState.error ? <Alert severity="warning">{refreshState.error}</Alert> : null}
+                        <Card sx={CARD_SX}>
+                            <CardContent>
+                                <ProcurementTable
+                                    rows={procurementRows}
+                                    commandId={commandSummary?.command_id || commandSummary?.id}
+                                    refreshNonce={refreshNonce}
+                                    onRefreshState={setRefreshState}
+                                    onLineSaved={handleLineSaved}
+                                />
+                            </CardContent>
+                        </Card>
+                        {/* Champs pour le fichier ERP (liés au flux de commande/export) */}
+                        <ErpContextForm
+                            exportContext={exportContext}
+                            onFieldChange={handleExportContextChange}
+                            isExporting={isExporting}
+                        />
+                    </Stack>
+                ) : (
+                    <Card sx={CARD_SX}>
+                        <CardContent>
+                            <Typography variant="caption" sx={{ color: colors.textMuted, display: 'block', mb: 2 }}>
+                                Renseigne les MPN manquants des composants de cette commande. Le MPN validé est écrit dans la bibliothèque (visible partout).
+                            </Typography>
+                            {(commandSummary?.command_id || commandSummary?.id) ? (
+                                <MpnEnrichmentPanel
+                                    commandId={commandSummary?.command_id || commandSummary?.id}
+                                    onApplied={handleRefreshCommand}
+                                    autoLoad
+                                />
+                            ) : (
+                                <Typography variant="body2" sx={{ color: colors.textMuted }}>
+                                    Génère d'abord la commande pour enrichir ses composants.
+                                </Typography>
+                            )}
+                        </CardContent>
+                    </Card>
+                )}
+            </Box>
         </Stack>
     );
 }
