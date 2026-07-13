@@ -1,27 +1,36 @@
 import React from 'react';
 import {
     Alert,
+    Autocomplete,
     Box,
     Button,
+    Checkbox,
     Chip,
     CircularProgress,
     Dialog,
     DialogActions,
     DialogContent,
     DialogTitle,
+    FormControlLabel,
     IconButton,
+    InputAdornment,
+    MenuItem,
     Stack,
+    Tab,
     Table,
     TableBody,
     TableCell,
     TableContainer,
     TableHead,
     TableRow,
+    Tabs,
     TextField,
     Tooltip,
     Typography,
 } from '@mui/material';
 import DeleteOutlineRoundedIcon from '@mui/icons-material/DeleteOutlineRounded';
+import SearchRoundedIcon from '@mui/icons-material/SearchRounded';
+import AddRoundedIcon from '@mui/icons-material/AddRounded';
 import apiClient from '../../api/client';
 import BomStockDialog from '../bom/BomStockDialog';
 import DeleteComponentDialog from './DeleteComponentDialog';
@@ -42,12 +51,35 @@ function statusChip(status) {
     return <Chip size="small" variant="outlined" color={meta.color} label={meta.label} />;
 }
 
+function fpOf(row) {
+    return row.footprint_pnp || row.footprint_eagle || '';
+}
+
+function componentLabel(row) {
+    return [row.value || '-', fpOf(row) || '-', row.mpn || '-'].join('  ·  ');
+}
+
 function StockPanel() {
     const [rows, setRows] = React.useState([]);
     const [loading, setLoading] = React.useState(true);
     const [error, setError] = React.useState(null);
     const [feedback, setFeedback] = React.useState(null);
     const [globalLoss, setGlobalLoss] = React.useState('');
+
+    // Sous-onglets Inventaire / Réception.
+    const [tab, setTab] = React.useState('inventaire');
+
+    // Inventaire : recherche + filtres.
+    const [search, setSearch] = React.useState('');
+    const [filterType, setFilterType] = React.useState('');
+    const [filterFp, setFilterFp] = React.useState('');
+    const [lowOnly, setLowOnly] = React.useState(false);
+
+    // Réception manuelle (ajoute au stock).
+    const [recComponent, setRecComponent] = React.useState(null);
+    const [recQty, setRecQty] = React.useState('');
+    const [recBusy, setRecBusy] = React.useState(false);
+    const [receipts, setReceipts] = React.useState([]); // historique de session
 
     // Déclaration (BomStockDialog réutilisé, motif declaration set-to).
     const [declareRow, setDeclareRow] = React.useState(null);
@@ -86,6 +118,29 @@ function StockPanel() {
     // Temps réel : rafraîchit silencieusement quand un autre poste modifie le stock.
     useEventStream('stock', React.useCallback(() => { refresh(true); }, [refresh]));
 
+    // ---- Filtres inventaire ----
+    const typeOptions = React.useMemo(
+        () => Array.from(new Set(rows.map((r) => r.component_type).filter(Boolean))).sort(),
+        [rows],
+    );
+    const fpOptions = React.useMemo(
+        () => Array.from(new Set(rows.map(fpOf).filter(Boolean))).sort(),
+        [rows],
+    );
+    const filteredRows = React.useMemo(() => {
+        const q = search.trim().toLowerCase();
+        return rows.filter((r) => {
+            if (q) {
+                const hay = `${r.value || ''} ${r.mpn || ''} ${r.footprint_pnp || ''} ${r.footprint_eagle || ''}`.toLowerCase();
+                if (!hay.includes(q)) return false;
+            }
+            if (filterType && r.component_type !== filterType) return false;
+            if (filterFp && fpOf(r) !== filterFp) return false;
+            if (lowOnly && r.status === 'ok') return false;
+            return true;
+        });
+    }, [rows, search, filterType, filterFp, lowOnly]);
+
     const saveGlobalLoss = async () => {
         try {
             await apiClient.put('/marketplace/stock/settings', {
@@ -94,6 +149,41 @@ function StockPanel() {
             setFeedback('Coefficient de perte global enregistré.');
         } catch (err) {
             setError(err?.response?.data?.detail || 'Échec de la sauvegarde du coefficient.');
+        }
+    };
+
+    // ---- Réception manuelle ----
+    const submitReception = async () => {
+        if (!recComponent || !(Number(recQty) > 0)) return;
+        setRecBusy(true);
+        setError(null);
+        try {
+            const oldQty = Number(recComponent.qty_pieces) || 0;
+            const res = await apiClient.post('/marketplace/stock/movements', {
+                component_id: recComponent.component_id,
+                motif: 'reception',
+                qty: Number(recQty),
+            });
+            const newQty = res.data?.qty_pieces ?? oldQty + Number(recQty);
+            setReceipts((prev) => [
+                {
+                    id: Date.now(),
+                    label: componentLabel(recComponent),
+                    qty: Number(recQty),
+                    old: oldQty,
+                    next: newQty,
+                    date: new Date(),
+                },
+                ...prev,
+            ]);
+            setRecComponent(null);
+            setRecQty('');
+            setFeedback('Réception ajoutée au stock.');
+            await refresh();
+        } catch (err) {
+            setError(err?.response?.data?.detail || 'Échec de la réception.');
+        } finally {
+            setRecBusy(false);
         }
     };
 
@@ -202,96 +292,271 @@ function StockPanel() {
             {error ? <Alert severity="error" onClose={() => setError(null)}>{error}</Alert> : null}
             {feedback ? <Alert severity="success" onClose={() => setFeedback(null)}>{feedback}</Alert> : null}
 
-            <Stack direction="row" spacing={1.5} alignItems="center" flexWrap="wrap" useFlexGap>
-                <TextField
-                    size="small"
-                    type="number"
-                    label="Coefficient de perte global (%)"
-                    value={globalLoss}
-                    onChange={(e) => setGlobalLoss(e.target.value)}
-                    sx={{ maxWidth: 260 }}
-                    helperText="Feeders + repicks (hors SAV). Surchargeable par composant."
-                />
-                <Button variant="outlined" onClick={saveGlobalLoss}>Enregistrer</Button>
-                <Box sx={{ flexGrow: 1 }} />
-                <Button variant="text" onClick={refresh}>Rafraîchir</Button>
-            </Stack>
+            <Tabs value={tab} onChange={(e, v) => setTab(v)} sx={{ borderBottom: 1, borderColor: 'divider', minHeight: 40 }}>
+                <Tab value="inventaire" label="Inventaire" sx={{ minHeight: 40 }} />
+                <Tab value="reception" label="Réception" sx={{ minHeight: 40 }} />
+            </Tabs>
 
-            <TableContainer sx={compactTableContainerSx}>
-                <Table sx={compactTableSx} size="small">
-                    {/* Largeurs fixes : la colonne Actions garde assez de place (Saisir + Corriger + supprimer)
-                        quelle que soit la taille de la fenêtre, sans rogner « Saisir ». */}
-                    <colgroup>
-                        <col style={{ width: '13%' }} />
-                        <col style={{ width: '14%' }} />
-                        <col style={{ width: '12%' }} />
-                        <col style={{ width: '7%' }} />
-                        <col style={{ width: '7%' }} />
-                        <col style={{ width: '7%' }} />
-                        <col style={{ width: '7%' }} />
-                        <col style={{ width: '7%' }} />
-                        <col style={{ width: '6%' }} />
-                        <col style={{ width: '6%' }} />
-                        <col style={{ width: '8%' }} />
-                        <col style={{ width: '186px' }} />
-                    </colgroup>
-                    <TableHead>
-                        <TableRow>
-                            <TableCell sx={compactCellSx}>Value</TableCell>
-                            <TableCell sx={compactCellSx}>MPN</TableCell>
-                            <TableCell sx={compactCellSx}>Empreinte</TableCell>
-                            <TableCell sx={compactCellSx} align="right">Solde</TableCell>
-                            <TableCell sx={compactCellSx} align="right">Engagé</TableCell>
-                            <TableCell sx={compactCellSx} align="right">Libre</TableCell>
-                            <TableCell sx={compactCellSx} align="right">Bobine</TableCell>
-                            <TableCell sx={compactCellSx} align="right">Sachet</TableCell>
-                            <TableCell sx={compactCellSx} align="right">Tube</TableCell>
-                            <TableCell sx={compactCellSx} align="right">Seuil</TableCell>
-                            <TableCell sx={compactCellSx}>Statut</TableCell>
-                            <TableCell sx={{ whiteSpace: 'nowrap' }} align="right">Actions</TableCell>
-                        </TableRow>
-                    </TableHead>
-                    <TableBody>
-                        {rows.length === 0 ? (
-                            <TableRow>
-                                <TableCell sx={compactCellSx} colSpan={12}>
-                                    <Typography variant="body2" sx={{ color: '#a1a1aa', py: 2 }}>
-                                        Aucun composant. Le stock se remplit au fil des déclarations
-                                        et des réceptions de commande.
-                                    </Typography>
-                                </TableCell>
-                            </TableRow>
-                        ) : (
-                            rows.map((row) => (
-                                <TableRow key={row.component_id} hover>
-                                    <TableCell sx={compactCellSx}>{row.value || '-'}</TableCell>
-                                    <TableCell sx={compactCellSx}>{row.mpn || '-'}</TableCell>
-                                    <TableCell sx={compactCellSx}>{row.footprint_pnp || row.footprint_eagle || '-'}</TableCell>
-                                    <TableCell sx={compactCellSx} align="right">{row.qty_pieces}</TableCell>
-                                    <TableCell sx={compactCellSx} align="right">{row.engaged ?? 0}</TableCell>
-                                    <TableCell sx={compactCellSx} align="right">{row.libre ?? row.qty_pieces}</TableCell>
-                                    <TableCell sx={compactCellSx} align="right">{row.qty_reel}</TableCell>
-                                    <TableCell sx={compactCellSx} align="right">{row.qty_bag}</TableCell>
-                                    <TableCell sx={compactCellSx} align="right">{row.qty_tube}</TableCell>
-                                    <TableCell sx={compactCellSx} align="right">{row.safety_stock}</TableCell>
-                                    <TableCell sx={compactCellSx}>{statusChip(row.status)}</TableCell>
-                                    <TableCell sx={{ whiteSpace: 'nowrap', overflow: 'visible' }} align="right">
-                                        <Stack direction="row" spacing={0.5} justifyContent="flex-end" alignItems="center" flexWrap="nowrap">
-                                            <Button size="small" onClick={() => openDeclare(row)} sx={{ minWidth: 0, px: 1 }}>Saisir</Button>
-                                            <Button size="small" color="inherit" onClick={() => openParams(row)} sx={{ minWidth: 0, px: 1 }}>Corriger</Button>
-                                            <Tooltip title="Supprimer le composant (doublon)">
-                                                <IconButton size="small" color="error" onClick={() => setDeleteRow(row)} sx={{ p: 0.5 }}>
-                                                    <DeleteOutlineRoundedIcon fontSize="inherit" />
-                                                </IconButton>
-                                            </Tooltip>
-                                        </Stack>
-                                    </TableCell>
+            {tab === 'inventaire' ? (
+                <>
+                    <Stack direction="row" spacing={1.5} alignItems="center" flexWrap="wrap" useFlexGap>
+                        <TextField
+                            size="small"
+                            type="number"
+                            label="Coefficient de perte global (%)"
+                            value={globalLoss}
+                            onChange={(e) => setGlobalLoss(e.target.value)}
+                            sx={{ maxWidth: 260 }}
+                            helperText="Feeders + repicks (hors SAV). Surchargeable par composant."
+                        />
+                        <Button variant="outlined" onClick={saveGlobalLoss}>Enregistrer</Button>
+                        <Box sx={{ flexGrow: 1 }} />
+                        <Button variant="text" onClick={refresh}>Rafraîchir</Button>
+                    </Stack>
+
+                    <Stack direction="row" spacing={1.5} alignItems="center" flexWrap="wrap" useFlexGap>
+                        <TextField
+                            size="small"
+                            placeholder="Rechercher : valeur, MPN, empreinte…"
+                            value={search}
+                            onChange={(e) => setSearch(e.target.value)}
+                            sx={{ flexGrow: 1, minWidth: 240 }}
+                            InputProps={{
+                                startAdornment: (
+                                    <InputAdornment position="start">
+                                        <SearchRoundedIcon fontSize="small" />
+                                    </InputAdornment>
+                                ),
+                            }}
+                        />
+                        <TextField
+                            select
+                            size="small"
+                            label="Type"
+                            value={filterType}
+                            onChange={(e) => setFilterType(e.target.value)}
+                            sx={{ minWidth: 150 }}
+                        >
+                            <MenuItem value="">Tous</MenuItem>
+                            {typeOptions.map((t) => (
+                                <MenuItem key={t} value={t}>{t}</MenuItem>
+                            ))}
+                        </TextField>
+                        <TextField
+                            select
+                            size="small"
+                            label="Empreinte"
+                            value={filterFp}
+                            onChange={(e) => setFilterFp(e.target.value)}
+                            sx={{ minWidth: 150 }}
+                        >
+                            <MenuItem value="">Toutes</MenuItem>
+                            {fpOptions.map((f) => (
+                                <MenuItem key={f} value={f}>{f}</MenuItem>
+                            ))}
+                        </TextField>
+                        <FormControlLabel
+                            control={<Checkbox size="small" checked={lowOnly} onChange={(e) => setLowOnly(e.target.checked)} />}
+                            label="Stock faible"
+                        />
+                    </Stack>
+
+                    <TableContainer sx={compactTableContainerSx}>
+                        <Table sx={compactTableSx} size="small">
+                            {/* Largeurs fixes : la colonne Actions garde assez de place (Saisir + Corriger + supprimer)
+                                quelle que soit la taille de la fenêtre, sans rogner « Saisir ». */}
+                            <colgroup>
+                                <col style={{ width: '13%' }} />
+                                <col style={{ width: '14%' }} />
+                                <col style={{ width: '12%' }} />
+                                <col style={{ width: '7%' }} />
+                                <col style={{ width: '7%' }} />
+                                <col style={{ width: '7%' }} />
+                                <col style={{ width: '7%' }} />
+                                <col style={{ width: '7%' }} />
+                                <col style={{ width: '6%' }} />
+                                <col style={{ width: '6%' }} />
+                                <col style={{ width: '8%' }} />
+                                <col style={{ width: '186px' }} />
+                            </colgroup>
+                            <TableHead>
+                                <TableRow>
+                                    <TableCell sx={compactCellSx}>Value</TableCell>
+                                    <TableCell sx={compactCellSx}>MPN</TableCell>
+                                    <TableCell sx={compactCellSx}>Empreinte</TableCell>
+                                    <TableCell sx={compactCellSx} align="right">Solde</TableCell>
+                                    <TableCell sx={compactCellSx} align="right">Engagé</TableCell>
+                                    <TableCell sx={compactCellSx} align="right">Libre</TableCell>
+                                    <TableCell sx={compactCellSx} align="right">Bobine</TableCell>
+                                    <TableCell sx={compactCellSx} align="right">Sachet</TableCell>
+                                    <TableCell sx={compactCellSx} align="right">Tube</TableCell>
+                                    <TableCell sx={compactCellSx} align="right">Seuil</TableCell>
+                                    <TableCell sx={compactCellSx}>Statut</TableCell>
+                                    <TableCell sx={{ whiteSpace: 'nowrap' }} align="right">Actions</TableCell>
                                 </TableRow>
-                            ))
-                        )}
-                    </TableBody>
-                </Table>
-            </TableContainer>
+                            </TableHead>
+                            <TableBody>
+                                {filteredRows.length === 0 ? (
+                                    <TableRow>
+                                        <TableCell sx={compactCellSx} colSpan={12}>
+                                            <Typography variant="body2" sx={{ color: '#a1a1aa', py: 2 }}>
+                                                {rows.length === 0
+                                                    ? 'Aucun composant. Le stock se remplit au fil des déclarations et des réceptions de commande.'
+                                                    : 'Aucun composant ne correspond à la recherche / aux filtres.'}
+                                            </Typography>
+                                        </TableCell>
+                                    </TableRow>
+                                ) : (
+                                    filteredRows.map((row) => (
+                                        <TableRow key={row.component_id} hover>
+                                            <TableCell sx={compactCellSx}>{row.value || '-'}</TableCell>
+                                            <TableCell sx={compactCellSx}>{row.mpn || '-'}</TableCell>
+                                            <TableCell sx={compactCellSx}>{row.footprint_pnp || row.footprint_eagle || '-'}</TableCell>
+                                            <TableCell sx={compactCellSx} align="right">{row.qty_pieces}</TableCell>
+                                            <TableCell sx={compactCellSx} align="right">{row.engaged ?? 0}</TableCell>
+                                            <TableCell sx={compactCellSx} align="right">{row.libre ?? row.qty_pieces}</TableCell>
+                                            <TableCell sx={compactCellSx} align="right">{row.qty_reel}</TableCell>
+                                            <TableCell sx={compactCellSx} align="right">{row.qty_bag}</TableCell>
+                                            <TableCell sx={compactCellSx} align="right">{row.qty_tube}</TableCell>
+                                            <TableCell sx={compactCellSx} align="right">{row.safety_stock}</TableCell>
+                                            <TableCell sx={compactCellSx}>{statusChip(row.status)}</TableCell>
+                                            <TableCell sx={{ whiteSpace: 'nowrap', overflow: 'visible' }} align="right">
+                                                <Stack direction="row" spacing={0.5} justifyContent="flex-end" alignItems="center" flexWrap="nowrap">
+                                                    <Button size="small" onClick={() => openDeclare(row)} sx={{ minWidth: 0, px: 1 }}>Saisir</Button>
+                                                    <Button size="small" color="inherit" onClick={() => openParams(row)} sx={{ minWidth: 0, px: 1 }}>Corriger</Button>
+                                                    <Tooltip title="Supprimer le composant (doublon)">
+                                                        <IconButton size="small" color="error" onClick={() => setDeleteRow(row)} sx={{ p: 0.5 }}>
+                                                            <DeleteOutlineRoundedIcon fontSize="inherit" />
+                                                        </IconButton>
+                                                    </Tooltip>
+                                                </Stack>
+                                            </TableCell>
+                                        </TableRow>
+                                    ))
+                                )}
+                            </TableBody>
+                        </Table>
+                    </TableContainer>
+                    <Typography variant="caption" sx={{ color: '#a1a1aa' }}>
+                        {filteredRows.length} composant(s) affiché(s){filteredRows.length !== rows.length ? ` sur ${rows.length}` : ''}
+                    </Typography>
+                </>
+            ) : (
+                <>
+                    <Box sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2, p: 2 }}>
+                        <Typography variant="subtitle1" sx={{ fontWeight: 500, mb: 0.5 }}>
+                            Réceptionner un composant reçu
+                        </Typography>
+                        <Typography variant="body2" sx={{ color: '#a1a1aa', mb: 2 }}>
+                            La quantité saisie s'ajoute au stock du composant. La Revue BOM se met à jour automatiquement.
+                        </Typography>
+
+                        <Stack direction="row" spacing={1.5} alignItems="flex-start" flexWrap="wrap" useFlexGap>
+                            <Autocomplete
+                                sx={{ flexGrow: 1, minWidth: 320 }}
+                                options={rows}
+                                value={recComponent}
+                                onChange={(e, v) => setRecComponent(v)}
+                                getOptionLabel={(o) => (o ? componentLabel(o) : '')}
+                                isOptionEqualToValue={(o, v) => o.component_id === v.component_id}
+                                filterOptions={(opts, state) => {
+                                    const q = state.inputValue.trim().toLowerCase();
+                                    if (!q) return opts.slice(0, 30);
+                                    return opts
+                                        .filter((o) => `${o.value || ''} ${o.mpn || ''} ${o.footprint_pnp || ''} ${o.footprint_eagle || ''}`.toLowerCase().includes(q))
+                                        .slice(0, 30);
+                                }}
+                                renderOption={(props, o) => (
+                                    <li {...props} key={o.component_id}>
+                                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', gap: 1 }}>
+                                            <Box sx={{ minWidth: 0 }}>
+                                                <Typography variant="body2" component="span" sx={{ fontWeight: 500 }}>
+                                                    {o.value || '-'}
+                                                </Typography>
+                                                <Typography variant="body2" component="span" sx={{ color: '#a1a1aa' }}>
+                                                    {' · '}{fpOf(o) || '-'}
+                                                </Typography>
+                                                <Typography variant="caption" component="div" sx={{ color: '#a1a1aa' }} noWrap>
+                                                    {o.mpn || '-'}
+                                                </Typography>
+                                            </Box>
+                                            <Typography variant="caption" sx={{ whiteSpace: 'nowrap', color: '#a1a1aa' }}>
+                                                stock {o.qty_pieces}
+                                            </Typography>
+                                        </Box>
+                                    </li>
+                                )}
+                                renderInput={(params) => (
+                                    <TextField
+                                        {...params}
+                                        size="small"
+                                        label="Composant"
+                                        placeholder="Tape une valeur ou un MPN…"
+                                    />
+                                )}
+                            />
+                            <TextField
+                                size="small"
+                                type="number"
+                                label="Quantité reçue"
+                                value={recQty}
+                                onChange={(e) => setRecQty(e.target.value)}
+                                sx={{ width: 160 }}
+                                inputProps={{ min: 1 }}
+                            />
+                            <Button
+                                variant="contained"
+                                color="success"
+                                startIcon={<AddRoundedIcon />}
+                                disabled={recBusy || !recComponent || !(Number(recQty) > 0)}
+                                onClick={submitReception}
+                                sx={{ height: 40 }}
+                            >
+                                Ajouter au stock
+                            </Button>
+                        </Stack>
+                        {recComponent ? (
+                            <Typography variant="caption" sx={{ color: '#a1a1aa', display: 'block', mt: 1 }}>
+                                {recComponent.value || '-'} {fpOf(recComponent)} — stock actuel : <b>{recComponent.qty_pieces}</b> pcs
+                            </Typography>
+                        ) : null}
+                    </Box>
+
+                    <Typography variant="subtitle2" sx={{ fontWeight: 500 }}>Réceptions récentes</Typography>
+                    {receipts.length === 0 ? (
+                        <Typography variant="body2" sx={{ color: '#a1a1aa' }}>
+                            Aucune réception depuis l'ouverture de la page.
+                        </Typography>
+                    ) : (
+                        <TableContainer sx={compactTableContainerSx}>
+                            <Table sx={compactTableSx} size="small">
+                                <TableHead>
+                                    <TableRow>
+                                        <TableCell sx={compactCellSx}>Composant</TableCell>
+                                        <TableCell sx={compactCellSx} align="right">Reçu</TableCell>
+                                        <TableCell sx={compactCellSx} align="right">Ancien</TableCell>
+                                        <TableCell sx={compactCellSx} align="right">Nouveau</TableCell>
+                                        <TableCell sx={compactCellSx}>Heure</TableCell>
+                                    </TableRow>
+                                </TableHead>
+                                <TableBody>
+                                    {receipts.map((r) => (
+                                        <TableRow key={r.id}>
+                                            <TableCell sx={compactCellSx}>{r.label}</TableCell>
+                                            <TableCell sx={compactCellSx} align="right">+{r.qty}</TableCell>
+                                            <TableCell sx={{ ...compactCellSx, color: '#a1a1aa' }} align="right">{r.old}</TableCell>
+                                            <TableCell sx={{ ...compactCellSx, fontWeight: 600 }} align="right">{r.next}</TableCell>
+                                            <TableCell sx={{ ...compactCellSx, color: '#a1a1aa' }}>
+                                                {r.date.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
+                                            </TableCell>
+                                        </TableRow>
+                                    ))}
+                                </TableBody>
+                            </Table>
+                        </TableContainer>
+                    )}
+                </>
+            )}
 
             <DeleteComponentDialog
                 open={Boolean(deleteRow)}

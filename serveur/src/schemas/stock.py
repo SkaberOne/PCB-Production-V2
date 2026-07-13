@@ -10,17 +10,20 @@ from ..models.stock import StockConditionnement, StockMotif, StockSens
 
 # ------------------------------------------------------------------ requests
 class MovementCreateRequest(BaseModel):
-    """Create a manual movement. Only ``declaration`` / ``correction`` are allowed
-    (``reception`` and ``production`` are posted automatically by the system)."""
+    """Create a manual movement: ``declaration`` (set-to recount), ``correction``
+    (set-to inventory) or ``reception`` (additive manual reception from the Stock
+    tab). ``production`` and auto command receptions are posted by the system."""
 
     component_id: int = Field(..., gt=0)
-    motif: Literal["declaration", "correction"]
+    motif: Literal["declaration", "correction", "reception"]
     # declaration (set-to recount from BomStockDialog) — piece counts per form:
     qty_reel: int = Field(default=0, ge=0)
     qty_bag: int = Field(default=0, ge=0)
     qty_tube: int = Field(default=0, ge=0)
     # correction (periodic recount) — new absolute balance:
     new_total: Optional[int] = None
+    # reception (manual add) — quantity received to add to the balance:
+    qty: int = Field(default=0, ge=0)
     note: Optional[str] = Field(default=None, max_length=500)
 
 
