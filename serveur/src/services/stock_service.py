@@ -318,6 +318,37 @@ class StockService:
         db.commit()
         cls.recompute_solde(db, component_id)
 
+    # ----------------------------------------------- manual reception (add)
+    @classmethod
+    def post_manual_reception(
+        cls,
+        db: Session,
+        component_id: int,
+        qty: int,
+        note: Optional[str] = None,
+    ) -> ComponentStock:
+        """Manual reception from the Stock › Réception tab: additive IN movement.
+
+        Unlike ``post_reception`` (idempotent per CommandReceipt), each call here
+        appends a fresh IN (unique uuid source_id) so the received quantity is
+        *added* to the current balance. Reversible like any other movement.
+        """
+        q = int(qty or 0)
+        if q > 0:
+            cls._insert(
+                db,
+                component_id=component_id,
+                sens=StockSens.IN,
+                qty=q,
+                motif=StockMotif.reception,
+                source_type="reception_manuelle",
+                source_id=uuid.uuid4().hex,
+                note=note or "Réception manuelle (onglet Stock)",
+            )
+            db.commit()
+        cls.recompute_solde(db, component_id)
+        return cls.get_or_create_stock(db, component_id)
+
     # ------------------------------------------------------ reversible undo
     @classmethod
     def cancel_movement(cls, db: Session, movement_id: int) -> StockMovement:

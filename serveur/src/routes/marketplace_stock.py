@@ -111,6 +111,17 @@ def create_movement(request: MovementCreateRequest, db: Session = Depends(get_db
             qty_tube=request.qty_tube,
             note=request.note,
         )
+    elif request.motif == "reception":
+        if not request.qty or request.qty <= 0:
+            raise HTTPException(
+                status_code=422, detail="qty > 0 requis pour une réception"
+            )
+        stock = StockService.post_manual_reception(
+            db,
+            component_id=request.component_id,
+            qty=request.qty,
+            note=request.note,
+        )
     else:  # correction
         if request.new_total is None:
             raise HTTPException(
