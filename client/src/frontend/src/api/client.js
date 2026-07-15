@@ -46,6 +46,26 @@ export function setStoredApiKey(key) {
     } catch (e) { /* localStorage indispo — ignore */ }
 }
 
+// ── Identité de poste (ADR 0015) : nom saisi une fois dans Paramètres, mémorisé
+// dans le navigateur, envoyé en header X-Workstation pour tracer les écritures. ──
+const WORKSTATION_STORAGE = 'pcbflow_workstation';
+
+export function getStoredWorkstation() {
+    try {
+        return (typeof localStorage !== 'undefined' && localStorage.getItem(WORKSTATION_STORAGE)) || null;
+    } catch (e) {
+        return null;
+    }
+}
+
+export function setStoredWorkstation(name) {
+    try {
+        const value = (name || '').trim();
+        if (value) localStorage.setItem(WORKSTATION_STORAGE, value.slice(0, 60));
+        else localStorage.removeItem(WORKSTATION_STORAGE);
+    } catch (e) { /* localStorage indispo — ignore */ }
+}
+
 function resolveApiKey() {
     // Clé X-API-Key injectée par Electron en mode packagé (auth obligatoire).
     if (typeof window !== 'undefined' && window.electronAPI
@@ -82,6 +102,9 @@ apiClient.interceptors.request.use(
         // Clé injectée à chaque requête (reflète la dernière valeur mémorisée).
         const key = resolveApiKey();
         if (key) config.headers['X-API-Key'] = key;
+        // Identité de poste (ADR 0015) — traçabilité des écritures stock.
+        const workstation = getStoredWorkstation();
+        if (workstation) config.headers['X-Workstation'] = workstation;
         return config;
     },
     (error) => Promise.reject(error),

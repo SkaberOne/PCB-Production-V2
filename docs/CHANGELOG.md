@@ -5,6 +5,41 @@
 
 ---
 
+## 2026-07-15 — Session 11 : Audit + refactor P0 + réception avec création (ADR 0015)
+
+### Audit
+- `docs/audits/Audit_2026-07-15_etat_des_lieux_pre_features.md` : état des lieux complet
+  avant les 3 features (réception+création, scan code-barres, dashboard). Base saine ;
+  défauts = pages surdimensionnées, réception limitée, doc périmée.
+
+### Refactor P0 (PR #46, mergée — ⚠ dans `main` par erreur, `dev` réaligné en ff)
+- `DashboardPage.jsx` 1085 → 271 L (7 composants `components/dashboard/` + 2 hooks)
+- `StockPanel.jsx` 625 → 118 L (`StockInventoryTab`, `StockReceptionTab`,
+  `StockCorrectionDialog`, `stockHelpers`) — onglets montés en display:none (état préservé)
+- Ménage : 9 branches mergées supprimées (3 locales + 6 remote)
+
+### Feature réception + identité de poste (branche `feat/reception-creation-composant`)
+- **ADR 0015** (implémenté) : header `X-Workstation` → colonne `created_by` (String(60),
+  nullable) sur `STOCK_MOVEMENTS`. Migration additive `e5f6a7b8c9d0`. Injecté par
+  `api/client.js` (localStorage `pcbflow_workstation`), saisie dans Paramètres
+  (`WorkstationSetting`). Exposé dans `MovementOut`.
+- **`POST /api/marketplace/stock/receptions`** : réception d'un composant existant
+  (`component_id`) OU **créé à la volée** (`new_component`, MPN obligatoire).
+  Dédoublonnage par MPN (insensible casse) avant création ; sinon
+  `get_or_create_component` (étendu : `footprint_pnp`, `description`).
+- UI : dialog « Créer et réceptionner » dans l'onglet Réception, badge « créé »
+  dans les réceptions récentes.
+- Tests : +7 (`test_stock_reception_create.py`) — backend **460 passed, 1 skipped** ;
+  frontend 27 suites / 109 tests verts.
+
+### Notes
+- Suite backend passée de 133/192 (mai) à 460/461 : l'isolation SQLite ne bloque plus.
+- Prochaines étapes : feature scan code-barres (attend photos étiquettes Mouser/DigiKey/
+  Farnell/RS — parseur ECIA pressenti), puis dashboard enrichi (endpoint agrégé
+  `productions-summary` à créer).
+
+---
+
 ## 2026-07-03 — Session 10 : Activation du stock + release 1.0.9 (déploiement atelier)
 
 ### Contexte
