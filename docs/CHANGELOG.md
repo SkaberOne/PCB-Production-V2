@@ -32,6 +32,22 @@
 - Tests : +7 (`test_stock_reception_create.py`) — backend **460 passed, 1 skipped** ;
   frontend 27 suites / 109 tests verts.
 
+### Feature dashboard enrichi (branche `feat/dashboard-productions-summary`)
+- **`GET /api/reports/productions-summary`** : résumé agrégé par production en cours
+  (DRAFT+ACTIVE) — avancement cartes (cible = Σ quantity_to_produce, produites = Σ runs
+  non annulés), « Puis-je produire ? » (can_produce + manques), dernière commande,
+  machine, présence postes. `?include_finished=true` pour tout.
+- UI : panneau « Productions en cours » (`ProductionSummaryCards`) en colonne droite du
+  dashboard — carte par production avec barre d'avancement, chips stock/commande/machine/
+  postes, refresh silencieux sur événements stock (SSE).
+- Tests : +2 (`test_productions_summary.py`) ; mocks du test DashboardPage rendus
+  URL-aware (plus de dépendance à l'ordre des GET).
+
+### Staging
+- `ECB_Production_STAGING` rafraîchie = copie de la prod du jour (backup COPY_ONLY +
+  restore). Staging :8001 relancé sur `dev` (réception + création + created_by actifs,
+  migration auto). Prod :8000 intacte.
+
 ### Notes
 - Suite backend passée de 133/192 (mai) à 460/461 : l'isolation SQLite ne bloque plus.
 - Prochaines étapes : feature scan code-barres (attend photos étiquettes Mouser/DigiKey/
