@@ -212,7 +212,12 @@ function AppShell({ pages, children }) {
     const currentPage = pages.find((page) => page.path === location.pathname) ?? pages[0];
     const isWorkflowPage = currentPage?.group === 'workflow';
 
-    const workflowPages = pages.filter((p) => p.group === 'workflow');
+    // Production assemblée à la main : l'étape « Machine PnP » est masquée
+    // (sidebar + stepper). Les anciennes sessions sans assembly_mode = PNP.
+    const isManualAssembly = String(activeProduction?.assembly_mode || '').toUpperCase() === 'MANUEL';
+    const workflowPages = pages.filter(
+        (p) => p.group === 'workflow' && !(isManualAssembly && p.path === '/machine-pnp'),
+    );
     const libraryPages = pages.filter((p) => p.group === 'library');
     const systemPages = pages.filter((p) => p.group === 'system');
 

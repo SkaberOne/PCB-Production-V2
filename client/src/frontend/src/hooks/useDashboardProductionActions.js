@@ -41,14 +41,53 @@ function useDashboardProductionActions({
 }) {
     const [createDialogOpen, setCreateDialogOpen] = React.useState(false);
     const [createName, setCreateName] = React.useState('');
+    const [createAssemblyMode, setCreateAssemblyMode] = React.useState('PNP');
     const [createDialogError, setCreateDialogError] = React.useState('');
     const [deleteDialog, setDeleteDialog] = React.useState({ open: false, production: null });
     const [renameDialog, setRenameDialog] = React.useState({ open: false, production: null, name: '' });
     const [reactivationDialog, setReactivationDialog] = React.useState({ open: false, production: null });
+    const [assemblyDialog, setAssemblyDialog] = React.useState({ open: false, production: null, mode: 'PNP' });
+
+    const handleRequestAssemblyMode = React.useCallback((production) => {
+        setAssemblyDialog({
+            open: true,
+            production,
+            mode: String(production?.assembly_mode || 'PNP').toUpperCase(),
+        });
+    }, []);
+
+    const handleCloseAssemblyDialog = React.useCallback(() => {
+        setAssemblyDialog({ open: false, production: null, mode: 'PNP' });
+    }, []);
+
+    const handleConfirmAssemblyMode = React.useCallback(async () => {
+        const production = assemblyDialog.production;
+        if (!production) return;
+        setActionLoadingId(production.id);
+        try {
+            await apiClient.patch(`/marketplace/productions/${production.id}`, {
+                assembly_mode: assemblyDialog.mode,
+            });
+            setAssemblyDialog({ open: false, production: null, mode: 'PNP' });
+            setFeedback({
+                type: 'success',
+                message: `Mode d'assemblage de « ${production.name} » mis à jour.`,
+            });
+            await loadProductions({ preserveFeedback: true });
+        } catch (requestError) {
+            setFeedback({
+                type: 'error',
+                message: requestError.response?.data?.detail || 'Échec du changement de mode.',
+            });
+        } finally {
+            setActionLoadingId(null);
+        }
+    }, [assemblyDialog, loadProductions, setFeedback, setActionLoadingId]);
 
     const handleOpenCreateDialog = React.useCallback(() => {
         setCreateDialogError('');
         setCreateName(buildSuggestedProductionName(productions));
+        setCreateAssemblyMode('PNP');
         setCreateDialogOpen(true);
     }, [productions]);
 
@@ -64,6 +103,7 @@ function useDashboardProductionActions({
         try {
             const response = await apiClient.post(`/marketplace/productions`, {
                 name: normalizedName,
+                assembly_mode: createAssemblyMode,
             });
             activateProductionSession(response.data);
             setCreateDialogOpen(false);
@@ -249,7 +289,14 @@ function useDashboardProductionActions({
         setCreateDialogOpen,
         createName,
         setCreateName,
+        createAssemblyMode,
+        setCreateAssemblyMode,
         createDialogError,
+        assemblyDialog,
+        setAssemblyDialog,
+        handleRequestAssemblyMode,
+        handleCloseAssemblyDialog,
+        handleConfirmAssemblyMode,
         deleteDialog,
         renameDialog,
         setRenameDialog,

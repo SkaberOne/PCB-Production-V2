@@ -1,5 +1,6 @@
 import React from 'react';
 import ArchiveRoundedIcon from '@mui/icons-material/ArchiveRounded';
+import BackHandRoundedIcon from '@mui/icons-material/BackHandRounded';
 import ContentCopyRoundedIcon from '@mui/icons-material/ContentCopyRounded';
 import DeleteOutlineRoundedIcon from '@mui/icons-material/DeleteOutlineRounded';
 import DriveFileRenameOutlineRoundedIcon from '@mui/icons-material/DriveFileRenameOutlineRounded';
@@ -109,6 +110,7 @@ const DashboardProductionRow = React.memo(function DashboardProductionRow({
     onRequestRenameProduction,
     onRequestArchiveProduction,
     onRequestDuplicateProduction,
+    onRequestAssemblyMode,
 }) {
     const [menuAnchor, setMenuAnchor] = React.useState(null);
     const statusUi = React.useMemo(
@@ -138,6 +140,10 @@ const DashboardProductionRow = React.memo(function DashboardProductionRow({
         setMenuAnchor(null);
         onRequestDuplicateProduction(production);
     }, [onRequestDuplicateProduction, production]);
+    const handleAssemblyMode = React.useCallback(() => {
+        setMenuAnchor(null);
+        onRequestAssemblyMode(production);
+    }, [onRequestAssemblyMode, production]);
 
     const isArchived = String(production.status || '').toUpperCase() === 'ARCHIVED';
 
@@ -254,6 +260,10 @@ const DashboardProductionRow = React.memo(function DashboardProductionRow({
                         <MenuItem onClick={handleRename}>
                             <ListItemIcon><DriveFileRenameOutlineRoundedIcon fontSize="small" sx={{ color: '#a1a1aa' }} /></ListItemIcon>
                             <ListItemText>Renommer</ListItemText>
+                        </MenuItem>
+                        <MenuItem onClick={handleAssemblyMode}>
+                            <ListItemIcon><BackHandRoundedIcon fontSize="small" sx={{ color: '#a1a1aa' }} /></ListItemIcon>
+                            <ListItemText>Mode d'assemblage…</ListItemText>
                         </MenuItem>
                         <MenuItem onClick={handleDuplicate}>
                             <ListItemIcon><ContentCopyRoundedIcon fontSize="small" sx={{ color: '#a1a1aa' }} /></ListItemIcon>

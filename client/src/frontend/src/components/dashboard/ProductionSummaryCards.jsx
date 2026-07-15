@@ -11,10 +11,13 @@ import {
     Tooltip,
     Typography,
 } from '@mui/material';
+import AddRoundedIcon from '@mui/icons-material/AddRounded';
+import BackHandRoundedIcon from '@mui/icons-material/BackHandRounded';
 import GroupsRoundedIcon from '@mui/icons-material/GroupsRounded';
 import PrecisionManufacturingRoundedIcon from '@mui/icons-material/PrecisionManufacturingRounded';
 import apiClient from '../../api/client';
 import useEventStream from '../../hooks/useEventStream';
+import ProduceRunDialog from './ProduceRunDialog';
 
 const STATUS_UI = {
     DRAFT: { label: 'Brouillon', color: 'default' },
@@ -55,11 +58,13 @@ function stockChip(stock) {
 function ProductionSummaryCards({ activeProductionId }) {
     const [items, setItems] = React.useState(null); // null = chargement initial
     const [error, setError] = React.useState(null);
+    const [produceFor, setProduceFor] = React.useState(null); // production du dialog lot
+    const [lastLot, setLastLot] = React.useState(null);
 
     const load = React.useCallback(async (silent = false) => {
         if (!silent) setError(null);
         try {
-            const res = await apiClient.get('/reports/productions-summary');
+            const res = await apiClient.get('/reports/productions-summary?include_finished=true');
             setItems(Array.isArray(res.data) ? res.data : []);
         } catch (err) {
             if (!silent) {
@@ -68,6 +73,16 @@ function ProductionSummaryCards({ activeProductionId }) {
             }
         }
     }, []);
+
+    // « En cours » = DRAFT/ACTIVE ; « Terminées » = COMPLETED (les archivées sont masquées).
+    const inProgress = React.useMemo(
+        () => (items || []).filter((p) => p.status === 'DRAFT' || p.status === 'ACTIVE'),
+        [items],
+    );
+    const finished = React.useMemo(
+        () => (items || []).filter((p) => p.status === 'COMPLETED').slice(0, 5),
+        [items],
+    );
 
     React.useEffect(() => { load(); }, [load]);
     useEventStream('stock', React.useCallback(() => { load(true); }, [load]));
@@ -91,13 +106,13 @@ function ProductionSummaryCards({ activeProductionId }) {
                         <Skeleton variant="rounded" height={96} />
                         <Skeleton variant="rounded" height={96} />
                     </Stack>
-                ) : items.length === 0 && !error ? (
+                ) : inProgress.length === 0 && !error ? (
                     <Typography variant="body2" sx={{ color: '#a1a1aa' }}>
                         Aucune production en cours.
                     </Typography>
                 ) : (
                     <Stack spacing={1.5}>
-                        {items.map((p) => {
+                        {inProgress.map((p) => {
                             const statusUi = STATUS_UI[p.status] || { label: p.status || '—', color: 'default' };
                             const commandUi = p.command ? COMMAND_UI[p.command.status] : null;
                             const target = Number(p.boards_target) || 0;
@@ -145,16 +160,28 @@ function ProductionSummaryCards({ activeProductionId }) {
                                             label={`${p.revisions_count} BOM`}
                                             sx={{ color: '#a1a1aa' }}
                                         />
-                                        {p.machine ? (
-                                            <Tooltip title="Machine assignée">
+                                        {p.assembly_mode === 'MANUEL' ? (
+                                            <Tooltip title="Cartes assemblées à la main (pas de machine PnP)">
+                                                <Chip
+                                                    size="small"
+                                                    variant="outlined"
+                                                    icon={<BackHandRoundedIcon />}
+                                                    label="À la main"
+                                                    sx={{ color: '#a1a1aa' }}
+                                                />
+                                            </Tooltip>
+                                        ) : p.machine ? (
+                                            <Tooltip title={p.assembly_mode === 'MIXTE' ? 'Assemblage mixte (PnP + main)' : 'Machine assignée'}>
                                                 <Chip
                                                     size="small"
                                                     variant="outlined"
                                                     icon={<PrecisionManufacturingRoundedIcon />}
-                                                    label={p.machine.name}
+                                                    label={p.assembly_mode === 'MIXTE' ? `${p.machine.name} + main` : p.machine.name}
                                                     sx={{ color: '#a1a1aa' }}
                                                 />
                                             </Tooltip>
+                                        ) : p.assembly_mode === 'MIXTE' ? (
+                                            <Chip size="small" variant="outlined" label="Mixte" sx={{ color: '#a1a1aa' }} />
                                         ) : null}
                                         {p.presence_count > 0 ? (
                                             <Tooltip title="Postes actuellement sur cette production">
@@ -167,12 +194,70 @@ function ProductionSummaryCards({ activeProductionId }) {
                                                 />
                                             </Tooltip>
                                         ) : null}
+                                        <Box sx={{ flexGrow: 1 }} />
+                                        <Button
+                                            size="small"
+                                            variant="outlined"
+                                            startIcon={<AddRoundedIcon />}
+                                            onClick={() => setProduceFor(p)}
+                                            sx={{ minWidth: 0, px: 1, py: 0.25, fontSize: 12 }}
+                                        >
+                                            Déclarer un lot
+                                        </Button>
                                     </Stack>
                                 </Box>
                             );
                         })}
                     </Stack>
                 )}
+
+                {finished.length > 0 ? (
+                    <>
+                        <Typography variant="subtitle2" sx={{ color: '#a1a1aa', fontWeight: 500, mt: 2.5, mb: 1 }}>
+                            Terminées
+                        </Typography>
+                        <Stack spacing={1}>
+                            {finished.map((p) => (
+                                <Box
+                                    key={p.id}
+                                    sx={{
+                                        border: '1px solid #27272a',
+                                        borderRadius: 2,
+                                        p: 1.25,
+                                        opacity: 0.75,
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: 1,
+                                    }}
+                                >
+                                    <Typography variant="body2" sx={{ color: '#d4d4d8', flexGrow: 1 }} noWrap>
+                                        {p.name}
+                                    </Typography>
+                                    <Typography variant="caption" sx={{ color: '#a1a1aa', whiteSpace: 'nowrap' }}>
+                                        {p.boards_produced} carte(s)
+                                    </Typography>
+                                    <Chip size="small" variant="outlined" color="info" label="Terminée" />
+                                </Box>
+                            ))}
+                        </Stack>
+                    </>
+                ) : null}
+
+                {lastLot ? (
+                    <Typography variant="caption" sx={{ color: '#34d399', display: 'block', mt: 1.5 }}>
+                        {lastLot}
+                    </Typography>
+                ) : null}
+
+                <ProduceRunDialog
+                    open={Boolean(produceFor)}
+                    production={produceFor}
+                    onClose={() => setProduceFor(null)}
+                    onSaved={(boards, byHand, completed) => {
+                        setLastLot(`Lot enregistré : ${boards} carte(s) ${byHand ? 'à la main' : 'en machine'}${completed ? ' — production terminée' : ''} — stock mis à jour.`);
+                        load(true);
+                    }}
+                />
             </CardContent>
         </Card>
     );

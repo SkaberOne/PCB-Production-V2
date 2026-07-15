@@ -43,6 +43,37 @@
 - Tests : +2 (`test_productions_summary.py`) ; mocks du test DashboardPage rendus
   URL-aware (plus de dépendance à l'ordre des GET).
 
+### Feature mode d'assemblage (branche `feat/mode-assemblage`)
+- **`PRODUCTIONS.assembly_mode`** (PNP | MANUEL | MIXTE, défaut PNP, migration additive
+  `f6a7b8c9d0e1`) : les cartes peuvent être assemblées **à la main**, pas seulement par
+  la machine PnP. Choix au moment de la création (ToggleButtons), modifiable en PATCH.
+- Production MANUEL : l'étape « Machine PnP » est **masquée** (sidebar + stepper,
+  `AppShell`). Chips dashboard : « À la main » / « machine + main » (MIXTE).
+- Tests : +4 (`test_assembly_mode.py`).
+
+### Feature déclaration de lot dashboard (branche `feat/declaration-lot-dashboard`)
+- **`POST /api/marketplace/productions/{id}/produce`** : clôture de lot **sans machine
+  obligatoire** (cartes à la main) — jusqu'ici uniquement via la page Machine PnP.
+  `ProduceRequest.machine_id` optionnel ; `PRODUCTION_RUNS.created_by` (migration
+  `a7b8c9d0e1f2`, ADR 0015) trace le poste qui déclare.
+- UI : bouton **« Déclarer un lot »** sur chaque carte « Productions en cours »
+  (`ProduceRunDialog` : cartes, fait par à la main/machine pré-rempli selon le mode, note).
+- UI : entrée **« Mode d'assemblage… »** dans le menu ⋮ des productions
+  (`AssemblyModeDialog`) pour passer une prod existante en MANUEL/MIXTE/PNP.
+- Tests : +3 (`test_produce_dashboard.py`).
+
+### Feature clôture au lot (branche `feat/cloture-production-lot`)
+- `ProduceRequest.complete_production` : marquer la production **terminée** en déclarant
+  un lot → passe en COMPLETED (quitte « en cours », libère les réservations ADR 0011).
+- Dialog lot : case « Marquer la production comme terminée », **pré-cochée** quand le
+  lot atteint la cible de cartes. Dashboard : section « Terminées » (5 dernières) sous
+  les productions en cours. Tests : +2 (`test_produce_complete.py`).
+
+### Release 15/07 (PR #50 `dev → main`, déployée)
+- Réception+création, suggestions de types (PR #49), dashboard productions, ADR 0015 :
+  **en prod :8000** (build-web reconstruit, migration `created_by` appliquée sur
+  `ECB_Production`). `.exe` desktop non reconstruit (décision Eric).
+
 ### Staging
 - `ECB_Production_STAGING` rafraîchie = copie de la prod du jour (backup COPY_ONLY +
   restore). Staging :8001 relancé sur `dev` (réception + création + created_by actifs,

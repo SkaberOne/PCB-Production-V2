@@ -33,6 +33,10 @@ class Production(Base):
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String(200), unique=True, nullable=False, index=True)
     machine_id = Column(Integer, ForeignKey("PNP_MACHINES.id"), nullable=True, index=True)
+    # Mode d'assemblage : PNP (machine), MANUEL (à la main), MIXTE. Les cartes
+    # peuvent être assemblées sans machine — le workflow Machine PnP est alors
+    # masqué côté UI. String simple (pas d'Enum SQL) pour rester additif.
+    assembly_mode = Column(String(10), nullable=False, default="PNP", server_default="PNP")
     status = Column(Enum(StatusEnum), default=StatusEnum.ACTIVE)
     notes = Column(Text, nullable=True)
     erp_context = Column(JSON, nullable=True)
@@ -95,6 +99,8 @@ class ProductionRun(Base):
     machine_id = Column(Integer, ForeignKey("PNP_MACHINES.id"), nullable=True, index=True)
     boards_produced = Column(Integer, nullable=False, default=0, server_default="0")
     note = Column(Text, nullable=True)
+    # ADR 0015 : identité de poste (header X-Workstation) — qui a déclaré le lot.
+    created_by = Column(String(60), nullable=True)
     is_cancelled = Column(Boolean, nullable=False, default=False, server_default="0")
     created_at = Column(DateTime, default=utcnow)
     updated_at = Column(DateTime, default=utcnow, onupdate=utcnow)

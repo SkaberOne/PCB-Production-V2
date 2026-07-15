@@ -161,10 +161,19 @@ class StockListOut(BaseModel):
 
 # ---------------------------------------------------------- Phase 2 (ADR 0011)
 class ProduceRequest(BaseModel):
-    """Close a production batch: real number of boards produced."""
+    """Close a production batch: real number of boards produced.
+
+    ``machine_id`` (optionnel) : utilisé par la route dashboard
+    ``POST /productions/{id}/produce`` — None/absent = lot fait à la main.
+    La route machine historique l'ignore (machine dans le chemin).
+    """
 
     boards_produced: int = Field(..., ge=0)
+    machine_id: Optional[int] = Field(default=None, gt=0)
     note: Optional[str] = Field(default=None, max_length=500)
+    # Marquer la production comme terminée après ce lot (dashboard) :
+    # elle quitte « en cours » et libère ses réservations de stock (ADR 0011).
+    complete_production: bool = False
 
 
 class RunOut(BaseModel):
@@ -175,6 +184,7 @@ class RunOut(BaseModel):
     machine_id: Optional[int] = None
     boards_produced: int
     note: Optional[str] = None
+    created_by: Optional[str] = None
     is_cancelled: bool
     created_at: Optional[datetime] = None
 

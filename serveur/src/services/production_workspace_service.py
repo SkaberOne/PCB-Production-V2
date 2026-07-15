@@ -107,6 +107,7 @@ class ProductionWorkspaceService:
             "name": production.name,
             "machine_id": production.machine_id,
             "machine_name": production.machine.name if production.machine else None,
+            "assembly_mode": production.assembly_mode or "PNP",
             "status": production.status.value if hasattr(production.status, "value") else str(production.status),
             "notes": production.notes,
             "erp_context": production.erp_context or {},
@@ -225,12 +226,27 @@ class ProductionWorkspaceService:
         production = ProductionWorkspaceService.get_production_or_raise(db, production_id)
         return ProductionWorkspaceService._serialize_production(production, include_boms=True)
 
+    _ASSEMBLY_MODES = {"PNP", "MANUEL", "MIXTE"}
+
+    @staticmethod
+    def _normalize_assembly_mode(value: Optional[str]) -> Optional[str]:
+        """Valide/normalise le mode d'assemblage. None = non fourni."""
+        if value is None:
+            return None
+        mode = str(value).strip().upper()
+        if mode not in ProductionWorkspaceService._ASSEMBLY_MODES:
+            raise ValueError(
+                f"assembly_mode invalide : {value!r} (attendu PNP, MANUEL ou MIXTE)"
+            )
+        return mode
+
     @staticmethod
     def create_production(
         db: Session,
         name: str,
         machine_id: Optional[int] = None,
         notes: Optional[str] = None,
+        assembly_mode: Optional[str] = None,
     ) -> Dict:
         normalized_name = str(name or "").strip()
         if not normalized_name:
@@ -250,6 +266,7 @@ class ProductionWorkspaceService:
         production = Production(
             name=normalized_name,
             machine_id=assigned_machine_id,
+            assembly_mode=ProductionWorkspaceService._normalize_assembly_mode(assembly_mode) or "PNP",
             status=Production.StatusEnum.ACTIVE,
             notes=notes.strip() if notes else None,
             manufacturing_order_validated_at=None,
@@ -270,8 +287,13 @@ class ProductionWorkspaceService:
         machine_id_provided: bool = False,
         status: Optional[str] = None,
         notes: Optional[str] = None,
+        assembly_mode: Optional[str] = None,
     ) -> Dict:
         production = ProductionWorkspaceService.get_production_or_raise(db, production_id)
+
+        normalized_mode = ProductionWorkspaceService._normalize_assembly_mode(assembly_mode)
+        if normalized_mode is not None:
+            production.assembly_mode = normalized_mode
 
         if name is not None:
             normalized_name = str(name).strip()

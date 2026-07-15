@@ -14,8 +14,11 @@ from ..schemas.marketplace import (
     UpdateProductionBomQuantitiesRequest,
     UpdateProductionRequest,
 )
+from ..schemas.stock import ProduceRequest, RunOut
+from ..services.production_stock_service import ProductionStockService
 from ..services.production_workspace_service import ProductionWorkspaceService
 from ..services import event_bus
+from .marketplace_stock import workstation_header
 
 
 def _build_duplicate_name(db: Session, source_name: str) -> str:
@@ -44,6 +47,7 @@ def create_production(
             name=request.name,
             machine_id=request.machine_id,
             notes=request.notes,
+            assembly_mode=request.assembly_mode,
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -149,11 +153,48 @@ def update_production(
             machine_id_provided="machine_id" in getattr(request, "__fields_set__", set()),
             status=request.status,
             notes=request.notes,
+            assembly_mode=request.assembly_mode,
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error updating production: {str(e)}")
+
+
+@router.post("/{production_id}/produce", response_model=RunOut)
+def produce_production(
+    production_id: int,
+    request: ProduceRequest,
+    db: Session = Depends(get_db),
+    created_by: Optional[str] = Depends(workstation_header),
+):
+    """Déclarer un lot produit depuis le dashboard — machine **optionnelle**.
+
+    ``machine_id`` absent/None = cartes assemblées à la main. Crée un
+    ``ProductionRun`` + sortie stock auto (ADR 0011), annulable, tracé par
+    poste (ADR 0015).
+    """
+    if db.get(Production, production_id) is None:
+        raise HTTPException(status_code=404, detail="Production introuvable")
+    try:
+        run = ProductionStockService.produce(
+            db=db,
+            production_id=production_id,
+            machine_id=request.machine_id,
+            boards_produced=request.boards_produced,
+            note=request.note,
+            created_by=created_by,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    if request.complete_production:
+        # Clôture : quitte « en cours » (dashboard) + libère les réservations
+        # de stock des autres productions (ADR 0011, _ACTIVE_STATUSES).
+        ProductionWorkspaceService.update_production(
+            db=db, production_id=production_id, status="COMPLETED"
+        )
+    event_bus.publish("stock", {"kind": "produce", "production_id": production_id})
+    return run
 
 
 @router.post("/{production_id}/bom-revisions")

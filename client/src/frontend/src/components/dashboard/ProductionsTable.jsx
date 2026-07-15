@@ -42,6 +42,7 @@ function ProductionsTable({
     onRequestRenameProduction,
     onRequestArchiveProduction,
     onRequestDuplicateProduction,
+    onRequestAssemblyMode,
 }) {
     return (
         <Card sx={{ backgroundColor: '#18181b', border: '1px solid #27272a' }}>
@@ -170,6 +171,7 @@ function ProductionsTable({
                                     onRequestRenameProduction={onRequestRenameProduction}
                                     onRequestArchiveProduction={onRequestArchiveProduction}
                                     onRequestDuplicateProduction={onRequestDuplicateProduction}
+                                    onRequestAssemblyMode={onRequestAssemblyMode}
                                 />
                             ))}
                         </TableBody>
