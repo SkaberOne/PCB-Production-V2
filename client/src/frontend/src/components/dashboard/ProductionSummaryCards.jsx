@@ -12,12 +12,14 @@ import {
     Typography,
 } from '@mui/material';
 import AddRoundedIcon from '@mui/icons-material/AddRounded';
+import EditRoundedIcon from '@mui/icons-material/EditRounded';
 import BackHandRoundedIcon from '@mui/icons-material/BackHandRounded';
 import GroupsRoundedIcon from '@mui/icons-material/GroupsRounded';
 import PrecisionManufacturingRoundedIcon from '@mui/icons-material/PrecisionManufacturingRounded';
 import apiClient from '../../api/client';
 import useEventStream from '../../hooks/useEventStream';
 import ProduceRunDialog from './ProduceRunDialog';
+import ProductionRunsDialog from './ProductionRunsDialog';
 
 const STATUS_UI = {
     DRAFT: { label: 'Brouillon', color: 'default' },
@@ -59,6 +61,7 @@ function ProductionSummaryCards({ activeProductionId }) {
     const [items, setItems] = React.useState(null); // null = chargement initial
     const [error, setError] = React.useState(null);
     const [produceFor, setProduceFor] = React.useState(null); // production du dialog lot
+    const [runsFor, setRunsFor] = React.useState(null); // production du dialog « corriger les lots »
     const [lastLot, setLastLot] = React.useState(null);
 
     const load = React.useCallback(async (silent = false) => {
@@ -195,6 +198,17 @@ function ProductionSummaryCards({ activeProductionId }) {
                                             </Tooltip>
                                         ) : null}
                                         <Box sx={{ flexGrow: 1 }} />
+                                        {produced > 0 ? (
+                                            <Button
+                                                size="small"
+                                                variant="text"
+                                                startIcon={<EditRoundedIcon />}
+                                                onClick={() => setRunsFor(p)}
+                                                sx={{ minWidth: 0, px: 1, py: 0.25, fontSize: 12, color: '#a1a1aa' }}
+                                            >
+                                                Corriger
+                                            </Button>
+                                        ) : null}
                                         <Button
                                             size="small"
                                             variant="outlined"
@@ -257,6 +271,13 @@ function ProductionSummaryCards({ activeProductionId }) {
                         setLastLot(`Lot enregistré : ${boards} carte(s) ${byHand ? 'à la main' : 'en machine'}${completed ? ' — production terminée' : ''} — stock mis à jour.`);
                         load(true);
                     }}
+                />
+
+                <ProductionRunsDialog
+                    open={Boolean(runsFor)}
+                    production={runsFor}
+                    onClose={() => setRunsFor(null)}
+                    onChanged={() => load(true)}
                 />
             </CardContent>
         </Card>

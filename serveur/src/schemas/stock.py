@@ -194,6 +194,13 @@ class ProduceRequest(BaseModel):
     complete_production: bool = False
 
 
+class RunUpdateRequest(BaseModel):
+    """Correction du nombre de cartes d'un lot déjà déclaré. Remplace (ne
+    s'additionne pas) : la sortie stock du lot est réconciliée."""
+
+    boards_produced: int = Field(..., ge=0)
+
+
 class RunOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
