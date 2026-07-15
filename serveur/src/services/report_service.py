@@ -11,7 +11,8 @@ from sqlalchemy.orm import Session
 from ..models.bom import BomItem, BomReference, BomRevision, Component
 from ..models.commands import Command, CommandItem, PlanAssignment, ProductionPlan
 from ..models.machines import PnpFeeder, PnpMachine
-from ..models.production import Production, ProductionBomRevision
+from ..models.production import Production, ProductionBomRevision, ProductionRun
+from . import presence_service
 from .command_service import CommandService
 
 
@@ -56,6 +57,94 @@ class ReportService:
             },
             "commands_by_status": status_counts,
         }
+
+    @staticmethod
+    def get_productions_summary(db: Session, include_finished: bool = False) -> List[Dict]:
+        """Résumé agrégé par production pour le dashboard (une carte par production).
+
+        Par défaut : productions **en cours** (DRAFT + ACTIVE), triées par dernière
+        activité. ``include_finished=True`` ajoute COMPLETED/ARCHIVED. Par production :
+        cible cartes (Σ quantity_to_produce), cartes produites (Σ runs non annulés),
+        « Puis-je produire ? » (can_produce + nb de manques), dernière commande,
+        machine assignée, postes présents (présence in-memory, ADR 0013).
+        """
+        # Import local : évite un cycle service↔service à l'import du module.
+        from .production_stock_service import ProductionStockService
+
+        query = db.query(Production)
+        if not include_finished:
+            query = query.filter(
+                Production.status.in_(
+                    [Production.StatusEnum.DRAFT, Production.StatusEnum.ACTIVE]
+                )
+            )
+        productions = query.order_by(Production.updated_at.desc()).all()
+
+        summaries: List[Dict] = []
+        for prod in productions:
+            links = prod.bom_links or []
+            boards_target = sum(int(link.quantity_to_produce or 0) for link in links)
+
+            boards_produced = (
+                db.query(func.coalesce(func.sum(ProductionRun.boards_produced), 0))
+                .filter(
+                    ProductionRun.production_id == prod.id,
+                    ProductionRun.is_cancelled == False,  # noqa: E712 (SQL Server: IS 0 invalide)
+                )
+                .scalar()
+                or 0
+            )
+
+            # « Puis-je produire ? » — résumé seulement (pas les lignes détaillées).
+            stock = None
+            try:
+                res = ProductionStockService.can_i_produce(db, prod.id, None)
+                getter = res.get if isinstance(res, dict) else lambda k, d=None: getattr(res, k, d)
+                stock = {
+                    "can_produce": bool(getter("can_produce", False)),
+                    "shortage_count": int(getter("shortage_count", 0) or 0),
+                    "board_count": int(getter("board_count", 0) or 0),
+                }
+            except ValueError:
+                stock = None  # production sans révision liée, etc.
+
+            last_command = (
+                db.query(Command)
+                .filter(Command.production_id == prod.id)
+                .order_by(Command.id.desc())
+                .first()
+            )
+
+            summaries.append(
+                {
+                    "id": prod.id,
+                    "name": prod.name,
+                    "status": prod.status.value if prod.status else None,
+                    "created_at": prod.created_at.isoformat() if prod.created_at else None,
+                    "updated_at": prod.updated_at.isoformat() if prod.updated_at else None,
+                    "machine": (
+                        {"id": prod.machine.id, "name": prod.machine.name}
+                        if prod.machine is not None
+                        else None
+                    ),
+                    "revisions_count": len(links),
+                    "boards_target": boards_target,
+                    "boards_produced": int(boards_produced),
+                    "stock": stock,
+                    "command": (
+                        {
+                            "id": last_command.id,
+                            "status": last_command.status.value
+                            if last_command.status
+                            else None,
+                        }
+                        if last_command is not None
+                        else None
+                    ),
+                    "presence_count": presence_service.count_for(prod.id)["count"],
+                }
+            )
+        return summaries
 
     @staticmethod
     def get_bom_stats(db: Session, production_id: Optional[int] = None) -> Dict:

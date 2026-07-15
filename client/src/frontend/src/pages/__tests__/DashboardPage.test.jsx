@@ -65,35 +65,43 @@ describe('DashboardPage', () => {
     });
 
     it('hydrates the active backend production when no local session exists', async () => {
-        // 1er get : liste des productions. 2e get : détail de la production ACTIVE
-        // (fetchProductionDetail). Le get /reports/bom-stats qui suit l'activation
-        // retombe sur le mockResolvedValue par défaut.
-        axios.get
-            .mockResolvedValueOnce({
-                data: {
-                    items: [
-                        {
-                            id: 2,
-                            name: 'prod-B',
-                            status: 'ACTIVE',
-                            bom_count: 0,
-                            linked_references: [],
-                            updated_at: '2026-03-25T10:00:00Z',
-                        },
-                    ],
-                },
-            })
-            .mockResolvedValueOnce({
-                data: {
-                    id: 2,
-                    name: 'prod-B',
-                    status: 'ACTIVE',
-                    bom_count: 0,
-                    linked_references: [],
-                    bom_revisions: [],
-                    updated_at: '2026-03-25T10:00:00Z',
-                },
-            });
+        // Mocks par URL (le composant ProductionSummaryCards ajoute un get
+        // /reports/productions-summary au montage : ne pas dépendre de l'ordre).
+        axios.get.mockImplementation((url) => {
+            if (url === '/marketplace/productions') {
+                return Promise.resolve({
+                    data: {
+                        items: [
+                            {
+                                id: 2,
+                                name: 'prod-B',
+                                status: 'ACTIVE',
+                                bom_count: 0,
+                                linked_references: [],
+                                updated_at: '2026-03-25T10:00:00Z',
+                            },
+                        ],
+                    },
+                });
+            }
+            if (url === '/marketplace/productions/2') {
+                return Promise.resolve({
+                    data: {
+                        id: 2,
+                        name: 'prod-B',
+                        status: 'ACTIVE',
+                        bom_count: 0,
+                        linked_references: [],
+                        bom_revisions: [],
+                        updated_at: '2026-03-25T10:00:00Z',
+                    },
+                });
+            }
+            if (url === '/reports/productions-summary') {
+                return Promise.resolve({ data: [] });
+            }
+            return Promise.resolve({ data: {} });
+        });
 
         renderDashboard();
 
@@ -107,48 +115,56 @@ describe('DashboardPage', () => {
 
         // apiClient applique le baseURL via la config axios ; le mock ne le préfixe pas,
         // donc les chemins relatifs sont ceux passés à apiClient.get.
-        expect(axios.get).toHaveBeenNthCalledWith(1, '/marketplace/productions');
-        expect(axios.get).toHaveBeenNthCalledWith(2, '/marketplace/productions/2');
+        expect(axios.get).toHaveBeenCalledWith('/marketplace/productions');
+        expect(axios.get).toHaveBeenCalledWith('/marketplace/productions/2');
     });
 
     it('asks for confirmation before reopening an archived production', async () => {
-        // 1er get : liste (une production ACTIVE + une ARCHIVED).
-        // 2e get : détail de la production ACTIVE hydratée au montage.
-        // Le get /reports/bom-stats retombe sur le mockResolvedValue par défaut.
-        axios.get
-            .mockResolvedValueOnce({
-                data: {
-                    items: [
-                        {
-                            id: 1,
-                            name: 'prod-active',
-                            status: 'ACTIVE',
-                            bom_count: 0,
-                            linked_references: [],
-                            updated_at: '2026-03-25T10:00:00Z',
-                        },
-                        {
-                            id: 2,
-                            name: 'prod-archive',
-                            status: 'ARCHIVED',
-                            bom_count: 0,
-                            linked_references: [],
-                            updated_at: '2026-03-24T10:00:00Z',
-                        },
-                    ],
-                },
-            })
-            .mockResolvedValueOnce({
-                data: {
-                    id: 1,
-                    name: 'prod-active',
-                    status: 'ACTIVE',
-                    bom_count: 0,
-                    linked_references: [],
-                    bom_revisions: [],
-                    updated_at: '2026-03-25T10:00:00Z',
-                },
-            });
+        // Mocks par URL (voir 1er test : le montage déclenche aussi
+        // /reports/productions-summary, l'ordre des gets n'est plus garanti).
+        axios.get.mockImplementation((url) => {
+            if (url === '/marketplace/productions') {
+                return Promise.resolve({
+                    data: {
+                        items: [
+                            {
+                                id: 1,
+                                name: 'prod-active',
+                                status: 'ACTIVE',
+                                bom_count: 0,
+                                linked_references: [],
+                                updated_at: '2026-03-25T10:00:00Z',
+                            },
+                            {
+                                id: 2,
+                                name: 'prod-archive',
+                                status: 'ARCHIVED',
+                                bom_count: 0,
+                                linked_references: [],
+                                updated_at: '2026-03-24T10:00:00Z',
+                            },
+                        ],
+                    },
+                });
+            }
+            if (url === '/marketplace/productions/1') {
+                return Promise.resolve({
+                    data: {
+                        id: 1,
+                        name: 'prod-active',
+                        status: 'ACTIVE',
+                        bom_count: 0,
+                        linked_references: [],
+                        bom_revisions: [],
+                        updated_at: '2026-03-25T10:00:00Z',
+                    },
+                });
+            }
+            if (url === '/reports/productions-summary') {
+                return Promise.resolve({ data: [] });
+            }
+            return Promise.resolve({ data: {} });
+        });
 
         renderDashboard();
 

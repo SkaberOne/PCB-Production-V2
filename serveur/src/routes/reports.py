@@ -24,6 +24,15 @@ def get_overview(db: Session = Depends(get_db)):
     return ReportService.get_overview(db=db)
 
 
+@router.get("/productions-summary")
+def get_productions_summary(
+    include_finished: bool = Query(False),
+    db: Session = Depends(get_db),
+):
+    """Résumé par production pour les cartes du dashboard (en cours par défaut)."""
+    return ReportService.get_productions_summary(db=db, include_finished=include_finished)
+
+
 @router.get("/bom-stats")
 def get_bom_stats(production_id: Optional[int] = Query(None, ge=1), db: Session = Depends(get_db)):
     """Get BOM review KPI stats (total items, footprints mapped, items to verify).
