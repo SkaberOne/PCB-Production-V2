@@ -130,6 +130,24 @@ class MovementOut(BaseModel):
     reverses_id: Optional[int] = None
 
 
+class RecentMovementOut(BaseModel):
+    """Ligne de la liste « Réceptions récentes » annulable : mouvement + libellé
+    composant. ``signed_qty`` = +qté (IN) ou −qté (OUT)."""
+
+    id: int
+    component_id: int
+    reference: Optional[str] = None
+    value: Optional[str] = None
+    mpn: Optional[str] = None
+    sens: StockSens
+    qty: int
+    signed_qty: int
+    motif: StockMotif
+    date: Optional[datetime] = None
+    note: Optional[str] = None
+    created_by: Optional[str] = None
+
+
 class ReceptionComponentOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

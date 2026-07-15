@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session
 
 from ..database import get_db
 from ..models.bom import Component
+from ..models.stock import StockSens
 from ..schemas.stock import (
     CanProduceOut,
     ComponentParamsRequest,
@@ -23,6 +24,7 @@ from ..schemas.stock import (
     MovementOut,
     ReceptionCreateRequest,
     ReceptionOut,
+    RecentMovementOut,
     SettingsOut,
     StockLineOut,
 )
@@ -239,6 +241,33 @@ def get_journal(component_id: int, db: Session = Depends(get_db)):
     if db.get(Component, component_id) is None:
         raise HTTPException(status_code=404, detail="Composant introuvable")
     return StockService.get_journal(db, component_id)
+
+
+@router.get("/stock/movements/recent", response_model=List[RecentMovementOut])
+def recent_movements(
+    limit: int = Query(default=20, ge=1, le=100),
+    db: Session = Depends(get_db),
+):
+    """Derniers mouvements de stock actifs (hors annulations), avec le libellé du
+    composant — alimente la liste « Réceptions récentes » annulable."""
+    out = []
+    for mv, comp in StockService.get_recent_movements(db, limit):
+        signed = mv.qty if mv.sens == StockSens.IN else -mv.qty
+        out.append({
+            "id": mv.id,
+            "component_id": mv.component_id,
+            "reference": comp.reference,
+            "value": comp.value,
+            "mpn": comp.mpn,
+            "sens": mv.sens,
+            "qty": mv.qty,
+            "signed_qty": signed,
+            "motif": mv.motif,
+            "date": mv.date,
+            "note": mv.note,
+            "created_by": mv.created_by,
+        })
+    return out
 
 
 @router.post("/stock/movements/{movement_id}/cancel", response_model=ComponentStockOut)
