@@ -1,7 +1,7 @@
 # ADR 0015 — Identité de poste : traçabilité des écritures (stock d'abord)
 
 **Date** : 2026-07-15
-**Statut** : 🟡 Accepté — implémentation prévue avec la feature « Réception » (création composant + scan)
+**Statut** : 🟢 Accepté — implémenté le 2026-07-15 (branche `feat/reception-creation-composant`, migration `e5f6a7b8c9d0`)
 **Décideurs** : Eric (P0 acté le 2026-07-15) · Claude (architecture)
 **Contexte** : Option 1 de l'audit [`Audit_2026-07-07_multi-postes_multi-productions.md`](../audits/Audit_2026-07-07_multi-postes_multi-productions.md) (§3.4, §4). Déploiement web LAN multi-postes avec clé API unique partagée : deux navigateurs sont indistinguables côté serveur. Aucune écriture ne porte « qui / quel poste ».
 

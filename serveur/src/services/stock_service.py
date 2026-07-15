@@ -172,6 +172,7 @@ class StockService:
         production_run_id: Optional[int] = None,
         is_reversed: bool = False,
         reverses_id: Optional[int] = None,
+        created_by: Optional[str] = None,
     ) -> StockMovement:
         movement = StockMovement(
             component_id=component_id,
@@ -185,6 +186,7 @@ class StockService:
             production_run_id=production_run_id,
             is_reversed=is_reversed,
             reverses_id=reverses_id,
+            created_by=created_by,
         )
         db.add(movement)
         db.flush()
@@ -224,6 +226,7 @@ class StockService:
         qty_bag: int = 0,
         qty_tube: int = 0,
         note: Optional[str] = None,
+        created_by: Optional[str] = None,
     ) -> ComponentStock:
         """Absolute physical recount from BomStockDialog (set-to).
 
@@ -246,6 +249,7 @@ class StockService:
                 source_type="declaration",
                 source_id=uuid.uuid4().hex,
                 note=note or "Recomptage physique (déclaration)",
+                created_by=created_by,
             )
             db.commit()
         stock = cls.get_or_create_stock(db, component_id)
@@ -262,6 +266,7 @@ class StockService:
         component_id: int,
         new_total: int,
         note: Optional[str] = None,
+        created_by: Optional[str] = None,
     ) -> ComponentStock:
         """Periodic inventory recount (set-to). Absorbs the SAV/repair drain."""
         current = cls.recompute_solde(db, component_id)
@@ -277,6 +282,7 @@ class StockService:
                 source_type="correction",
                 source_id=uuid.uuid4().hex,
                 note=note or "Correction d'inventaire",
+                created_by=created_by,
             )
             db.commit()
         cls.recompute_solde(db, component_id)
@@ -326,6 +332,7 @@ class StockService:
         component_id: int,
         qty: int,
         note: Optional[str] = None,
+        created_by: Optional[str] = None,
     ) -> ComponentStock:
         """Manual reception from the Stock › Réception tab: additive IN movement.
 
@@ -344,6 +351,7 @@ class StockService:
                 source_type="reception_manuelle",
                 source_id=uuid.uuid4().hex,
                 note=note or "Réception manuelle (onglet Stock)",
+                created_by=created_by,
             )
             db.commit()
         cls.recompute_solde(db, component_id)
@@ -449,6 +457,8 @@ class StockService:
         mpn: Optional[str],
         footprint_eagle: Optional[str],
         component_type: Optional[str] = None,
+        footprint_pnp: Optional[str] = None,
+        description: Optional[str] = None,
     ) -> Component:
         reference = ComponentLibraryService.build_component_reference(
             value, mpn, footprint_eagle
@@ -462,7 +472,11 @@ class StockService:
                 value=value,
                 mpn=mpn,
                 footprint_eagle=ComponentLibraryService.normalize_footprint(footprint_eagle),
+                footprint_pnp=ComponentLibraryService.normalize_footprint(footprint_pnp)
+                if footprint_pnp
+                else None,
                 component_type=component_type,
+                description=description,
             )
             db.add(component)
             db.commit()

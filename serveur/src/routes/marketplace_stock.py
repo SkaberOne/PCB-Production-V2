@@ -7,8 +7,9 @@ write path for ``CommandReceipt``), not here.
 
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from pydantic import BaseModel
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from ..database import get_db
@@ -20,6 +21,8 @@ from ..schemas.stock import (
     GlobalSettingsRequest,
     MovementCreateRequest,
     MovementOut,
+    ReceptionCreateRequest,
+    ReceptionOut,
     SettingsOut,
     StockLineOut,
 )
@@ -28,6 +31,14 @@ from ..services.production_stock_service import ProductionStockService
 from ..services import event_bus
 
 router = APIRouter(tags=["stock"])
+
+
+def workstation_header(
+    x_workstation: Optional[str] = Header(default=None, alias="X-Workstation"),
+) -> Optional[str]:
+    """Identité de poste déclarative (ADR 0015). Absente = ``None`` (compatible)."""
+    value = (x_workstation or "").strip()
+    return value[:60] or None
 
 
 @router.get("/stock/can-produce/{production_id}", response_model=CanProduceOut)
@@ -98,7 +109,11 @@ def update_settings(request: GlobalSettingsRequest, db: Session = Depends(get_db
 
 
 @router.post("/stock/movements", response_model=ComponentStockOut)
-def create_movement(request: MovementCreateRequest, db: Session = Depends(get_db)):
+def create_movement(
+    request: MovementCreateRequest,
+    db: Session = Depends(get_db),
+    created_by: Optional[str] = Depends(workstation_header),
+):
     """Manual movement: ``declaration`` (set-to recount) or ``correction``."""
     if db.get(Component, request.component_id) is None:
         raise HTTPException(status_code=404, detail="Composant introuvable")
@@ -110,6 +125,7 @@ def create_movement(request: MovementCreateRequest, db: Session = Depends(get_db
             qty_bag=request.qty_bag,
             qty_tube=request.qty_tube,
             note=request.note,
+            created_by=created_by,
         )
     elif request.motif == "reception":
         if not request.qty or request.qty <= 0:
@@ -121,6 +137,7 @@ def create_movement(request: MovementCreateRequest, db: Session = Depends(get_db
             component_id=request.component_id,
             qty=request.qty,
             note=request.note,
+            created_by=created_by,
         )
     else:  # correction
         if request.new_total is None:
@@ -132,9 +149,63 @@ def create_movement(request: MovementCreateRequest, db: Session = Depends(get_db
             component_id=request.component_id,
             new_total=request.new_total,
             note=request.note,
+            created_by=created_by,
         )
     event_bus.publish("stock", {"kind": "movement", "component_id": request.component_id, "motif": request.motif})
     return stock
+
+
+@router.post("/stock/receptions", response_model=ReceptionOut)
+def create_reception(
+    request: ReceptionCreateRequest,
+    db: Session = Depends(get_db),
+    created_by: Optional[str] = Depends(workstation_header),
+):
+    """Réception manuelle, composant existant ou **créé à la volée** (ADR 0015).
+
+    ``new_component`` : d'abord recherche par MPN exact (insensible à la casse)
+    pour éviter les doublons ; sinon création via ``get_or_create_component``.
+    """
+    component_created = False
+    if request.component_id is not None:
+        component = db.get(Component, request.component_id)
+        if component is None:
+            raise HTTPException(status_code=404, detail="Composant introuvable")
+    else:
+        payload = request.new_component
+        mpn = payload.mpn.strip()
+        component = (
+            db.query(Component)
+            .filter(func.upper(Component.mpn) == mpn.upper())
+            .first()
+        )
+        if component is None:
+            component = StockService.get_or_create_component(
+                db,
+                value=(payload.value or "").strip() or None,
+                mpn=mpn,
+                footprint_eagle=(payload.footprint or "").strip() or None,
+                footprint_pnp=(payload.footprint or "").strip() or None,
+                component_type=(payload.component_type or "").strip() or None,
+                description=(payload.description or "").strip() or None,
+            )
+            component_created = True
+    stock = StockService.post_manual_reception(
+        db,
+        component_id=component.id,
+        qty=request.qty,
+        note=request.note,
+        created_by=created_by,
+    )
+    event_bus.publish(
+        "stock",
+        {"kind": "movement", "component_id": component.id, "motif": "reception"},
+    )
+    return {
+        "component": component,
+        "component_created": component_created,
+        "stock": stock,
+    }
 
 
 @router.get("/stock/{component_id}", response_model=ComponentStockOut)
@@ -171,7 +242,10 @@ def get_journal(component_id: int, db: Session = Depends(get_db)):
 
 
 @router.post("/stock/movements/{movement_id}/cancel", response_model=ComponentStockOut)
-def cancel_movement(movement_id: int, db: Session = Depends(get_db)):
+def cancel_movement(
+    movement_id: int,
+    db: Session = Depends(get_db),
+):
     """Reversible cancel (appends an inverse movement, never deletes)."""
     try:
         movement = StockService.cancel_movement(db, movement_id)
