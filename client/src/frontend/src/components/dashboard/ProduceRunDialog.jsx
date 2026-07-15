@@ -2,10 +2,12 @@ import React from 'react';
 import {
     Alert,
     Button,
+    Checkbox,
     Dialog,
     DialogActions,
     DialogContent,
     DialogTitle,
+    FormControlLabel,
     MenuItem,
     Stack,
     TextField,
@@ -27,13 +29,24 @@ function ProduceRunDialog({ open, production, onClose, onSaved }) {
     const [machines, setMachines] = React.useState([]);
     const [machineId, setMachineId] = React.useState('');
     const [note, setNote] = React.useState('');
+    const [complete, setComplete] = React.useState(false);
     const [busy, setBusy] = React.useState(false);
     const [error, setError] = React.useState(null);
+
+    // Pré-coche « terminée » quand ce lot atteint (ou dépasse) la cible de cartes.
+    const target = Number(production?.boards_target) || 0;
+    const alreadyProduced = Number(production?.boards_produced) || 0;
+    const reachesTarget = target > 0 && alreadyProduced + (Number(boards) || 0) >= target;
+
+    React.useEffect(() => {
+        setComplete(reachesTarget);
+    }, [reachesTarget]);
 
     React.useEffect(() => {
         if (!open || !production) return;
         setBoards('');
         setNote('');
+        setComplete(false);
         setError(null);
         const manualDefault = production.assembly_mode === 'MANUEL';
         setByHand(manualDefault);
@@ -60,8 +73,9 @@ function ProduceRunDialog({ open, production, onClose, onSaved }) {
                 boards_produced: Number(boards),
                 machine_id: byHand ? null : machineId,
                 note: note.trim() || null,
+                complete_production: complete,
             });
-            onSaved(Number(boards), byHand);
+            onSaved(Number(boards), byHand, complete);
             onClose();
         } catch (err) {
             setError(extractApiError(err) || 'Échec de la déclaration du lot.');
@@ -130,6 +144,23 @@ function ProduceRunDialog({ open, production, onClose, onSaved }) {
                         onChange={(e) => setNote(e.target.value)}
                         inputProps={{ maxLength: 500 }}
                     />
+                    <div>
+                        <FormControlLabel
+                            control={(
+                                <Checkbox
+                                    size="small"
+                                    checked={complete}
+                                    onChange={(e) => setComplete(e.target.checked)}
+                                />
+                            )}
+                            label="Marquer la production comme terminée"
+                        />
+                        <Typography variant="caption" sx={{ color: '#a1a1aa', display: 'block' }}>
+                            {reachesTarget
+                                ? 'Cible de cartes atteinte avec ce lot — la production passera dans « Terminées » et libérera ses réservations de stock.'
+                                : 'La production quitte « en cours » et libère ses réservations de stock. Décoche si d\'autres lots suivent.'}
+                        </Typography>
+                    </div>
                 </Stack>
             </DialogContent>
             <DialogActions>

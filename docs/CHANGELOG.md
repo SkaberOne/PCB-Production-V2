@@ -62,6 +62,13 @@
   (`AssemblyModeDialog`) pour passer une prod existante en MANUEL/MIXTE/PNP.
 - Tests : +3 (`test_produce_dashboard.py`).
 
+### Feature clôture au lot (branche `feat/cloture-production-lot`)
+- `ProduceRequest.complete_production` : marquer la production **terminée** en déclarant
+  un lot → passe en COMPLETED (quitte « en cours », libère les réservations ADR 0011).
+- Dialog lot : case « Marquer la production comme terminée », **pré-cochée** quand le
+  lot atteint la cible de cartes. Dashboard : section « Terminées » (5 dernières) sous
+  les productions en cours. Tests : +2 (`test_produce_complete.py`).
+
 ### Release 15/07 (PR #50 `dev → main`, déployée)
 - Réception+création, suggestions de types (PR #49), dashboard productions, ADR 0015 :
   **en prod :8000** (build-web reconstruit, migration `created_by` appliquée sur
