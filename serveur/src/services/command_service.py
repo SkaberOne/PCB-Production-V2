@@ -99,7 +99,18 @@ class CommandService:
                 offer.get("supplier"), defaults.get("default_supplier")
             )
             product_url = cls._clean_export_text(offer.get("product_url") or line.get("supplier_link"))
-            export_quantity = int(overrides.get(line.get("key"), line.get("quantity") or 0) or 0)
+            # Quantité à commander = override manuel, sinon besoin − stock réel disponible.
+            # On n'exporte QUE les lignes à commander (> 0) : les composants couverts par
+            # le stock sont exclus du fichier ERP (choix Eric 2026-07-09).
+            override_qty = overrides.get(line.get("key"))
+            if override_qty is not None:
+                export_quantity = int(override_qty or 0)
+            else:
+                besoin = int(line.get("quantity") or 0)
+                stock_available = line.get("stock_available")
+                export_quantity = besoin if stock_available is None else max(besoin - int(stock_available), 0)
+            if export_quantity <= 0:
+                continue
 
             rows.append(
                 {
@@ -850,6 +861,24 @@ class CommandService:
         }
         for line in aggregated_lines:
             line["qty_received"] = receipts.get(line["key"], 0)
+
+        # Attache le stock réel disponible (même calcul que la Revue BOM, ADR 0010/0011)
+        # par composant, pour que l'onglet Commande reflète le stock et ne liste que
+        # ce qui reste à commander. Import paresseux (évite tout cycle d'import).
+        stock_by_component: Dict[int, int] = {}
+        if command.production_id:
+            try:
+                from .production_stock_service import ProductionStockService
+                report = ProductionStockService.can_i_produce(db, command.production_id)
+                for row in report.get("lines", []):
+                    cid = row.get("component_id")
+                    if cid is not None:
+                        stock_by_component[cid] = int(row.get("disponible") or 0)
+            except Exception:  # best-effort : en cas d'échec, stock inconnu (on commande tout)
+                stock_by_component = {}
+        for line in aggregated_lines:
+            cid = line.get("component_library_id")
+            line["stock_available"] = stock_by_component.get(cid) if cid in stock_by_component else None
 
         return {
             "id": command.id,

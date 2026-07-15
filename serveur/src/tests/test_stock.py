@@ -39,6 +39,55 @@ def _active_movements(db, component_id):
     ]
 
 
+# -------------------------------------------------------- manual reception
+def test_manual_reception_adds_to_balance():
+    """Réception manuelle (onglet Stock) : chaque appel s'AJOUTE au solde."""
+    db = TestingSessionLocal()
+    comp = _make_component(db)
+    StockService.post_declaration(db, comp.id, qty_reel=100)  # solde initial
+    StockService.post_manual_reception(db, comp.id, qty=500)
+    assert StockService.recompute_solde(db, comp.id) == 600
+    StockService.post_manual_reception(db, comp.id, qty=250)  # s'ajoute encore
+    assert StockService.recompute_solde(db, comp.id) == 850
+    ins = [m for m in _active_movements(db, comp.id) if m.sens == StockSens.IN and m.motif == StockMotif.reception]
+    assert len(ins) == 2
+    db.close()
+
+
+def test_manual_reception_zero_is_noop():
+    db = TestingSessionLocal()
+    comp = _make_component(db)
+    StockService.post_manual_reception(db, comp.id, qty=0)
+    assert StockService.recompute_solde(db, comp.id) == 0
+    assert _active_movements(db, comp.id) == []
+    db.close()
+
+
+def test_manual_reception_route_adds_stock():
+    db = TestingSessionLocal()
+    comp = _make_component(db, value="4K7", mpn="RC0402-4K7", footprint="R0402")
+    cid = comp.id
+    db.close()
+    res = client.post(
+        "/api/marketplace/stock/movements",
+        json={"component_id": cid, "motif": "reception", "qty": 320},
+    )
+    assert res.status_code == 200
+    assert res.json()["qty_pieces"] == 320
+
+
+def test_manual_reception_route_rejects_zero_qty():
+    db = TestingSessionLocal()
+    comp = _make_component(db, value="2K2", mpn="RC0402-2K2", footprint="R0402")
+    cid = comp.id
+    db.close()
+    res = client.post(
+        "/api/marketplace/stock/movements",
+        json={"component_id": cid, "motif": "reception", "qty": 0},
+    )
+    assert res.status_code == 422
+
+
 # --------------------------------------------------------------- declaration
 def test_declaration_set_to_balance_and_breakdown():
     db = TestingSessionLocal()

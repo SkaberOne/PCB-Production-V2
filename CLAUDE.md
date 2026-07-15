@@ -111,10 +111,11 @@ Détail complet : `STRUCTURE.md`. Règles critiques :
 - Code React → `client/src/frontend/src/`
 - Code Electron → `client/src/desktop/src/`
 - Config serveur → `serveur/.env` (modèle : `serveur/.env.example`)
-- Config client → `client/client.env` (copié vers `client/src/frontend/.env` par `DEMARRER_CLIENT.bat`)
+- Config client → `client/client.env` (copié vers `client/src/frontend/.env` par les scripts de build/client)
 - Specs → `docs/specs/` · Audits → `docs/audits/` · ADR → `docs/adr/` · Guides → `docs/guides/` · Archive → `docs/archive/`
-- Scripts utilitaires universels (auto_push, restart_serveur, test_api) → racine
-- Scripts spécifiques serveur/client → `serveur/` ou `client/`
+- Scripts utilitaires universels (auto_push, test_api) → racine · fiche des lanceurs → `LANCEMENT.md`
+- Lanceurs **web** (quotidien) → `serveur/DEMARRER_SERVEUR_WEB*.bat`, `client/CONSTRUIRE_WEB*.bat`
+- Scripts **desktop/.exe** (rares, futures releases) → `serveur/_desktop/` et `client/_desktop/`
 - **Interdit à la racine** : `.vbs`, `.exe`, code source
 
 ---
@@ -148,21 +149,25 @@ Détail complet : `STRUCTURE.md`. Règles critiques :
 
 ## 5. Lancement et test
 
-```powershell
-# --- Serveur ---
-.\serveur\DEMARRER_SERVEUR.bat                    # double-clic OK
-.venv\Scripts\python.exe serveur\launch.py --reload  # dev manuel
+> Fiche complète « quel script lancer » : `LANCEMENT.md` (racine).
 
-# --- Client ---
-.\client\DEMARRER_CLIENT.bat                      # double-clic OK
+```powershell
+# --- Serveur web (prod :8000, ce que tout le monde utilise) ---
+.\serveur\DEMARRER_SERVEUR_WEB.bat                # double-clic OK
+.venv\Scripts\python.exe serveur\launch.py --reload  # dev manuel
+.\serveur\_desktop\DEMARRER_SERVEUR.bat           # serveur dev classique (desktop)
+
+# --- Client / build web ---
+.\client\CONSTRUIRE_WEB.bat                        # rebuild build-web (prod)
 cd client\src\frontend; npm start                 # React seul (port 3000)
+.\client\_desktop\DEMARRER_CLIENT.bat             # client Electron/dev (rare)
 
 # --- Tests ---
 .venv\Scripts\pytest serveur\src\tests\ -v
 cd client\src\frontend; npm test
 
-# --- Build ---
-.\client\CONSTRUIRE_CLIENT.bat                    # produit dist/PCB Flow Production Suite.exe
+# --- Build desktop / .exe (rare, futures releases) ---
+.\client\_desktop\CONSTRUIRE_CLIENT.bat           # produit dist/PCB Flow Production Suite.exe
 ```
 
 URLs : API → `http://localhost:8000` · Swagger → `/docs` · Frontend → `http://localhost:3000`
