@@ -32,6 +32,12 @@ function StockReceptionTab({ rows, onRefresh, onError, onFeedback }) {
     const [receipts, setReceipts] = React.useState([]); // historique de session
     const [createOpen, setCreateOpen] = React.useState(false);
 
+    // Types déjà présents dans la base (suggestions du dialog « Créer et réceptionner »).
+    const typeOptions = React.useMemo(
+        () => Array.from(new Set(rows.map((r) => r.component_type).filter(Boolean))).sort(),
+        [rows],
+    );
+
     // Réception via le dialog « Créer et réceptionner » (composant créé ou réutilisé par MPN).
     const handleCreatedReception = async (data, qty) => {
         const comp = data?.component || {};
@@ -224,6 +230,7 @@ function StockReceptionTab({ rows, onRefresh, onError, onFeedback }) {
                 open={createOpen}
                 onClose={() => setCreateOpen(false)}
                 onReceived={handleCreatedReception}
+                typeOptions={typeOptions}
             />
         </Stack>
     );

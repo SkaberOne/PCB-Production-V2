@@ -1,6 +1,7 @@
 import React from 'react';
 import {
     Alert,
+    Autocomplete,
     Button,
     Dialog,
     DialogActions,
@@ -20,7 +21,7 @@ const EMPTY = { mpn: '', value: '', footprint: '', componentType: '', qty: '' };
  * Le backend dédoublonne par MPN : si le MPN existe déjà, le composant
  * existant est réutilisé (aucun doublon créé).
  */
-function StockReceptionCreateDialog({ open, onClose, onReceived }) {
+function StockReceptionCreateDialog({ open, onClose, onReceived, typeOptions = [] }) {
     const [form, setForm] = React.useState(EMPTY);
     const [busy, setBusy] = React.useState(false);
     const [error, setError] = React.useState(null);
@@ -99,14 +100,21 @@ function StockReceptionCreateDialog({ open, onClose, onReceived }) {
                         />
                     </Stack>
                     <Stack direction="row" spacing={1.5}>
-                        <TextField
-                            size="small"
-                            label="Type"
-                            placeholder="ex. CONDO, RESISTOR…"
-                            value={form.componentType}
-                            onChange={set('componentType')}
+                        <Autocomplete
+                            freeSolo
+                            options={typeOptions}
+                            inputValue={form.componentType}
+                            onInputChange={(e, v) => setForm((prev) => ({ ...prev, componentType: v || '' }))}
                             sx={{ flexGrow: 1 }}
-                            inputProps={{ maxLength: 50 }}
+                            renderInput={(params) => (
+                                <TextField
+                                    {...params}
+                                    size="small"
+                                    label="Type"
+                                    placeholder="ex. CONDO, RESISTOR…"
+                                    inputProps={{ ...params.inputProps, maxLength: 50 }}
+                                />
+                            )}
                         />
                         <TextField
                             size="small"
