@@ -11,6 +11,7 @@ import {
     Tooltip,
     Typography,
 } from '@mui/material';
+import BackHandRoundedIcon from '@mui/icons-material/BackHandRounded';
 import GroupsRoundedIcon from '@mui/icons-material/GroupsRounded';
 import PrecisionManufacturingRoundedIcon from '@mui/icons-material/PrecisionManufacturingRounded';
 import apiClient from '../../api/client';
@@ -145,16 +146,28 @@ function ProductionSummaryCards({ activeProductionId }) {
                                             label={`${p.revisions_count} BOM`}
                                             sx={{ color: '#a1a1aa' }}
                                         />
-                                        {p.machine ? (
-                                            <Tooltip title="Machine assignée">
+                                        {p.assembly_mode === 'MANUEL' ? (
+                                            <Tooltip title="Cartes assemblées à la main (pas de machine PnP)">
+                                                <Chip
+                                                    size="small"
+                                                    variant="outlined"
+                                                    icon={<BackHandRoundedIcon />}
+                                                    label="À la main"
+                                                    sx={{ color: '#a1a1aa' }}
+                                                />
+                                            </Tooltip>
+                                        ) : p.machine ? (
+                                            <Tooltip title={p.assembly_mode === 'MIXTE' ? 'Assemblage mixte (PnP + main)' : 'Machine assignée'}>
                                                 <Chip
                                                     size="small"
                                                     variant="outlined"
                                                     icon={<PrecisionManufacturingRoundedIcon />}
-                                                    label={p.machine.name}
+                                                    label={p.assembly_mode === 'MIXTE' ? `${p.machine.name} + main` : p.machine.name}
                                                     sx={{ color: '#a1a1aa' }}
                                                 />
                                             </Tooltip>
+                                        ) : p.assembly_mode === 'MIXTE' ? (
+                                            <Chip size="small" variant="outlined" label="Mixte" sx={{ color: '#a1a1aa' }} />
                                         ) : null}
                                         {p.presence_count > 0 ? (
                                             <Tooltip title="Postes actuellement sur cette production">

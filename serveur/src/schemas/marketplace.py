@@ -61,12 +61,15 @@ class SetLineDetailRequest(BaseModel):
 class CreateProductionRequest(BaseModel):
     name: str = Field(..., min_length=1, max_length=200)
     machine_id: Optional[int] = Field(default=None, gt=0)
+    # Mode d'assemblage : PNP (défaut), MANUEL (à la main), MIXTE.
+    assembly_mode: Optional[str] = Field(default=None, max_length=10)
     notes: Optional[str] = Field(default=None, max_length=500)
 
 
 class UpdateProductionRequest(BaseModel):
     name: Optional[str] = Field(default=None, min_length=1, max_length=200)
     machine_id: Optional[int] = Field(default=None, gt=0)
+    assembly_mode: Optional[str] = Field(default=None, max_length=10)
     status: Optional[str] = Field(default=None, max_length=50)
     notes: Optional[str] = Field(default=None, max_length=500)
     # Concurrence optimiste (ADR 0013 extension B) : optionnel. Si fourni et

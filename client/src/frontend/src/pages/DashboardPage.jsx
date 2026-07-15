@@ -66,6 +66,8 @@ function DashboardPage() {
         setCreateDialogOpen,
         createName,
         setCreateName,
+        createAssemblyMode,
+        setCreateAssemblyMode,
         createDialogError,
         deleteDialog,
         renameDialog,
@@ -240,6 +242,8 @@ function DashboardPage() {
                 name={createName}
                 errorText={createDialogError}
                 busy={actionLoadingId === 'create'}
+                assemblyMode={createAssemblyMode}
+                onAssemblyModeChange={setCreateAssemblyMode}
                 onClose={() => setCreateDialogOpen(false)}
                 onNameChange={setCreateName}
                 onConfirm={handleCreateProduction}

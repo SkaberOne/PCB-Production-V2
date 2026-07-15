@@ -43,6 +43,19 @@
 - Tests : +2 (`test_productions_summary.py`) ; mocks du test DashboardPage rendus
   URL-aware (plus de dépendance à l'ordre des GET).
 
+### Feature mode d'assemblage (branche `feat/mode-assemblage`)
+- **`PRODUCTIONS.assembly_mode`** (PNP | MANUEL | MIXTE, défaut PNP, migration additive
+  `f6a7b8c9d0e1`) : les cartes peuvent être assemblées **à la main**, pas seulement par
+  la machine PnP. Choix au moment de la création (ToggleButtons), modifiable en PATCH.
+- Production MANUEL : l'étape « Machine PnP » est **masquée** (sidebar + stepper,
+  `AppShell`). Chips dashboard : « À la main » / « machine + main » (MIXTE).
+- Tests : +4 (`test_assembly_mode.py`).
+
+### Release 15/07 (PR #50 `dev → main`, déployée)
+- Réception+création, suggestions de types (PR #49), dashboard productions, ADR 0015 :
+  **en prod :8000** (build-web reconstruit, migration `created_by` appliquée sur
+  `ECB_Production`). `.exe` desktop non reconstruit (décision Eric).
+
 ### Staging
 - `ECB_Production_STAGING` rafraîchie = copie de la prod du jour (backup COPY_ONLY +
   restore). Staging :8001 relancé sur `dev` (réception + création + created_by actifs,

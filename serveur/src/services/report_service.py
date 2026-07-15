@@ -119,6 +119,7 @@ class ReportService:
                 {
                     "id": prod.id,
                     "name": prod.name,
+                    "assembly_mode": prod.assembly_mode or "PNP",
                     "status": prod.status.value if prod.status else None,
                     "created_at": prod.created_at.isoformat() if prod.created_at else None,
                     "updated_at": prod.updated_at.isoformat() if prod.updated_at else None,
