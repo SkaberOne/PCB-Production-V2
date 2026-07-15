@@ -21,17 +21,17 @@ const EMPTY = { mpn: '', value: '', footprint: '', componentType: '', qty: '' };
  * Le backend dédoublonne par MPN : si le MPN existe déjà, le composant
  * existant est réutilisé (aucun doublon créé).
  */
-function StockReceptionCreateDialog({ open, onClose, onReceived, typeOptions = [] }) {
+function StockReceptionCreateDialog({ open, onClose, onReceived, typeOptions = [], initialForm = null }) {
     const [form, setForm] = React.useState(EMPTY);
     const [busy, setBusy] = React.useState(false);
     const [error, setError] = React.useState(null);
 
     React.useEffect(() => {
         if (open) {
-            setForm(EMPTY);
+            setForm({ ...EMPTY, ...(initialForm || {}) });
             setError(null);
         }
-    }, [open]);
+    }, [open, initialForm]);
 
     const set = (field) => (e) => setForm((prev) => ({ ...prev, [field]: e.target.value }));
     const canSubmit = form.mpn.trim().length > 0 && Number(form.qty) > 0 && !busy;

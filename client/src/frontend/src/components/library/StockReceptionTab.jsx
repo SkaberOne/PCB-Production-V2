@@ -3,6 +3,7 @@ import {
     Autocomplete,
     Box,
     Button,
+    Chip,
     Stack,
     Table,
     TableBody,
@@ -14,48 +15,64 @@ import {
     Typography,
 } from '@mui/material';
 import AddRoundedIcon from '@mui/icons-material/AddRounded';
-import PlaylistAddRoundedIcon from '@mui/icons-material/PlaylistAddRounded';
-import { Chip } from '@mui/material';
+import AddCircleOutlineRoundedIcon from '@mui/icons-material/AddCircleOutlineRounded';
+import UndoRoundedIcon from '@mui/icons-material/UndoRounded';
 import apiClient from '../../api/client';
 import { compactCellSx, compactTableContainerSx, compactTableSx } from '../../utils/compactTable';
 import StockReceptionCreateDialog from './StockReceptionCreateDialog';
 import { componentLabel, fpOf } from './stockHelpers';
 
+function fmtDate(iso) {
+    if (!iso) return '';
+    try {
+        return new Date(iso).toLocaleString('fr-FR', {
+            day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit',
+        });
+    } catch (_) {
+        return '';
+    }
+}
+
 /**
- * Onglet « Réception » du panneau Stock : réception manuelle (mouvement IN,
- * motif reception) + historique de session des réceptions.
+ * Onglet « Réception » du panneau Stock : réception manuelle (mouvement IN) +
+ * liste des mouvements récents **annulables** (bouton Annuler → mouvement
+ * inverse réversible). La création d'un composant absent se fait via une option
+ * dédiée du menu déroulant de recherche (plus de bouton séparé).
  */
 function StockReceptionTab({ rows, onRefresh, onError, onFeedback }) {
     const [recComponent, setRecComponent] = React.useState(null);
     const [recQty, setRecQty] = React.useState('');
     const [recBusy, setRecBusy] = React.useState(false);
-    const [receipts, setReceipts] = React.useState([]); // historique de session
     const [createOpen, setCreateOpen] = React.useState(false);
+    const [createInitial, setCreateInitial] = React.useState(null);
+    const [recent, setRecent] = React.useState([]);
+    const [cancelBusy, setCancelBusy] = React.useState(null);
 
-    // Types déjà présents dans la base (suggestions du dialog « Créer et réceptionner »).
     const typeOptions = React.useMemo(
         () => Array.from(new Set(rows.map((r) => r.component_type).filter(Boolean))).sort(),
         [rows],
     );
 
-    // Réception via le dialog « Créer et réceptionner » (composant créé ou réutilisé par MPN).
-    const handleCreatedReception = async (data, qty) => {
-        const comp = data?.component || {};
-        setReceipts((prev) => [
-            {
-                id: Date.now(),
-                label: [comp.value || '-', comp.footprint_pnp || comp.footprint_eagle || '-', comp.mpn || '-'].join('  ·  '),
-                qty,
-                old: (data?.stock?.qty_pieces ?? qty) - qty,
-                next: data?.stock?.qty_pieces ?? qty,
-                date: new Date(),
-                created: Boolean(data?.component_created),
-            },
-            ...prev,
-        ]);
+    const loadRecent = React.useCallback(async () => {
+        try {
+            const res = await apiClient.get('/marketplace/stock/movements/recent?limit=20');
+            setRecent(res.data || []);
+        } catch (_) { /* silencieux : la liste reste vide */ }
+    }, []);
+
+    React.useEffect(() => { loadRecent(); }, [loadRecent]);
+
+    const openCreate = (text) => {
+        setCreateInitial(text ? { mpn: text.trim() } : null);
+        setCreateOpen(true);
+    };
+
+    // Réception d'un composant créé/réutilisé (dialog « Créer et réceptionner »).
+    const handleCreatedReception = async (data) => {
         onFeedback(data?.component_created
             ? 'Composant créé dans le catalogue et réception ajoutée au stock.'
             : 'MPN déjà connu : réception ajoutée au composant existant.');
+        await loadRecent();
         await onRefresh();
     };
 
@@ -64,32 +81,35 @@ function StockReceptionTab({ rows, onRefresh, onError, onFeedback }) {
         setRecBusy(true);
         onError(null);
         try {
-            const oldQty = Number(recComponent.qty_pieces) || 0;
-            const res = await apiClient.post('/marketplace/stock/movements', {
+            await apiClient.post('/marketplace/stock/movements', {
                 component_id: recComponent.component_id,
                 motif: 'reception',
                 qty: Number(recQty),
             });
-            const newQty = res.data?.qty_pieces ?? oldQty + Number(recQty);
-            setReceipts((prev) => [
-                {
-                    id: Date.now(),
-                    label: componentLabel(recComponent),
-                    qty: Number(recQty),
-                    old: oldQty,
-                    next: newQty,
-                    date: new Date(),
-                },
-                ...prev,
-            ]);
             setRecComponent(null);
             setRecQty('');
             onFeedback('Réception ajoutée au stock.');
+            await loadRecent();
             await onRefresh();
         } catch (err) {
             onError(err?.response?.data?.detail || 'Échec de la réception.');
         } finally {
             setRecBusy(false);
+        }
+    };
+
+    const cancelMovement = async (id) => {
+        setCancelBusy(id);
+        onError(null);
+        try {
+            await apiClient.post(`/marketplace/stock/movements/${id}/cancel`);
+            onFeedback('Mouvement annulé (mouvement inverse enregistré).');
+            await loadRecent();
+            await onRefresh();
+        } catch (err) {
+            onError(err?.response?.data?.detail || "Échec de l'annulation.");
+        } finally {
+            setCancelBusy(null);
         }
     };
 
@@ -100,7 +120,8 @@ function StockReceptionTab({ rows, onRefresh, onError, onFeedback }) {
                     Réceptionner un composant reçu
                 </Typography>
                 <Typography variant="body2" sx={{ color: '#a1a1aa', mb: 2 }}>
-                    La quantité saisie s'ajoute au stock du composant. La Revue BOM se met à jour automatiquement.
+                    La quantité saisie s'ajoute au stock du composant. Si le composant n'existe
+                    pas encore, choisissez « Créer et réceptionner » en bas de la liste.
                 </Typography>
 
                 <Stack direction="row" spacing={1.5} alignItems="flex-start" flexWrap="wrap" useFlexGap>
@@ -108,36 +129,60 @@ function StockReceptionTab({ rows, onRefresh, onError, onFeedback }) {
                         sx={{ flexGrow: 1, minWidth: 320 }}
                         options={rows}
                         value={recComponent}
-                        onChange={(e, v) => setRecComponent(v)}
-                        getOptionLabel={(o) => (o ? componentLabel(o) : '')}
-                        isOptionEqualToValue={(o, v) => o.component_id === v.component_id}
+                        onChange={(e, v) => {
+                            if (v && v.__create) {
+                                openCreate(v.inputValue);
+                                return;
+                            }
+                            setRecComponent(v);
+                        }}
+                        getOptionLabel={(o) => {
+                            if (o && o.__create) return `Créer et réceptionner « ${o.inputValue} »`;
+                            return o ? componentLabel(o) : '';
+                        }}
+                        isOptionEqualToValue={(o, v) => !o.__create && !v.__create && o.component_id === v.component_id}
                         filterOptions={(opts, state) => {
                             const q = state.inputValue.trim().toLowerCase();
-                            if (!q) return opts.slice(0, 30);
-                            return opts
-                                .filter((o) => `${o.value || ''} ${o.mpn || ''} ${o.footprint_pnp || ''} ${o.footprint_eagle || ''}`.toLowerCase().includes(q))
-                                .slice(0, 30);
+                            const filtered = !q
+                                ? opts.slice(0, 30)
+                                : opts.filter((o) => `${o.value || ''} ${o.mpn || ''} ${o.footprint_pnp || ''} ${o.footprint_eagle || ''}`.toLowerCase().includes(q)).slice(0, 30);
+                            if (q) {
+                                return [...filtered, { __create: true, inputValue: state.inputValue.trim() }];
+                            }
+                            return filtered;
                         }}
-                        renderOption={(props, o) => (
-                            <li {...props} key={o.component_id}>
-                                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', gap: 1 }}>
-                                    <Box sx={{ minWidth: 0 }}>
-                                        <Typography variant="body2" component="span" sx={{ fontWeight: 500 }}>
-                                            {o.value || '-'}
-                                        </Typography>
-                                        <Typography variant="body2" component="span" sx={{ color: '#a1a1aa' }}>
-                                            {' · '}{fpOf(o) || '-'}
-                                        </Typography>
-                                        <Typography variant="caption" component="div" sx={{ color: '#a1a1aa' }} noWrap>
-                                            {o.mpn || '-'}
+                        renderOption={(props, o) => {
+                            if (o.__create) {
+                                return (
+                                    <li {...props} key="__create">
+                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, color: 'success.main', fontWeight: 500 }}>
+                                            <AddCircleOutlineRoundedIcon fontSize="small" />
+                                            <span>Créer et réceptionner «&nbsp;{o.inputValue}&nbsp;»</span>
+                                        </Box>
+                                    </li>
+                                );
+                            }
+                            return (
+                                <li {...props} key={o.component_id}>
+                                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', gap: 1 }}>
+                                        <Box sx={{ minWidth: 0 }}>
+                                            <Typography variant="body2" component="span" sx={{ fontWeight: 500 }}>
+                                                {o.value || '-'}
+                                            </Typography>
+                                            <Typography variant="body2" component="span" sx={{ color: '#a1a1aa' }}>
+                                                {' · '}{fpOf(o) || '-'}
+                                            </Typography>
+                                            <Typography variant="caption" component="div" sx={{ color: '#a1a1aa' }} noWrap>
+                                                {o.mpn || '-'}
+                                            </Typography>
+                                        </Box>
+                                        <Typography variant="caption" sx={{ whiteSpace: 'nowrap', color: '#a1a1aa' }}>
+                                            stock {o.qty_pieces}
                                         </Typography>
                                     </Box>
-                                    <Typography variant="caption" sx={{ whiteSpace: 'nowrap', color: '#a1a1aa' }}>
-                                        stock {o.qty_pieces}
-                                    </Typography>
-                                </Box>
-                            </li>
-                        )}
+                                </li>
+                            );
+                        }}
                         renderInput={(params) => (
                             <TextField
                                 {...params}
@@ -172,25 +217,12 @@ function StockReceptionTab({ rows, onRefresh, onError, onFeedback }) {
                         {recComponent.value || '-'} {fpOf(recComponent)} — stock actuel : <b>{recComponent.qty_pieces}</b> pcs
                     </Typography>
                 ) : null}
-                <Stack direction="row" spacing={1} alignItems="center" sx={{ mt: 2 }}>
-                    <Typography variant="body2" sx={{ color: '#a1a1aa' }}>
-                        Composant absent de la base ?
-                    </Typography>
-                    <Button
-                        size="small"
-                        variant="outlined"
-                        startIcon={<PlaylistAddRoundedIcon />}
-                        onClick={() => setCreateOpen(true)}
-                    >
-                        Créer et réceptionner
-                    </Button>
-                </Stack>
             </Box>
 
-            <Typography variant="subtitle2" sx={{ fontWeight: 500 }}>Réceptions récentes</Typography>
-            {receipts.length === 0 ? (
+            <Typography variant="subtitle2" sx={{ fontWeight: 500 }}>Mouvements récents</Typography>
+            {recent.length === 0 ? (
                 <Typography variant="body2" sx={{ color: '#a1a1aa' }}>
-                    Aucune réception depuis l'ouverture de la page.
+                    Aucun mouvement de stock récent.
                 </Typography>
             ) : (
                 <TableContainer sx={compactTableContainerSx}>
@@ -198,26 +230,37 @@ function StockReceptionTab({ rows, onRefresh, onError, onFeedback }) {
                         <TableHead>
                             <TableRow>
                                 <TableCell sx={compactCellSx}>Composant</TableCell>
-                                <TableCell sx={compactCellSx} align="right">Reçu</TableCell>
-                                <TableCell sx={compactCellSx} align="right">Ancien</TableCell>
-                                <TableCell sx={compactCellSx} align="right">Nouveau</TableCell>
-                                <TableCell sx={compactCellSx}>Heure</TableCell>
+                                <TableCell sx={compactCellSx}>Motif</TableCell>
+                                <TableCell sx={compactCellSx} align="right">Mouvement</TableCell>
+                                <TableCell sx={compactCellSx}>Poste</TableCell>
+                                <TableCell sx={compactCellSx}>Date</TableCell>
+                                <TableCell sx={compactCellSx} align="right">Action</TableCell>
                             </TableRow>
                         </TableHead>
                         <TableBody>
-                            {receipts.map((r) => (
-                                <TableRow key={r.id}>
+                            {recent.map((m) => (
+                                <TableRow key={m.id}>
                                     <TableCell sx={compactCellSx}>
-                                        {r.label}
-                                        {r.created ? (
-                                            <Chip size="small" variant="outlined" color="info" label="créé" sx={{ ml: 1 }} />
-                                        ) : null}
+                                        {(m.value || '-')} · <span style={{ color: '#a1a1aa' }}>{m.mpn || '-'}</span>
                                     </TableCell>
-                                    <TableCell sx={compactCellSx} align="right">+{r.qty}</TableCell>
-                                    <TableCell sx={{ ...compactCellSx, color: '#a1a1aa' }} align="right">{r.old}</TableCell>
-                                    <TableCell sx={{ ...compactCellSx, fontWeight: 600 }} align="right">{r.next}</TableCell>
-                                    <TableCell sx={{ ...compactCellSx, color: '#a1a1aa' }}>
-                                        {r.date.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
+                                    <TableCell sx={compactCellSx}>
+                                        <Chip size="small" variant="outlined" label={m.motif} />
+                                    </TableCell>
+                                    <TableCell sx={{ ...compactCellSx, fontWeight: 600, color: m.signed_qty >= 0 ? 'success.main' : 'error.main' }} align="right">
+                                        {m.signed_qty >= 0 ? `+${m.signed_qty}` : m.signed_qty}
+                                    </TableCell>
+                                    <TableCell sx={{ ...compactCellSx, color: '#a1a1aa' }}>{m.created_by || '-'}</TableCell>
+                                    <TableCell sx={{ ...compactCellSx, color: '#a1a1aa' }}>{fmtDate(m.date)}</TableCell>
+                                    <TableCell sx={compactCellSx} align="right">
+                                        <Button
+                                            size="small"
+                                            color="inherit"
+                                            startIcon={<UndoRoundedIcon />}
+                                            disabled={cancelBusy === m.id}
+                                            onClick={() => cancelMovement(m.id)}
+                                        >
+                                            Annuler
+                                        </Button>
                                     </TableCell>
                                 </TableRow>
                             ))}
@@ -225,12 +268,17 @@ function StockReceptionTab({ rows, onRefresh, onError, onFeedback }) {
                     </Table>
                 </TableContainer>
             )}
+            <Typography variant="caption" sx={{ color: '#71717a' }}>
+                « Annuler » enregistre un mouvement inverse (réversible, rien n'est supprimé).
+                Pour corriger une quantité : annuler puis re-réceptionner.
+            </Typography>
 
             <StockReceptionCreateDialog
                 open={createOpen}
                 onClose={() => setCreateOpen(false)}
                 onReceived={handleCreatedReception}
                 typeOptions={typeOptions}
+                initialForm={createInitial}
             />
         </Stack>
     );
