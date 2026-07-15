@@ -99,6 +99,8 @@ class ProductionRun(Base):
     machine_id = Column(Integer, ForeignKey("PNP_MACHINES.id"), nullable=True, index=True)
     boards_produced = Column(Integer, nullable=False, default=0, server_default="0")
     note = Column(Text, nullable=True)
+    # ADR 0015 : identité de poste (header X-Workstation) — qui a déclaré le lot.
+    created_by = Column(String(60), nullable=True)
     is_cancelled = Column(Boolean, nullable=False, default=False, server_default="0")
     created_at = Column(DateTime, default=utcnow)
     updated_at = Column(DateTime, default=utcnow, onupdate=utcnow)

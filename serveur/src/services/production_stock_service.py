@@ -99,6 +99,7 @@ class ProductionStockService:
         machine_id: Optional[int],
         boards_produced: int,
         note: Optional[str] = None,
+        created_by: Optional[str] = None,
     ) -> ProductionRun:
         """Create a production run (batch) and post its auto OUT movements."""
         needs, _ = cls.aggregate_needs_per_board(db, production_id)
@@ -114,6 +115,7 @@ class ProductionStockService:
             machine_id=valid_machine_id,
             boards_produced=max(int(boards_produced or 0), 0),
             note=note,
+            created_by=created_by,
         )
         db.add(run)
         db.commit()

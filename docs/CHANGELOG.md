@@ -51,6 +51,17 @@
   `AppShell`). Chips dashboard : « À la main » / « machine + main » (MIXTE).
 - Tests : +4 (`test_assembly_mode.py`).
 
+### Feature déclaration de lot dashboard (branche `feat/declaration-lot-dashboard`)
+- **`POST /api/marketplace/productions/{id}/produce`** : clôture de lot **sans machine
+  obligatoire** (cartes à la main) — jusqu'ici uniquement via la page Machine PnP.
+  `ProduceRequest.machine_id` optionnel ; `PRODUCTION_RUNS.created_by` (migration
+  `a7b8c9d0e1f2`, ADR 0015) trace le poste qui déclare.
+- UI : bouton **« Déclarer un lot »** sur chaque carte « Productions en cours »
+  (`ProduceRunDialog` : cartes, fait par à la main/machine pré-rempli selon le mode, note).
+- UI : entrée **« Mode d'assemblage… »** dans le menu ⋮ des productions
+  (`AssemblyModeDialog`) pour passer une prod existante en MANUEL/MIXTE/PNP.
+- Tests : +3 (`test_produce_dashboard.py`).
+
 ### Release 15/07 (PR #50 `dev → main`, déployée)
 - Réception+création, suggestions de types (PR #49), dashboard productions, ADR 0015 :
   **en prod :8000** (build-web reconstruit, migration `created_by` appliquée sur

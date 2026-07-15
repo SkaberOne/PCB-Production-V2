@@ -11,11 +11,13 @@ import {
     Tooltip,
     Typography,
 } from '@mui/material';
+import AddRoundedIcon from '@mui/icons-material/AddRounded';
 import BackHandRoundedIcon from '@mui/icons-material/BackHandRounded';
 import GroupsRoundedIcon from '@mui/icons-material/GroupsRounded';
 import PrecisionManufacturingRoundedIcon from '@mui/icons-material/PrecisionManufacturingRounded';
 import apiClient from '../../api/client';
 import useEventStream from '../../hooks/useEventStream';
+import ProduceRunDialog from './ProduceRunDialog';
 
 const STATUS_UI = {
     DRAFT: { label: 'Brouillon', color: 'default' },
@@ -56,6 +58,8 @@ function stockChip(stock) {
 function ProductionSummaryCards({ activeProductionId }) {
     const [items, setItems] = React.useState(null); // null = chargement initial
     const [error, setError] = React.useState(null);
+    const [produceFor, setProduceFor] = React.useState(null); // production du dialog lot
+    const [lastLot, setLastLot] = React.useState(null);
 
     const load = React.useCallback(async (silent = false) => {
         if (!silent) setError(null);
@@ -180,12 +184,38 @@ function ProductionSummaryCards({ activeProductionId }) {
                                                 />
                                             </Tooltip>
                                         ) : null}
+                                        <Box sx={{ flexGrow: 1 }} />
+                                        <Button
+                                            size="small"
+                                            variant="outlined"
+                                            startIcon={<AddRoundedIcon />}
+                                            onClick={() => setProduceFor(p)}
+                                            sx={{ minWidth: 0, px: 1, py: 0.25, fontSize: 12 }}
+                                        >
+                                            Déclarer un lot
+                                        </Button>
                                     </Stack>
                                 </Box>
                             );
                         })}
                     </Stack>
                 )}
+
+                {lastLot ? (
+                    <Typography variant="caption" sx={{ color: '#34d399', display: 'block', mt: 1.5 }}>
+                        {lastLot}
+                    </Typography>
+                ) : null}
+
+                <ProduceRunDialog
+                    open={Boolean(produceFor)}
+                    production={produceFor}
+                    onClose={() => setProduceFor(null)}
+                    onSaved={(boards, byHand) => {
+                        setLastLot(`Lot enregistré : ${boards} carte(s) ${byHand ? 'à la main' : 'en machine'} — stock mis à jour.`);
+                        load(true);
+                    }}
+                />
             </CardContent>
         </Card>
     );

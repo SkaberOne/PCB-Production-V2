@@ -6,6 +6,7 @@ import WarningRoundedIcon from '@mui/icons-material/WarningRounded';
 import { Alert, Grid, Stack } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 import GuideBanner from '../components/common/GuideBanner';
+import AssemblyModeDialog from '../components/dashboard/AssemblyModeDialog';
 import CreateProductionDialog from '../components/dashboard/CreateProductionDialog';
 import DashboardStatCards from '../components/dashboard/DashboardStatCards';
 import DeleteProductionDialog from '../components/dashboard/DeleteProductionDialog';
@@ -69,6 +70,11 @@ function DashboardPage() {
         createAssemblyMode,
         setCreateAssemblyMode,
         createDialogError,
+        assemblyDialog,
+        setAssemblyDialog,
+        handleRequestAssemblyMode,
+        handleCloseAssemblyDialog,
+        handleConfirmAssemblyMode,
         deleteDialog,
         renameDialog,
         setRenameDialog,
@@ -230,6 +236,7 @@ function DashboardPage() {
                         onRequestRenameProduction={handleRequestRenameProduction}
                         onRequestArchiveProduction={handleArchiveProduction}
                         onRequestDuplicateProduction={handleDuplicateProduction}
+                        onRequestAssemblyMode={handleRequestAssemblyMode}
                     />
                 </Grid>
                 <Grid item xs={12} lg={4}>
@@ -271,6 +278,16 @@ function DashboardPage() {
                 production={reactivationDialog.production}
                 onClose={handleCloseReactivationDialog}
                 onConfirm={handleConfirmReactivation}
+            />
+
+            <AssemblyModeDialog
+                open={assemblyDialog.open}
+                production={assemblyDialog.production}
+                mode={assemblyDialog.mode}
+                busy={actionLoadingId === assemblyDialog.production?.id}
+                onModeChange={(value) => setAssemblyDialog((prev) => ({ ...prev, mode: value }))}
+                onClose={handleCloseAssemblyDialog}
+                onConfirm={handleConfirmAssemblyMode}
             />
         </Stack>
     );
