@@ -18,8 +18,8 @@ PCB-Production-V2/
 ├── .venv/                          ← Venv Python (gitignored, NE PAS DÉPLACER)
 ├── .git/
 │
+├── LANCEMENT.md                    ← Fiche « quel script lancer pour quoi »
 ├── auto_push.bat                   ← Push GitHub (double-clic)
-├── restart_serveur.bat             ← Kill + redémarre backend
 ├── test_api.bat                    ← Smoke test endpoints
 │
 ├── data/                           ← Données métier (hors code/doc) — voir ADR 0003
@@ -46,8 +46,10 @@ PCB-Production-V2/
 │   ├── requirements.txt            ← Deps épinglées
 │   ├── requirements_flexible.txt   ← Deps souples (Python récent)
 │   ├── pytest.ini                  ← Config pytest
-│   ├── DEMARRER_SERVEUR.bat
+│   ├── DEMARRER_SERVEUR_WEB.bat         ← PROD web :8000 (usage principal)
+│   ├── DEMARRER_SERVEUR_WEB_STAGING.bat ← Test/staging :8001
 │   ├── INSTALLER_SERVEUR.bat
+│   ├── _desktop/                   ← Scripts desktop/.exe (rares) : CONSTRUIRE_SERVEUR, DEMARRER_SERVEUR
 │   ├── src/
 │   │   ├── __init__.py
 │   │   ├── app.py                  ← FastAPI app
@@ -66,8 +68,9 @@ PCB-Production-V2/
 │
 └── client/                         ← === FRONTEND React + Electron ===
     ├── client.env                  ← URL API (adapté réseau)
-    ├── DEMARRER_CLIENT.bat
-    ├── CONSTRUIRE_CLIENT.bat
+    ├── CONSTRUIRE_WEB.bat              ← Build web PROD
+    ├── CONSTRUIRE_WEB_STAGING.bat      ← Build web staging
+    ├── _desktop/                   ← Scripts desktop/.exe (rares) : CONSTRUIRE_CLIENT, DEMARRER_CLIENT
     └── src/
         ├── frontend/               ← React 18 SPA
         │   ├── package.json

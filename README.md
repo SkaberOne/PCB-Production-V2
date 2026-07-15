@@ -180,13 +180,16 @@ l'interface et le backend **d'un seul bloc** (electron-updater + GitHub Releases
 
 Prérequis : Windows 10/11, Python 3.11+, Node.js 18+, Google Chrome.
 
+> Aide-mémoire des lanceurs : [`LANCEMENT.md`](LANCEMENT.md).
+
 ```powershell
 # Backend (crée .venv + dépendances)
 .\serveur\INSTALLER_SERVEUR.bat
-.\serveur\DEMARRER_SERVEUR.bat            # API sur http://localhost:8000 (/docs)
+.\serveur\DEMARRER_SERVEUR_WEB.bat            # PROD web sur http://localhost:8000 (/docs)
+.\serveur\_desktop\DEMARRER_SERVEUR.bat       # serveur dev classique (desktop)
 
 # Frontend (React, port 3000)
-.\client\DEMARRER_CLIENT.bat
+.\client\_desktop\DEMARRER_CLIENT.bat
 
 # Tests
 .venv\Scripts\pytest serveur\src\tests\ -v
@@ -196,7 +199,7 @@ cd client\src\frontend ; npm test
 ### Construire & publier
 
 ```powershell
-.\serveur\CONSTRUIRE_SERVEUR.bat          # backend → dist\pcb-flow-server
+.\serveur\_desktop\CONSTRUIRE_SERVEUR.bat # backend → dist\pcb-flow-server
 cd client\src\desktop ; npm run dist      # installeur (NSIS + portable)
 cd client\src\desktop ; npm run publish   # publie une Release (GH_TOKEN requis)
 ```

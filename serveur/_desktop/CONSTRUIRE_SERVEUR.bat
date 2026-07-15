@@ -1,6 +1,6 @@
 @echo off
 title PCB Flow Production Suite - Build backend (pcb-flow-server.exe)
-cd /d "%~dp0"
+cd /d "%~dp0.."
 
 echo.
 echo ========================================
