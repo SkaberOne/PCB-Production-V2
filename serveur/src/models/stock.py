@@ -114,6 +114,8 @@ class StockMovement(Base):
     production_run_id = Column(Integer, nullable=True, index=True)
     date = Column(DateTime, nullable=False, default=utcnow, index=True)
     note = Column(Text, nullable=True)
+    # ADR 0015 : identité de poste (header X-Workstation) — traçabilité, nullable.
+    created_by = Column(String(60), nullable=True)
     is_reversed = Column(Boolean, nullable=False, default=False, server_default="0")
     reverses_id = Column(Integer, ForeignKey("STOCK_MOVEMENTS.id"), nullable=True)
 

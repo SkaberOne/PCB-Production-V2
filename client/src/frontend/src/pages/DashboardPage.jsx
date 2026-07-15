@@ -10,6 +10,7 @@ import CreateProductionDialog from '../components/dashboard/CreateProductionDial
 import DashboardStatCards from '../components/dashboard/DashboardStatCards';
 import DeleteProductionDialog from '../components/dashboard/DeleteProductionDialog';
 import ProductionsTable from '../components/dashboard/ProductionsTable';
+import ProductionSummaryCards from '../components/dashboard/ProductionSummaryCards';
 import ReactivateProductionDialog from '../components/dashboard/ReactivateProductionDialog';
 import RenameProductionDialog from '../components/dashboard/RenameProductionDialog';
 import { useBomSession } from '../context/BomSessionContext';
@@ -228,6 +229,9 @@ function DashboardPage() {
                         onRequestArchiveProduction={handleArchiveProduction}
                         onRequestDuplicateProduction={handleDuplicateProduction}
                     />
+                </Grid>
+                <Grid item xs={12} lg={4}>
+                    <ProductionSummaryCards activeProductionId={activeProduction?.id} />
                 </Grid>
             </Grid>
 

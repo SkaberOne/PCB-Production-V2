@@ -15,9 +15,11 @@ import {
     Stack,
     Typography,
 } from '@mui/material';
+import BadgeRoundedIcon from '@mui/icons-material/BadgeRounded';
 import PageHeader from '../components/common/PageHeader';
 import DatabaseSettings from '../components/common/DatabaseSettings';
 import SupplierApiSettings from '../components/common/SupplierApiSettings';
+import WorkstationSetting from '../components/common/WorkstationSetting';
 
 const cardSx = { backgroundColor: '#18181b', border: '1px solid #1f2937' };
 
@@ -50,6 +52,10 @@ function SettingsPage() {
                 title="Réglages de l'application"
                 description="Intégrations fournisseurs, valeurs ERP par défaut et chemins des flux locaux. La gestion des référentiels (composants, empreintes, règles) se fait désormais dans Bibliothèque › Base de données."
             />
+
+            <SettingsSection icon={BadgeRoundedIcon} title="Identité de poste" chip="Poste">
+                <WorkstationSetting />
+            </SettingsSection>
 
             <SettingsSection icon={DnsRoundedIcon} title="Connexion base de données" chip="Poste">
                 <DatabaseSettings />

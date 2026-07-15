@@ -3,7 +3,7 @@
 from datetime import datetime
 from typing import List, Literal, Optional
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from ..models.stock import StockConditionnement, StockMotif, StockSens
 
@@ -25,6 +25,38 @@ class MovementCreateRequest(BaseModel):
     # reception (manual add) — quantity received to add to the balance:
     qty: int = Field(default=0, ge=0)
     note: Optional[str] = Field(default=None, max_length=500)
+
+
+class NewComponentIn(BaseModel):
+    """Composant à créer au moment de la réception (feature réception, ADR 0015).
+
+    Le MPN est obligatoire (identifiant fournisseur) ; le reste est optionnel et
+    complétable plus tard depuis le catalogue.
+    """
+
+    mpn: str = Field(..., min_length=1, max_length=200)
+    value: Optional[str] = Field(default=None, max_length=100)
+    footprint: Optional[str] = Field(default=None, max_length=100)
+    component_type: Optional[str] = Field(default=None, max_length=50)
+    description: Optional[str] = Field(default=None, max_length=500)
+
+
+class ReceptionCreateRequest(BaseModel):
+    """Réception manuelle : composant existant (``component_id``) OU nouveau
+    composant (``new_component``) créé à la volée. Exactement l'un des deux."""
+
+    component_id: Optional[int] = Field(default=None, gt=0)
+    new_component: Optional[NewComponentIn] = None
+    qty: int = Field(..., gt=0)
+    note: Optional[str] = Field(default=None, max_length=500)
+
+    @model_validator(mode="after")
+    def _exactly_one_target(self):
+        if bool(self.component_id) == bool(self.new_component):
+            raise ValueError(
+                "Fournir exactement un de component_id ou new_component"
+            )
+        return self
 
 
 class ComponentParamsRequest(BaseModel):
@@ -93,8 +125,27 @@ class MovementOut(BaseModel):
     production_run_id: Optional[int] = None
     date: Optional[datetime] = None
     note: Optional[str] = None
+    created_by: Optional[str] = None
     is_reversed: bool
     reverses_id: Optional[int] = None
+
+
+class ReceptionComponentOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    reference: Optional[str] = None
+    value: Optional[str] = None
+    mpn: Optional[str] = None
+    component_type: Optional[str] = None
+    footprint_eagle: Optional[str] = None
+    footprint_pnp: Optional[str] = None
+
+
+class ReceptionOut(BaseModel):
+    component: ReceptionComponentOut
+    component_created: bool
+    stock: ComponentStockOut
 
 
 class SettingsOut(BaseModel):

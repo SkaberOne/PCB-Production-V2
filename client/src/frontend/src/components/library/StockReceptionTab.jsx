@@ -14,8 +14,11 @@ import {
     Typography,
 } from '@mui/material';
 import AddRoundedIcon from '@mui/icons-material/AddRounded';
+import PlaylistAddRoundedIcon from '@mui/icons-material/PlaylistAddRounded';
+import { Chip } from '@mui/material';
 import apiClient from '../../api/client';
 import { compactCellSx, compactTableContainerSx, compactTableSx } from '../../utils/compactTable';
+import StockReceptionCreateDialog from './StockReceptionCreateDialog';
 import { componentLabel, fpOf } from './stockHelpers';
 
 /**
@@ -27,6 +30,34 @@ function StockReceptionTab({ rows, onRefresh, onError, onFeedback }) {
     const [recQty, setRecQty] = React.useState('');
     const [recBusy, setRecBusy] = React.useState(false);
     const [receipts, setReceipts] = React.useState([]); // historique de session
+    const [createOpen, setCreateOpen] = React.useState(false);
+
+    // Types déjà présents dans la base (suggestions du dialog « Créer et réceptionner »).
+    const typeOptions = React.useMemo(
+        () => Array.from(new Set(rows.map((r) => r.component_type).filter(Boolean))).sort(),
+        [rows],
+    );
+
+    // Réception via le dialog « Créer et réceptionner » (composant créé ou réutilisé par MPN).
+    const handleCreatedReception = async (data, qty) => {
+        const comp = data?.component || {};
+        setReceipts((prev) => [
+            {
+                id: Date.now(),
+                label: [comp.value || '-', comp.footprint_pnp || comp.footprint_eagle || '-', comp.mpn || '-'].join('  ·  '),
+                qty,
+                old: (data?.stock?.qty_pieces ?? qty) - qty,
+                next: data?.stock?.qty_pieces ?? qty,
+                date: new Date(),
+                created: Boolean(data?.component_created),
+            },
+            ...prev,
+        ]);
+        onFeedback(data?.component_created
+            ? 'Composant créé dans le catalogue et réception ajoutée au stock.'
+            : 'MPN déjà connu : réception ajoutée au composant existant.');
+        await onRefresh();
+    };
 
     const submitReception = async () => {
         if (!recComponent || !(Number(recQty) > 0)) return;
@@ -141,6 +172,19 @@ function StockReceptionTab({ rows, onRefresh, onError, onFeedback }) {
                         {recComponent.value || '-'} {fpOf(recComponent)} — stock actuel : <b>{recComponent.qty_pieces}</b> pcs
                     </Typography>
                 ) : null}
+                <Stack direction="row" spacing={1} alignItems="center" sx={{ mt: 2 }}>
+                    <Typography variant="body2" sx={{ color: '#a1a1aa' }}>
+                        Composant absent de la base ?
+                    </Typography>
+                    <Button
+                        size="small"
+                        variant="outlined"
+                        startIcon={<PlaylistAddRoundedIcon />}
+                        onClick={() => setCreateOpen(true)}
+                    >
+                        Créer et réceptionner
+                    </Button>
+                </Stack>
             </Box>
 
             <Typography variant="subtitle2" sx={{ fontWeight: 500 }}>Réceptions récentes</Typography>
@@ -163,7 +207,12 @@ function StockReceptionTab({ rows, onRefresh, onError, onFeedback }) {
                         <TableBody>
                             {receipts.map((r) => (
                                 <TableRow key={r.id}>
-                                    <TableCell sx={compactCellSx}>{r.label}</TableCell>
+                                    <TableCell sx={compactCellSx}>
+                                        {r.label}
+                                        {r.created ? (
+                                            <Chip size="small" variant="outlined" color="info" label="créé" sx={{ ml: 1 }} />
+                                        ) : null}
+                                    </TableCell>
                                     <TableCell sx={compactCellSx} align="right">+{r.qty}</TableCell>
                                     <TableCell sx={{ ...compactCellSx, color: '#a1a1aa' }} align="right">{r.old}</TableCell>
                                     <TableCell sx={{ ...compactCellSx, fontWeight: 600 }} align="right">{r.next}</TableCell>
@@ -176,6 +225,13 @@ function StockReceptionTab({ rows, onRefresh, onError, onFeedback }) {
                     </Table>
                 </TableContainer>
             )}
+
+            <StockReceptionCreateDialog
+                open={createOpen}
+                onClose={() => setCreateOpen(false)}
+                onReceived={handleCreatedReception}
+                typeOptions={typeOptions}
+            />
         </Stack>
     );
 }
