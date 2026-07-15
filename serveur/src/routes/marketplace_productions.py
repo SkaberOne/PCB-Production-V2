@@ -187,6 +187,12 @@ def produce_production(
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+    if request.complete_production:
+        # Clôture : quitte « en cours » (dashboard) + libère les réservations
+        # de stock des autres productions (ADR 0011, _ACTIVE_STATUSES).
+        ProductionWorkspaceService.update_production(
+            db=db, production_id=production_id, status="COMPLETED"
+        )
     event_bus.publish("stock", {"kind": "produce", "production_id": production_id})
     return run
 

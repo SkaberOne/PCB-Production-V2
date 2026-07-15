@@ -171,6 +171,9 @@ class ProduceRequest(BaseModel):
     boards_produced: int = Field(..., ge=0)
     machine_id: Optional[int] = Field(default=None, gt=0)
     note: Optional[str] = Field(default=None, max_length=500)
+    # Marquer la production comme terminée après ce lot (dashboard) :
+    # elle quitte « en cours » et libère ses réservations de stock (ADR 0011).
+    complete_production: bool = False
 
 
 class RunOut(BaseModel):

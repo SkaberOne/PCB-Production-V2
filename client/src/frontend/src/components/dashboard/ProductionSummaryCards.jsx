@@ -64,7 +64,7 @@ function ProductionSummaryCards({ activeProductionId }) {
     const load = React.useCallback(async (silent = false) => {
         if (!silent) setError(null);
         try {
-            const res = await apiClient.get('/reports/productions-summary');
+            const res = await apiClient.get('/reports/productions-summary?include_finished=true');
             setItems(Array.isArray(res.data) ? res.data : []);
         } catch (err) {
             if (!silent) {
@@ -73,6 +73,16 @@ function ProductionSummaryCards({ activeProductionId }) {
             }
         }
     }, []);
+
+    // « En cours » = DRAFT/ACTIVE ; « Terminées » = COMPLETED (les archivées sont masquées).
+    const inProgress = React.useMemo(
+        () => (items || []).filter((p) => p.status === 'DRAFT' || p.status === 'ACTIVE'),
+        [items],
+    );
+    const finished = React.useMemo(
+        () => (items || []).filter((p) => p.status === 'COMPLETED').slice(0, 5),
+        [items],
+    );
 
     React.useEffect(() => { load(); }, [load]);
     useEventStream('stock', React.useCallback(() => { load(true); }, [load]));
@@ -96,13 +106,13 @@ function ProductionSummaryCards({ activeProductionId }) {
                         <Skeleton variant="rounded" height={96} />
                         <Skeleton variant="rounded" height={96} />
                     </Stack>
-                ) : items.length === 0 && !error ? (
+                ) : inProgress.length === 0 && !error ? (
                     <Typography variant="body2" sx={{ color: '#a1a1aa' }}>
                         Aucune production en cours.
                     </Typography>
                 ) : (
                     <Stack spacing={1.5}>
-                        {items.map((p) => {
+                        {inProgress.map((p) => {
                             const statusUi = STATUS_UI[p.status] || { label: p.status || '—', color: 'default' };
                             const commandUi = p.command ? COMMAND_UI[p.command.status] : null;
                             const target = Number(p.boards_target) || 0;
@@ -201,6 +211,38 @@ function ProductionSummaryCards({ activeProductionId }) {
                     </Stack>
                 )}
 
+                {finished.length > 0 ? (
+                    <>
+                        <Typography variant="subtitle2" sx={{ color: '#a1a1aa', fontWeight: 500, mt: 2.5, mb: 1 }}>
+                            Terminées
+                        </Typography>
+                        <Stack spacing={1}>
+                            {finished.map((p) => (
+                                <Box
+                                    key={p.id}
+                                    sx={{
+                                        border: '1px solid #27272a',
+                                        borderRadius: 2,
+                                        p: 1.25,
+                                        opacity: 0.75,
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: 1,
+                                    }}
+                                >
+                                    <Typography variant="body2" sx={{ color: '#d4d4d8', flexGrow: 1 }} noWrap>
+                                        {p.name}
+                                    </Typography>
+                                    <Typography variant="caption" sx={{ color: '#a1a1aa', whiteSpace: 'nowrap' }}>
+                                        {p.boards_produced} carte(s)
+                                    </Typography>
+                                    <Chip size="small" variant="outlined" color="info" label="Terminée" />
+                                </Box>
+                            ))}
+                        </Stack>
+                    </>
+                ) : null}
+
                 {lastLot ? (
                     <Typography variant="caption" sx={{ color: '#34d399', display: 'block', mt: 1.5 }}>
                         {lastLot}
@@ -211,8 +253,8 @@ function ProductionSummaryCards({ activeProductionId }) {
                     open={Boolean(produceFor)}
                     production={produceFor}
                     onClose={() => setProduceFor(null)}
-                    onSaved={(boards, byHand) => {
-                        setLastLot(`Lot enregistré : ${boards} carte(s) ${byHand ? 'à la main' : 'en machine'} — stock mis à jour.`);
+                    onSaved={(boards, byHand, completed) => {
+                        setLastLot(`Lot enregistré : ${boards} carte(s) ${byHand ? 'à la main' : 'en machine'}${completed ? ' — production terminée' : ''} — stock mis à jour.`);
                         load(true);
                     }}
                 />
