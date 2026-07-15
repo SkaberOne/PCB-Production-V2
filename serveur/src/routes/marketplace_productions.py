@@ -1,6 +1,6 @@
 """Marketplace production workspace routes."""
 
-from typing import Optional
+from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
@@ -14,7 +14,7 @@ from ..schemas.marketplace import (
     UpdateProductionBomQuantitiesRequest,
     UpdateProductionRequest,
 )
-from ..schemas.stock import ProduceRequest, RunOut
+from ..schemas.stock import ProduceRequest, RunOut, RunUpdateRequest
 from ..services.production_stock_service import ProductionStockService
 from ..services.production_workspace_service import ProductionWorkspaceService
 from ..services import event_bus
@@ -193,6 +193,48 @@ def produce_production(
         ProductionWorkspaceService.update_production(
             db=db, production_id=production_id, status="COMPLETED"
         )
+    event_bus.publish("stock", {"kind": "produce", "production_id": production_id})
+    return run
+
+
+@router.get("/{production_id}/runs", response_model=List[RunOut])
+def list_production_runs(production_id: int, db: Session = Depends(get_db)):
+    """Liste les lots déclarés d'une production (récents d'abord), pour les
+    consulter / corriger depuis le dashboard."""
+    if db.get(Production, production_id) is None:
+        raise HTTPException(status_code=404, detail="Production introuvable")
+    return ProductionStockService.list_runs(db, production_id)
+
+
+@router.patch("/{production_id}/runs/{run_id}", response_model=RunOut)
+def update_production_run(
+    production_id: int,
+    run_id: int,
+    request: RunUpdateRequest,
+    db: Session = Depends(get_db),
+):
+    """Corrige le nombre de cartes d'un lot déjà déclaré. **Remplace** (ne
+    s'additionne pas) : la sortie stock du lot est réconciliée (ADR 0011)."""
+    try:
+        run = ProductionStockService.update_run(db, run_id, request.boards_produced)
+    except ValueError as e:
+        code = 404 if "introuvable" in str(e).lower() else 400
+        raise HTTPException(status_code=code, detail=str(e))
+    event_bus.publish("stock", {"kind": "produce", "production_id": production_id})
+    return run
+
+
+@router.post("/{production_id}/runs/{run_id}/cancel", response_model=RunOut)
+def cancel_production_run(
+    production_id: int,
+    run_id: int,
+    db: Session = Depends(get_db),
+):
+    """Annule un lot déclaré (réversible : contra-passe sa sortie stock)."""
+    try:
+        run = ProductionStockService.cancel_run(db, run_id)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
     event_bus.publish("stock", {"kind": "produce", "production_id": production_id})
     return run
 
