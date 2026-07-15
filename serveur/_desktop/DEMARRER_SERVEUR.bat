@@ -1,6 +1,6 @@
 @echo off
 title PCB Flow Production Suite - Serveur API
-cd /d "%~dp0"
+cd /d "%~dp0.."
 
 :: Neutraliser une variable d'environnement API_KEY polluee (ex: gabarit
 :: non resolu "${user_config.api_key}") qui ecrase le .env et force l'auth.
