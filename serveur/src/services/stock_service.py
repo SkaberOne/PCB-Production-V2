@@ -373,6 +373,22 @@ class StockService:
         cls.recompute_solde(db, movement.component_id)
         return movement
 
+    # ---------------------------------------------- recent activity (undo UI)
+    @staticmethod
+    def get_recent_movements(db: Session, limit: int = 20):
+        """Derniers mouvements de stock actifs (hors lignes d'annulation et hors
+        mouvements déjà annulés), joints au composant pour l'affichage. Sert la
+        liste « Réceptions récentes » annulable (bouton Annuler → cancel)."""
+        return (
+            db.query(StockMovement, Component)
+            .join(Component, Component.id == StockMovement.component_id)
+            .filter(StockMovement.source_type != "reversal")
+            .filter(StockMovement.is_reversed == False)  # noqa: E712 (SQL Server)
+            .order_by(StockMovement.date.desc(), StockMovement.id.desc())
+            .limit(int(limit))
+            .all()
+        )
+
     # ----------------------------------------------------- production (OUT)
     @classmethod
     def post_production_out(
