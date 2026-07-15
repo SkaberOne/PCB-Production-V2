@@ -33,6 +33,10 @@ class Production(Base):
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String(200), unique=True, nullable=False, index=True)
     machine_id = Column(Integer, ForeignKey("PNP_MACHINES.id"), nullable=True, index=True)
+    # Mode d'assemblage : PNP (machine), MANUEL (à la main), MIXTE. Les cartes
+    # peuvent être assemblées sans machine — le workflow Machine PnP est alors
+    # masqué côté UI. String simple (pas d'Enum SQL) pour rester additif.
+    assembly_mode = Column(String(10), nullable=False, default="PNP", server_default="PNP")
     status = Column(Enum(StatusEnum), default=StatusEnum.ACTIVE)
     notes = Column(Text, nullable=True)
     erp_context = Column(JSON, nullable=True)

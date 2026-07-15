@@ -44,6 +44,7 @@ def create_production(
             name=request.name,
             machine_id=request.machine_id,
             notes=request.notes,
+            assembly_mode=request.assembly_mode,
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -149,6 +150,7 @@ def update_production(
             machine_id_provided="machine_id" in getattr(request, "__fields_set__", set()),
             status=request.status,
             notes=request.notes,
+            assembly_mode=request.assembly_mode,
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))

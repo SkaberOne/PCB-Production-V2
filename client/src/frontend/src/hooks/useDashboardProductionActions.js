@@ -41,6 +41,7 @@ function useDashboardProductionActions({
 }) {
     const [createDialogOpen, setCreateDialogOpen] = React.useState(false);
     const [createName, setCreateName] = React.useState('');
+    const [createAssemblyMode, setCreateAssemblyMode] = React.useState('PNP');
     const [createDialogError, setCreateDialogError] = React.useState('');
     const [deleteDialog, setDeleteDialog] = React.useState({ open: false, production: null });
     const [renameDialog, setRenameDialog] = React.useState({ open: false, production: null, name: '' });
@@ -49,6 +50,7 @@ function useDashboardProductionActions({
     const handleOpenCreateDialog = React.useCallback(() => {
         setCreateDialogError('');
         setCreateName(buildSuggestedProductionName(productions));
+        setCreateAssemblyMode('PNP');
         setCreateDialogOpen(true);
     }, [productions]);
 
@@ -64,6 +66,7 @@ function useDashboardProductionActions({
         try {
             const response = await apiClient.post(`/marketplace/productions`, {
                 name: normalizedName,
+                assembly_mode: createAssemblyMode,
             });
             activateProductionSession(response.data);
             setCreateDialogOpen(false);
@@ -249,6 +252,8 @@ function useDashboardProductionActions({
         setCreateDialogOpen,
         createName,
         setCreateName,
+        createAssemblyMode,
+        setCreateAssemblyMode,
         createDialogError,
         deleteDialog,
         renameDialog,
