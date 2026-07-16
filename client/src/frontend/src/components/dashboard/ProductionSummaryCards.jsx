@@ -198,17 +198,15 @@ function ProductionSummaryCards({ activeProductionId }) {
                                             </Tooltip>
                                         ) : null}
                                         <Box sx={{ flexGrow: 1 }} />
-                                        {produced > 0 ? (
-                                            <Button
-                                                size="small"
-                                                variant="text"
-                                                startIcon={<EditRoundedIcon />}
-                                                onClick={() => setRunsFor(p)}
-                                                sx={{ minWidth: 0, px: 1, py: 0.25, fontSize: 12, color: '#a1a1aa' }}
-                                            >
-                                                Corriger
-                                            </Button>
-                                        ) : null}
+                                        <Button
+                                            size="small"
+                                            variant="text"
+                                            startIcon={<EditRoundedIcon />}
+                                            onClick={() => setRunsFor(p)}
+                                            sx={{ minWidth: 0, px: 1, py: 0.25, fontSize: 12, color: '#a1a1aa' }}
+                                        >
+                                            Corriger
+                                        </Button>
                                         <Button
                                             size="small"
                                             variant="outlined"
