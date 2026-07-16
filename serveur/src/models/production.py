@@ -47,6 +47,13 @@ class Production(Base):
     # vérifiée côté route seulement si le client envoie une version (opt-in).
     version = Column(Integer, nullable=False, default=1, server_default="1")
 
+    # Suivi manuel des productions terminées (saisi à la main sur le dashboard) :
+    # état des cartes après production. Additif, défaut 0 / null.
+    cards_tested = Column(Integer, nullable=False, default=0, server_default="0")
+    cards_validated = Column(Integer, nullable=False, default=0, server_default="0")
+    cards_to_debug = Column(Integer, nullable=False, default=0, server_default="0")
+    followup_note = Column(Text, nullable=True)
+
     bom_links = relationship(
         "ProductionBomRevision",
         back_populates="production",
