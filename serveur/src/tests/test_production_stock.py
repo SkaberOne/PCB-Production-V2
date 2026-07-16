@@ -168,6 +168,74 @@ def test_can_i_produce_reservation_and_shortage():
     db.close()
 
 
+def test_draft_does_not_reserve_against_active():
+    """Priorité : un brouillon ne bloque pas une production active."""
+    db = TestingSessionLocal()
+    r = _component(db, "10k", "R0402")
+    db.commit()
+    StockService.post_declaration(db, r.id, qty_reel=30)
+    target = _production(
+        db, "ACTIVE_TARGET", [("TOP", [("10k", "R0402", 2, False)])],
+        qty=10, status=Production.StatusEnum.ACTIVE,
+    )
+    # Gros brouillon qui, sans priorité, réserverait tout (5 × 10 = 50).
+    _production(
+        db, "BIG_DRAFT", [("TOP", [("10k", "R0402", 5, False)])],
+        qty=10, status=Production.StatusEnum.DRAFT,
+    )
+    res = ProductionStockService.can_i_produce(db, target.id)
+    line = next(l for l in res["lines"] if l["component_id"] == r.id)
+    assert line["besoin"] == 20
+    assert line["reserve"] == 0            # le brouillon est ignoré
+    assert line["disponible"] == 30
+    assert line["manque"] == 0
+    assert res["can_produce"] is True
+    db.close()
+
+
+def test_active_reserves_against_draft():
+    """Une production active prime : elle réserve contre un brouillon."""
+    db = TestingSessionLocal()
+    r = _component(db, "10k", "R0402")
+    db.commit()
+    StockService.post_declaration(db, r.id, qty_reel=30)
+    target = _production(
+        db, "DRAFT_TARGET", [("TOP", [("10k", "R0402", 1, False)])],
+        qty=10, status=Production.StatusEnum.DRAFT,
+    )
+    _production(
+        db, "ACTIVE_OTHER", [("TOP", [("10k", "R0402", 2, False)])],
+        qty=10, status=Production.StatusEnum.ACTIVE,
+    )
+    res = ProductionStockService.can_i_produce(db, target.id)
+    line = next(l for l in res["lines"] if l["component_id"] == r.id)
+    assert line["besoin"] == 10
+    assert line["reserve"] == 20           # l'active réserve contre le brouillon
+    assert line["disponible"] == 10
+    db.close()
+
+
+def test_draft_reserves_against_draft():
+    """Deux brouillons se partagent le stock (priorité égale)."""
+    db = TestingSessionLocal()
+    r = _component(db, "10k", "R0402")
+    db.commit()
+    StockService.post_declaration(db, r.id, qty_reel=30)
+    target = _production(
+        db, "DRAFT_A", [("TOP", [("10k", "R0402", 1, False)])],
+        qty=10, status=Production.StatusEnum.DRAFT,
+    )
+    _production(
+        db, "DRAFT_B", [("TOP", [("10k", "R0402", 2, False)])],
+        qty=10, status=Production.StatusEnum.DRAFT,
+    )
+    res = ProductionStockService.can_i_produce(db, target.id)
+    line = next(l for l in res["lines"] if l["component_id"] == r.id)
+    assert line["reserve"] == 20           # l'autre brouillon réserve
+    assert line["disponible"] == 10
+    db.close()
+
+
 def test_produce_endpoint_http():
     from .conftest import client
     db = TestingSessionLocal()

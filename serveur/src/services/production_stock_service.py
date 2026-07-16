@@ -21,6 +21,20 @@ from .stock_service import StockService
 
 _ACTIVE_STATUSES = (Production.StatusEnum.DRAFT, Production.StatusEnum.ACTIVE)
 
+# Priorité de réservation du stock : une production ACTIVE prime sur un brouillon
+# (DRAFT). Un "autre" ne réserve du stock contre la production cible que si sa
+# priorité est >= à celle de la cible. Conséquences :
+#   - cible ACTIVE  → seuls les autres ACTIVE réservent (les brouillons ne la bloquent plus)
+#   - cible DRAFT   → les ACTIVE + les autres DRAFT réservent (elle voit ce qui reste)
+_RESERVATION_PRIORITY = {
+    Production.StatusEnum.DRAFT: 1,
+    Production.StatusEnum.ACTIVE: 2,
+}
+
+
+def _reservation_priority(status) -> int:
+    return _RESERVATION_PRIORITY.get(status, 0)
+
 
 class ProductionStockService:
     """Consumption, reservations and shortage anticipation for productions."""
@@ -169,10 +183,25 @@ class ProductionStockService:
     # --------------------------------------------------- reservations / need
     @classmethod
     def _reserved_by_others(
-        cls, db: Session, target_production_id: int, settings
+        cls, db: Session, target_production_id: int, settings, target_status=None
     ) -> Dict[int, int]:
-        """{component_id: reserved qty} = Σ remaining need of other non-closed prods."""
+        """{component_id: reserved qty} = Σ remaining need of other non-closed prods.
+
+        Priorité (ADR 0011, révisée) : un "autre" ne réserve du stock contre la
+        cible que si sa priorité de réservation est >= à celle de la cible. Ainsi
+        une production ACTIVE ignore les réservations des brouillons (elle prime),
+        tandis qu'un brouillon voit ce qui reste après les actives et les autres
+        brouillons.
+        """
         reserved: Dict[int, int] = {}
+        if target_status is None:
+            target = (
+                db.query(Production)
+                .filter(Production.id == target_production_id)
+                .first()
+            )
+            target_status = target.status if target else None
+        target_priority = _reservation_priority(target_status)
         others = (
             db.query(Production)
             .filter(
@@ -182,6 +211,9 @@ class ProductionStockService:
             .all()
         )
         for production in others:
+            # Un brouillon ne bloque pas une production plus prioritaire (active).
+            if _reservation_priority(production.status) < target_priority:
+                continue
             needs, _ = cls.aggregate_needs_per_board(db, production.id)
             boards = cls.board_count(production)
             run_ids = [
@@ -207,7 +239,9 @@ class ProductionStockService:
         needs, production = cls.aggregate_needs_per_board(db, production_id)
         settings = StockService.get_settings(db)
         board_count = int(boards) if boards is not None else cls.board_count(production)
-        reserved = cls._reserved_by_others(db, production_id, settings)
+        reserved = cls._reserved_by_others(
+            db, production_id, settings, target_status=production.status
+        )
         engaged = StockService.engaged_by_component(db)
 
         stocks = {
