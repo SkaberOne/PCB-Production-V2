@@ -41,3 +41,18 @@ test('prérempli, édite et enregistre le suivi', async () => {
     });
     await waitFor(() => expect(onSaved).toHaveBeenCalled());
 });
+
+test('réintègre la production (PATCH status DRAFT)', async () => {
+    apiClient.patch.mockResolvedValue({ data: {} });
+    const onReintegrated = jest.fn();
+    const onClose = jest.fn();
+
+    render(<ProductionFollowupDialog open production={PROD} onClose={onClose} onSaved={() => {}} onReintegrated={onReintegrated} />);
+
+    fireEvent.click(screen.getByText('Réintégrer'));
+
+    await waitFor(() => {
+        expect(apiClient.patch).toHaveBeenCalledWith('/marketplace/productions/4', { status: 'DRAFT' });
+    });
+    await waitFor(() => expect(onReintegrated).toHaveBeenCalled());
+});
