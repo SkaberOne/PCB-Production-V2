@@ -3,6 +3,7 @@
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from ..database import get_db
@@ -237,6 +238,40 @@ def cancel_production_run(
         raise HTTPException(status_code=404, detail=str(e))
     event_bus.publish("stock", {"kind": "produce", "production_id": production_id})
     return run
+
+
+class FollowupRequest(BaseModel):
+    """Suivi manuel d'une production terminée (compteurs cartes + note libre).
+    Tous les champs optionnels : seuls ceux fournis sont mis à jour."""
+
+    cards_tested: Optional[int] = Field(default=None, ge=0)
+    cards_validated: Optional[int] = Field(default=None, ge=0)
+    cards_to_debug: Optional[int] = Field(default=None, ge=0)
+    note: Optional[str] = Field(default=None, max_length=1000)
+
+
+@router.patch("/{production_id}/followup")
+def update_production_followup(
+    production_id: int,
+    request: FollowupRequest,
+    db: Session = Depends(get_db),
+):
+    """Met à jour le suivi manuel d'une production (cartes testées / validées /
+    à débugger + note). N'affecte ni le statut ni le stock."""
+    try:
+        result = ProductionWorkspaceService.update_followup(
+            db,
+            production_id,
+            cards_tested=request.cards_tested,
+            cards_validated=request.cards_validated,
+            cards_to_debug=request.cards_to_debug,
+            note=request.note,
+            note_provided="note" in request.model_fields_set,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    event_bus.publish("stock", {"kind": "produce", "production_id": production_id})
+    return result
 
 
 @router.post("/{production_id}/bom-revisions")
