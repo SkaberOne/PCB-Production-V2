@@ -125,7 +125,7 @@ def serialize_fixed_feeder_component(component: Component, usage_entry: Optional
         "value": component.value,
         "mpn": component.mpn,
         "description": component.description,
-        "component_label": component.description or component.mpn or component.value or component.reference,
+        "component_label": component.value or component.mpn or component.description or component.reference,
         "footprint_pnp": component.footprint_pnp or component.package,
         "footprint_eagle": component.footprint_eagle,
         "feeder_type": normalize_component_feeder_type(component.feeder_type),
@@ -171,6 +171,25 @@ def component_display_label(component: Optional[Component]) -> str:
     if not component:
         return "Composant inconnu"
     return component.description or component.mpn or component.value or component.reference or "Composant inconnu"
+
+
+def component_value_label(component: Optional[Component]) -> str:
+    """Libellé « valeur d'abord » pour l'affichage de la table machine.
+
+    Priorise la valeur (ex. 10k, 100nF) sur le MPN, plus parlant pour les
+    passifs. Les composants sans valeur (transistors, diodes, LED, ICs)
+    retombent sur le MPN puis la description. NE PAS utiliser comme clé de tri
+    (le tri des placements reste sur component_display_label).
+    """
+    if not component:
+        return "Composant inconnu"
+    return (
+        component.value
+        or component.mpn
+        or component.description
+        or component.reference
+        or "Composant inconnu"
+    )
 
 
 def cart_kind_value(cart: Optional[PnpCart]) -> Optional[str]:
@@ -261,7 +280,7 @@ def build_assignment_payload(
         "slot_positions": slot_positions,
         "placement_group": placement_group,
         "component_id": component.id,
-        "component_label": component_display_label(component),
+        "component_label": component_value_label(component),
         "component_reference": component.reference,
         "component_value": component.value,
         "component_mpn": component.mpn,
@@ -316,7 +335,7 @@ def build_unassigned_payload(
     cart = component.fixed_cart
     return {
         "component_id": component.id,
-        "component_label": component_display_label(component),
+        "component_label": component_value_label(component),
         "component_reference": component.reference,
         "footprint_pnp": component.footprint_pnp or component.package,
         "feeder_type": normalize_component_feeder_type(component.feeder_type),
