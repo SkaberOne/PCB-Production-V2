@@ -20,7 +20,7 @@ const EMPTY = { tested: '0', validated: '0', to_debug: '0', note: '' };
  * Édition du suivi d'une production terminée : cartes testées / validées / à
  * débugger + note. Aperçu de la barre en direct. PATCH /productions/{id}/followup.
  */
-function ProductionFollowupDialog({ open, production, onClose, onSaved }) {
+function ProductionFollowupDialog({ open, production, onClose, onSaved, onReintegrated }) {
     const [form, setForm] = React.useState(EMPTY);
     const [busy, setBusy] = React.useState(false);
     const [error, setError] = React.useState(null);
@@ -54,6 +54,21 @@ function ProductionFollowupDialog({ open, production, onClose, onSaved }) {
             onClose();
         } catch (err) {
             setError(err?.response?.data?.detail || 'Enregistrement impossible.');
+        } finally {
+            setBusy(false);
+        }
+    };
+
+    const reintegrate = async () => {
+        if (!production) return;
+        setBusy(true);
+        setError(null);
+        try {
+            await apiClient.patch(`/marketplace/productions/${production.id}`, { status: 'DRAFT' });
+            if (onReintegrated) onReintegrated();
+            onClose();
+        } catch (err) {
+            setError(err?.response?.data?.detail || 'Réintégration impossible.');
         } finally {
             setBusy(false);
         }
@@ -118,9 +133,19 @@ function ProductionFollowupDialog({ open, production, onClose, onSaved }) {
                     />
                 </Stack>
             </DialogContent>
-            <DialogActions>
-                <Button color="inherit" onClick={onClose} disabled={busy}>Annuler</Button>
-                <Button variant="contained" color="success" onClick={save} disabled={busy}>Enregistrer</Button>
+            <DialogActions sx={{ justifyContent: 'space-between' }}>
+                <Button
+                    color="warning"
+                    onClick={reintegrate}
+                    disabled={busy}
+                    title="Repasser la production en brouillon (elle réapparaît dans « Productions créées »)"
+                >
+                    Réintégrer
+                </Button>
+                <Box>
+                    <Button color="inherit" onClick={onClose} disabled={busy}>Annuler</Button>
+                    <Button variant="contained" color="success" onClick={save} disabled={busy}>Enregistrer</Button>
+                </Box>
             </DialogActions>
         </Dialog>
     );
