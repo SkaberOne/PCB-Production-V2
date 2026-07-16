@@ -90,6 +90,10 @@ class ReportService:
                     "date_fin": prod.updated_at.isoformat() if prod.updated_at else None,
                     "boards_produced": int(boards_produced),
                     "boards_target": boards_target,
+                    "cards_tested": int(prod.cards_tested or 0),
+                    "cards_validated": int(prod.cards_validated or 0),
+                    "cards_to_debug": int(prod.cards_to_debug or 0),
+                    "followup_note": prod.followup_note,
                 }
             )
         return out

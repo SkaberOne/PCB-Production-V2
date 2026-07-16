@@ -222,6 +222,37 @@ class ProductionWorkspaceService:
         return production
 
     @staticmethod
+    def update_followup(
+        db: Session,
+        production_id: int,
+        cards_tested: Optional[int] = None,
+        cards_validated: Optional[int] = None,
+        cards_to_debug: Optional[int] = None,
+        note: Optional[str] = None,
+        note_provided: bool = False,
+    ) -> Dict:
+        """Suivi manuel d'une production terminée (compteurs cartes + note).
+        Ne touche pas le statut ni le stock — pur suivi qualité saisi à la main."""
+        production = ProductionWorkspaceService.get_production_or_raise(db, production_id)
+        if cards_tested is not None:
+            production.cards_tested = max(int(cards_tested), 0)
+        if cards_validated is not None:
+            production.cards_validated = max(int(cards_validated), 0)
+        if cards_to_debug is not None:
+            production.cards_to_debug = max(int(cards_to_debug), 0)
+        if note_provided:
+            production.followup_note = (note or "").strip() or None
+        db.commit()
+        db.refresh(production)
+        return {
+            "id": production.id,
+            "cards_tested": production.cards_tested or 0,
+            "cards_validated": production.cards_validated or 0,
+            "cards_to_debug": production.cards_to_debug or 0,
+            "followup_note": production.followup_note,
+        }
+
+    @staticmethod
     def get_production_detail(db: Session, production_id: int) -> Dict:
         production = ProductionWorkspaceService.get_production_or_raise(db, production_id)
         return ProductionWorkspaceService._serialize_production(production, include_boms=True)
