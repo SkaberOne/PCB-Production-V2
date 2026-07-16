@@ -13,6 +13,7 @@ import {
 } from '@mui/material';
 import AddRoundedIcon from '@mui/icons-material/AddRounded';
 import EditRoundedIcon from '@mui/icons-material/EditRounded';
+import HistoryRoundedIcon from '@mui/icons-material/HistoryRounded';
 import BackHandRoundedIcon from '@mui/icons-material/BackHandRounded';
 import GroupsRoundedIcon from '@mui/icons-material/GroupsRounded';
 import PrecisionManufacturingRoundedIcon from '@mui/icons-material/PrecisionManufacturingRounded';
@@ -20,6 +21,7 @@ import apiClient from '../../api/client';
 import useEventStream from '../../hooks/useEventStream';
 import ProduceRunDialog from './ProduceRunDialog';
 import ProductionRunsDialog from './ProductionRunsDialog';
+import ProductionHistoryDialog from './ProductionHistoryDialog';
 
 const STATUS_UI = {
     DRAFT: { label: 'Brouillon', color: 'default' },
@@ -62,6 +64,7 @@ function ProductionSummaryCards({ activeProductionId }) {
     const [error, setError] = React.useState(null);
     const [produceFor, setProduceFor] = React.useState(null); // production du dialog lot
     const [runsFor, setRunsFor] = React.useState(null); // production du dialog « corriger les lots »
+    const [historyOpen, setHistoryOpen] = React.useState(false);
     const [lastLot, setLastLot] = React.useState(null);
 
     const load = React.useCallback(async (silent = false) => {
@@ -97,6 +100,9 @@ function ProductionSummaryCards({ activeProductionId }) {
                     <Typography variant="h6" sx={{ flexGrow: 1, color: '#f4f4f5', fontWeight: 600 }}>
                         Productions en cours
                     </Typography>
+                    <Button size="small" variant="text" startIcon={<HistoryRoundedIcon />} onClick={() => setHistoryOpen(true)}>
+                        Historique
+                    </Button>
                     <Button size="small" variant="text" onClick={() => load()}>Actualiser</Button>
                 </Stack>
 
@@ -198,17 +204,15 @@ function ProductionSummaryCards({ activeProductionId }) {
                                             </Tooltip>
                                         ) : null}
                                         <Box sx={{ flexGrow: 1 }} />
-                                        {produced > 0 ? (
-                                            <Button
-                                                size="small"
-                                                variant="text"
-                                                startIcon={<EditRoundedIcon />}
-                                                onClick={() => setRunsFor(p)}
-                                                sx={{ minWidth: 0, px: 1, py: 0.25, fontSize: 12, color: '#a1a1aa' }}
-                                            >
-                                                Corriger
-                                            </Button>
-                                        ) : null}
+                                        <Button
+                                            size="small"
+                                            variant="text"
+                                            startIcon={<EditRoundedIcon />}
+                                            onClick={() => setRunsFor(p)}
+                                            sx={{ minWidth: 0, px: 1, py: 0.25, fontSize: 12, color: '#a1a1aa' }}
+                                        >
+                                            Corriger
+                                        </Button>
                                         <Button
                                             size="small"
                                             variant="outlined"
@@ -278,6 +282,11 @@ function ProductionSummaryCards({ activeProductionId }) {
                     production={runsFor}
                     onClose={() => setRunsFor(null)}
                     onChanged={() => load(true)}
+                />
+
+                <ProductionHistoryDialog
+                    open={historyOpen}
+                    onClose={() => setHistoryOpen(false)}
                 />
             </CardContent>
         </Card>
