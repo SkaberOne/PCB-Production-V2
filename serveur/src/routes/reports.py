@@ -33,6 +33,15 @@ def get_productions_summary(
     return ReportService.get_productions_summary(db=db, include_finished=include_finished)
 
 
+@router.get("/productions-history")
+def get_productions_history(
+    limit: int = Query(100, ge=1, le=500),
+    db: Session = Depends(get_db),
+):
+    """Historique des productions terminées, datées de leur clôture (récentes d'abord)."""
+    return ReportService.get_productions_history(db=db, limit=limit)
+
+
 @router.get("/bom-stats")
 def get_bom_stats(production_id: Optional[int] = Query(None, ge=1), db: Session = Depends(get_db)):
     """Get BOM review KPI stats (total items, footprints mapped, items to verify).

@@ -59,6 +59,42 @@ class ReportService:
         }
 
     @staticmethod
+    def get_productions_history(db: Session, limit: int = 100) -> List[Dict]:
+        """Historique des productions **terminées** (COMPLETED), datées de leur
+        clôture (``updated_at``), les plus récentes d'abord. Sert le bouton
+        « Historique » du dashboard."""
+        prods = (
+            db.query(Production)
+            .filter(Production.status == Production.StatusEnum.COMPLETED)
+            .order_by(Production.updated_at.desc(), Production.id.desc())
+            .limit(int(limit))
+            .all()
+        )
+        out: List[Dict] = []
+        for prod in prods:
+            links = prod.bom_links or []
+            boards_target = sum(int(link.quantity_to_produce or 0) for link in links)
+            boards_produced = (
+                db.query(func.coalesce(func.sum(ProductionRun.boards_produced), 0))
+                .filter(
+                    ProductionRun.production_id == prod.id,
+                    ProductionRun.is_cancelled == False,  # noqa: E712 (SQL Server)
+                )
+                .scalar()
+                or 0
+            )
+            out.append(
+                {
+                    "id": prod.id,
+                    "name": prod.name,
+                    "date_fin": prod.updated_at.isoformat() if prod.updated_at else None,
+                    "boards_produced": int(boards_produced),
+                    "boards_target": boards_target,
+                }
+            )
+        return out
+
+    @staticmethod
     def get_productions_summary(db: Session, include_finished: bool = False) -> List[Dict]:
         """Résumé agrégé par production pour le dashboard (une carte par production).
 
