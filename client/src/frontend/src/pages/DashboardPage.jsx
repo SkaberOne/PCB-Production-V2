@@ -169,6 +169,10 @@ function DashboardPage() {
             ? productions.filter((p) => (p.name || '').toLowerCase().includes(q))
             : [...productions];
 
+        // Les productions terminées (COMPLETED) sortent de « Productions créées »
+        // — elles restent dans le suivi en bas et sont réintégrables de là.
+        list = list.filter((p) => String(p.status || '').toUpperCase() !== 'COMPLETED');
+
         list.sort((a, b) => {
             // Archived always floats to bottom (regardless of sort field)
             const aArchived = String(a.status || '').toUpperCase() === 'ARCHIVED' ? 1 : 0;
@@ -245,7 +249,7 @@ function DashboardPage() {
                 </Grid>
             </Grid>
 
-            <ProductionFollowupPanel />
+            <ProductionFollowupPanel onReintegrated={loadProductions} />
 
             <CreateProductionDialog
                 open={createDialogOpen}

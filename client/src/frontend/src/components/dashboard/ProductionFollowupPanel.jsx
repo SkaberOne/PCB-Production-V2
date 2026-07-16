@@ -34,7 +34,7 @@ function fmtDate(iso) {
  * avec une barre de progression (validées / à débugger / testées). **Cliquer
  * sur une ligne** ouvre la fenêtre de saisie des compteurs + note.
  */
-function ProductionFollowupPanel() {
+function ProductionFollowupPanel({ onReintegrated }) {
     const [rows, setRows] = React.useState(null);
     const [error, setError] = React.useState(null);
     const [editing, setEditing] = React.useState(null); // production en cours d'édition
@@ -129,6 +129,7 @@ function ProductionFollowupPanel() {
                 production={editing}
                 onClose={() => setEditing(null)}
                 onSaved={() => load(true)}
+                onReintegrated={() => { load(true); if (onReintegrated) onReintegrated(); }}
             />
         </Card>
     );
