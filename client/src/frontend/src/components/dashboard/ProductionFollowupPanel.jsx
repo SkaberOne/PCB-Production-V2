@@ -12,6 +12,7 @@ import {
     TableHead,
     TableRow,
     TextField,
+    Tooltip,
     Typography,
 } from '@mui/material';
 import CheckRoundedIcon from '@mui/icons-material/CheckRounded';
@@ -31,6 +32,33 @@ function fmtDate(iso) {
 }
 
 const FIELDS = ['cards_tested', 'cards_validated', 'cards_to_debug', 'followup_note'];
+
+/**
+ * Barre de progression du suivi : sur le total produit, part **validée** (vert),
+ * **à débugger** (orange), **testée en attente** (bleu = testées − validées − à
+ * débugger), le reste **non testée** (fond gris). Reflète les 3 compteurs.
+ */
+function SuiviBar({ produced, tested, validated, toDebug }) {
+    const p = Math.max(Number(produced) || 0, 0);
+    const t = Math.max(Number(tested) || 0, 0);
+    const v = Math.max(Number(validated) || 0, 0);
+    const d = Math.max(Number(toDebug) || 0, 0);
+    const base = Math.max(p, v + d, t);
+    const pending = Math.max(t - v - d, 0);
+    const pct = (n) => (base > 0 ? `${(n / base) * 100}%` : '0%');
+    return (
+        <Tooltip
+            arrow
+            title={`Validées ${v} · À débugger ${d} · Testées ${t} / produites ${p}`}
+        >
+            <Box sx={{ display: 'flex', width: 130, height: 9, borderRadius: 5, overflow: 'hidden', bgcolor: '#3f3f46' }}>
+                <Box sx={{ width: pct(v), bgcolor: '#22c55e' }} />
+                <Box sx={{ width: pct(d), bgcolor: '#f59e0b' }} />
+                <Box sx={{ width: pct(pending), bgcolor: '#3b82f6' }} />
+            </Box>
+        </Tooltip>
+    );
+}
 
 function draftFrom(p) {
     return {
@@ -110,9 +138,19 @@ function ProductionFollowupPanel() {
                     <Typography variant="h6" sx={{ flexGrow: 1, color: '#f4f4f5', fontWeight: 600 }}>
                         Suivi des productions terminées
                     </Typography>
-                    <Typography variant="caption" sx={{ color: '#71717a' }}>
-                        Cartes testées / validées / à débugger — saisie manuelle
-                    </Typography>
+                    <Stack direction="row" spacing={1.5} alignItems="center">
+                        {[
+                            ['#22c55e', 'Validées'],
+                            ['#f59e0b', 'À débugger'],
+                            ['#3b82f6', 'Testées'],
+                            ['#3f3f46', 'Non testées'],
+                        ].map(([c, label]) => (
+                            <Stack key={label} direction="row" spacing={0.5} alignItems="center">
+                                <Box sx={{ width: 10, height: 10, borderRadius: '50%', bgcolor: c }} />
+                                <Typography variant="caption" sx={{ color: '#a1a1aa' }}>{label}</Typography>
+                            </Stack>
+                        ))}
+                    </Stack>
                 </Stack>
 
                 {error ? <Typography variant="body2" sx={{ color: '#f87171', mb: 1 }}>{error}</Typography> : null}
@@ -132,6 +170,7 @@ function ProductionFollowupPanel() {
                                     <TableCell sx={compactCellSx} align="center">Testées</TableCell>
                                     <TableCell sx={compactCellSx} align="center">Validées</TableCell>
                                     <TableCell sx={compactCellSx} align="center">À débugger</TableCell>
+                                    <TableCell sx={compactCellSx} align="center">Progression</TableCell>
                                     <TableCell sx={compactCellSx}>Note</TableCell>
                                     <TableCell sx={compactCellSx} align="center"> </TableCell>
                                 </TableRow>
@@ -157,6 +196,14 @@ function ProductionFollowupPanel() {
                                             <TableCell sx={compactCellSx} align="center">{num('cards_tested')}</TableCell>
                                             <TableCell sx={compactCellSx} align="center">{num('cards_validated')}</TableCell>
                                             <TableCell sx={compactCellSx} align="center">{num('cards_to_debug')}</TableCell>
+                                            <TableCell sx={compactCellSx} align="center">
+                                                <SuiviBar
+                                                    produced={p.boards_produced}
+                                                    tested={d.cards_tested}
+                                                    validated={d.cards_validated}
+                                                    toDebug={d.cards_to_debug}
+                                                />
+                                            </TableCell>
                                             <TableCell sx={compactCellSx}>
                                                 <TextField
                                                     size="small"
