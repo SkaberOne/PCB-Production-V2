@@ -81,13 +81,20 @@ class CommandService:
         defaults: Dict[str, str],
         offers_by_component: Optional[Dict[int, Dict]] = None,
         line_overrides: Optional[Dict[str, int]] = None,
+        line_offer_override: Optional[Dict[str, Dict]] = None,
     ) -> List[Dict[str, object]]:
         rows: List[Dict[str, object]] = []
         overrides = line_overrides or {}
         offers_by_component = offers_by_component or {}
+        line_offer_override = line_offer_override or {}
 
         for line in command_summary.get("aggregated_components", []):
-            offer = offers_by_component.get(line.get("component_library_id")) or {}
+            # Feature B : fournisseur choisi par ligne prime sur le meilleur global.
+            offer = (
+                line_offer_override.get(line.get("key"))
+                or offers_by_component.get(line.get("component_library_id"))
+                or {}
+            )
 
             supplier_reference = cls._clean_export_text(
                 offer.get("supplier_part")
@@ -166,6 +173,35 @@ class CommandService:
             priority_supplier=priority_supplier,
         )
 
+        # Feature B : offre du fournisseur explicitement choisi par ligne (prix live).
+        from ..models.commands import CommandLineDetail  # évite un cycle d'import
+
+        selected_by_key = {
+            detail.line_key: (detail.selected_supplier or "").upper()
+            for detail in db.query(CommandLineDetail)
+            .filter(CommandLineDetail.command_id == command_id)
+            .all()
+            if (detail.selected_supplier or "").strip()
+        }
+        line_offer_override: Dict[str, Dict] = {}
+        if selected_by_key:
+            raw_offers = SupplierOfferService.get_offers(db, list(component_quantities.keys()))
+            for line in summary.get("aggregated_components", []):
+                supplier = selected_by_key.get(line.get("key"))
+                component_id = line.get("component_library_id")
+                if not supplier or not component_id:
+                    continue
+                match = next(
+                    (
+                        offer
+                        for offer in raw_offers.get(component_id, [])
+                        if (offer.get("supplier") or "").upper() == supplier
+                    ),
+                    None,
+                )
+                if match:
+                    line_offer_override[line.get("key")] = match
+
         workbook = Workbook()
         worksheet = workbook.active
         worksheet.title = "Purchase List ERP"
@@ -176,6 +212,7 @@ class CommandService:
             defaults=defaults,
             offers_by_component=offers_by_component,
             line_overrides=line_overrides,
+            line_offer_override=line_offer_override,
         ):
             worksheet.append([row[header] for header in cls.ERP_HEADERS])
 

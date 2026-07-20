@@ -183,6 +183,12 @@ class CommandLineDetail(Base):
     manual_currency = Column(String(8), nullable=True)
     manual_product_url = Column(Text, nullable=True)
 
+    # Fournisseur retenu PARMI les offres API (choix par composant sur la page
+    # Commande). Contrairement à manual_supplier (offre saisie à la main, prix
+    # figé), ici on ne stocke que le CODE fournisseur : le prix reste « live »
+    # (recalculé depuis SUPPLIER_OFFERS à chaque affichage/export).
+    selected_supplier = Column(String(20), nullable=True)
+
     updated_at = Column(DateTime, default=utcnow, onupdate=utcnow)
 
     def __repr__(self):
