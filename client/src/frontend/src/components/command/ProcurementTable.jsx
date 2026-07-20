@@ -57,6 +57,20 @@ const EMPTY_FORM = {
     supplier: '', supplierPart: '', unitPrice: '', currency: 'EUR', productUrl: '',
 };
 
+/**
+ * Options du menu déroulant « quantité » d'une ligne : le besoin restant, la
+ * quantité courante, les paliers de prix de l'offre retenue (souvent les tailles
+ * de bobine 2000/3000/5000) et la taille de bobine du composant. Dédupliqué, trié.
+ */
+function buildQtyChoices({ autoQty, current, offer, qtyPerReel }) {
+    const set = new Set();
+    [autoQty, current].forEach((q) => { if (q && q > 0) set.add(Number(q)); });
+    const breaks = Array.isArray(offer?.price_breaks) ? offer.price_breaks : [];
+    breaks.forEach((b) => { if (b && Number(b.qty) > 0) set.add(Number(b.qty)); });
+    if (qtyPerReel && Number(qtyPerReel) > 0) set.add(Number(qtyPerReel));
+    return Array.from(set).sort((a, b) => a - b);
+}
+
 function ProcurementTable({ rows = [], commandId, refreshNonce = 0, onRefreshState, onLineSaved }) {
     const [offersByComponent, setOffersByComponent] = useState({});
     const [strategy, setStrategy] = useState('cheapest');
@@ -107,6 +121,8 @@ function ProcurementTable({ rows = [], commandId, refreshNonce = 0, onRefreshSta
                 currency: form.currency.trim() || null,
                 product_url: form.productUrl.trim() || null,
                 component_library_id: Number.isInteger(editRow.componentLibraryId) ? editRow.componentLibraryId : null,
+                // Préserve le fournisseur choisi (menu par ligne) lors d'un enregistrement popup.
+                selected_supplier: editRow.selectedSupplier || null,
             });
             onLineSaved?.(res.data);
             closeEditor();
@@ -115,6 +131,32 @@ function ProcurementTable({ rows = [], commandId, refreshNonce = 0, onRefreshSta
             setSaving(false);
         }
     }, [commandId, editRow, form, onLineSaved, closeEditor]);
+
+    // Persistance « préservante » : réécrit l'état complet de la ligne (set_line_detail
+    // écrase tout) en ne modifiant que `changes`. Sert aux menus déroulants par ligne
+    // (fournisseur retenu, quantité) sans effacer note / MPN / offre manuelle.
+    const persistLineDetail = useCallback(async (row, changes) => {
+        if (!commandId) return;
+        try {
+            const res = await apiClient.put(`/marketplace/commands/${commandId}/line-details`, {
+                line_key: row.key,
+                mpn: row.mpn || null,
+                quantity_to_order: row.quantityToOrderOverride ?? null,
+                note: row.note || null,
+                supplier: row.manualOffer?.supplier || null,
+                supplier_part: row.manualOffer?.supplier_part || null,
+                unit_price: row.manualOffer?.unit_price ?? null,
+                currency: row.manualOffer?.currency || null,
+                product_url: row.manualOffer?.product_url || null,
+                component_library_id: Number.isInteger(row.componentLibraryId) ? row.componentLibraryId : null,
+                selected_supplier: row.selectedSupplier || null,
+                ...changes,
+            });
+            onLineSaved?.(res.data);
+        } catch (e) {
+            /* non bloquant : l'UI se resynchronise au prochain refresh */
+        }
+    }, [commandId, onLineSaved]);
 
     const componentIds = useMemo(
         () => rows.map((r) => r.componentLibraryId).filter((id) => Number.isInteger(id)),
@@ -257,10 +299,20 @@ function ProcurementTable({ rows = [], commandId, refreshNonce = 0, onRefreshSta
                             const offers = offersByComponent[row.componentLibraryId] || [];
                             const opts = sortOptsFor(toOrder || row.requiredQuantity);
                             const sorted = sortOffers(offers, opts);
-                            // Une offre saisie à la main prime sur le cache fournisseur.
+                            // Une offre saisie à la main prime ; sinon le fournisseur choisi
+                            // par ligne (Feature B) ; sinon le tri automatique.
                             const manual = row.manualOffer;
-                            const best = manual || selectBest(offers, opts);
+                            const chosenBySupplier = row.selectedSupplier
+                                ? offers.find((o) => (o.supplier || '').toUpperCase() === String(row.selectedSupplier).toUpperCase())
+                                : null;
+                            const best = manual || chosenBySupplier || selectBest(offers, opts);
                             const qty = best ? (toOrder || row.requiredQuantity || 1) : 0;
+                            // Feature A : options de quantité (besoin restant + paliers + bobine).
+                            const autoQty = Math.max((row.requiredQuantity || 0) - (row.stockAvailableQty || 0), 0);
+                            const qtyChoices = buildQtyChoices({ autoQty, current: toOrder, offer: best, qtyPerReel: row.qtyPerReel });
+                            const selectedSupplierValue = (row.selectedSupplier
+                                && offers.some((o) => (o.supplier || '').toUpperCase() === String(row.selectedSupplier).toUpperCase()))
+                                ? String(row.selectedSupplier).toUpperCase() : '';
                             const unit = best ? effectivePrice(best, qty) : null;
                             const total = unit != null && Number.isFinite(unit) ? unit * qty : null;
                             const currency = best?.currency || 'EUR';
@@ -293,7 +345,27 @@ function ProcurementTable({ rows = [], commandId, refreshNonce = 0, onRefreshSta
                                     <TableCell>{row.footprint}</TableCell>
                                     <TableCell align="right">{row.requiredQuantity}</TableCell>
                                     <TableCell align="right">{row.stockAvailableQty || 0}</TableCell>
-                                    <TableCell align="right" sx={{ fontWeight: 600 }}>{toOrder}</TableCell>
+                                    <TableCell align="right" onClick={(e) => e.stopPropagation()}>
+                                        <Select
+                                            size="small"
+                                            value={toOrder}
+                                            onChange={(e) => persistLineDetail(row, { quantity_to_order: Number(e.target.value) })}
+                                            renderValue={(v) => <span style={{ fontWeight: 600 }}>{Number(v).toLocaleString('fr-FR')}</span>}
+                                            sx={{ minWidth: 96, '& .MuiSelect-select': { py: '4px', textAlign: 'right' } }}
+                                        >
+                                            {qtyChoices.map((q) => {
+                                                const up = best ? effectivePrice(best, q) : null;
+                                                const totalAtQ = up != null && Number.isFinite(up) ? up * q : null;
+                                                return (
+                                                    <MenuItem key={q} value={q}>
+                                                        {q.toLocaleString('fr-FR')}
+                                                        {totalAtQ != null ? ` · ${formatPrice(totalAtQ, best?.currency || 'EUR')}` : ''}
+                                                        {row.qtyPerReel && q === row.qtyPerReel ? ' · bobine' : ''}
+                                                    </MenuItem>
+                                                );
+                                            })}
+                                        </Select>
+                                    </TableCell>
                                     <TableCell align="right" onClick={(e) => e.stopPropagation()}>
                                         <TextField
                                             type="number"
@@ -304,15 +376,37 @@ function ProcurementTable({ rows = [], commandId, refreshNonce = 0, onRefreshSta
                                             inputProps={{ min: 0, style: { textAlign: 'right', width: 64, padding: '4px 6px' } }}
                                         />
                                     </TableCell>
-                                    <TableCell>
-                                        {best ? (
-                                            best.product_url ? (
-                                                <a href={best.product_url} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()} style={{ color: colors.textPrimary }}>
-                                                    {supplierLabel(best.supplier)}
-                                                </a>
-                                            ) : supplierLabel(best.supplier)
+                                    <TableCell onClick={(e) => e.stopPropagation()}>
+                                        {manual ? (
+                                            <Stack direction="row" spacing={0.5} alignItems="center">
+                                                {best?.product_url ? (
+                                                    <a href={best.product_url} target="_blank" rel="noreferrer" style={{ color: colors.textPrimary }}>
+                                                        {supplierLabel(best.supplier)}
+                                                    </a>
+                                                ) : <span>{supplierLabel(best?.supplier)}</span>}
+                                                <Chip size="small" label="manuel" variant="outlined" />
+                                            </Stack>
+                                        ) : offers.length ? (
+                                            <Stack direction="row" spacing={0.5} alignItems="center">
+                                                <Select
+                                                    size="small"
+                                                    displayEmpty
+                                                    value={selectedSupplierValue}
+                                                    onChange={(e) => persistLineDetail(row, { selected_supplier: e.target.value || null })}
+                                                    sx={{ minWidth: 132, '& .MuiSelect-select': { py: '4px' } }}
+                                                >
+                                                    <MenuItem value=""><em>Auto (moins cher)</em></MenuItem>
+                                                    {sorted.map((o) => (
+                                                        <MenuItem key={o.id || o.supplier} value={(o.supplier || '').toUpperCase()}>
+                                                            {supplierLabel(o.supplier)} · {formatPrice(effectivePrice(o, qty || 1), o.currency || 'EUR')}
+                                                        </MenuItem>
+                                                    ))}
+                                                </Select>
+                                                {best?.product_url ? (
+                                                    <a href={best.product_url} target="_blank" rel="noreferrer" title="Ouvrir la fiche produit" style={{ color: colors.textSecondary }}>↗</a>
+                                                ) : null}
+                                            </Stack>
                                         ) : '—'}
-                                        {manual ? <Chip size="small" label="manuel" sx={{ ml: 0.5 }} variant="outlined" /> : null}
                                     </TableCell>
                                     <TableCell align="right">
                                         {best && stock != null ? (
