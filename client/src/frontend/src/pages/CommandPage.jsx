@@ -569,11 +569,16 @@ function CommandPage() {
                 requiredQuantity,
                 stockAvailableQty: stockAvailable != null ? Math.max(stockAvailable, 0) : 0,
                 quantityToOrder,
+                // Override brut persisté (null = quantité calculée) — nécessaire pour
+                // ré-enregistrer une ligne sans écraser la quantité choisie.
+                quantityToOrderOverride: line.quantity_to_order_override ?? null,
                 componentLibraryId: line.component_library_id,
                 lifecycleStatus: line.lifecycle_status,
                 mpn: line.component_mpn,
                 note: line.note || '',
                 manualOffer: line.manual_offer || null,
+                selectedSupplier: line.selected_supplier || null,
+                qtyPerReel: line.qty_per_reel ?? null,
                 qtyReceived: line.qty_received ?? 0,
             };
         })

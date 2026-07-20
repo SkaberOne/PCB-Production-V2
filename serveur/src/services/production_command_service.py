@@ -212,6 +212,7 @@ class ProductionCommandService:
         currency: Optional[str] = None,
         product_url: Optional[str] = None,
         component_library_id: Optional[int] = None,
+        selected_supplier: Optional[str] = None,
     ) -> Dict:
         """Upsert the manual completion of one command line and return the summary.
 
@@ -246,6 +247,9 @@ class ProductionCommandService:
         row.manual_currency = (currency or "").strip() or None
         row.manual_product_url = (product_url or "").strip() or None
 
+        # Fournisseur retenu parmi les offres API (code seul, prix live). Vide => auto.
+        row.selected_supplier = (selected_supplier or "").strip().upper() or None
+
         # MPN : biblio si composant connu, sinon repli par ligne.
         clean_mpn = (mpn or "").strip()
         if clean_mpn and component_library_id:
@@ -277,11 +281,13 @@ class ProductionCommandService:
                 line["note"] = ""
                 line["quantity_to_order_override"] = None
                 line["manual_offer"] = None
+                line["selected_supplier"] = None
                 continue
 
             line["note"] = detail.note or ""
             line["quantity_to_order_override"] = detail.quantity_to_order
             line["manual_offer"] = cls._detail_to_offer(detail)
+            line["selected_supplier"] = detail.selected_supplier
             # MPN de repli quand la biblio n'en fournit pas.
             if not (line.get("component_mpn") or "").strip() and detail.manual_mpn:
                 line["component_mpn"] = detail.manual_mpn

@@ -71,6 +71,7 @@ def set_line_detail(command_id: int, request: SetLineDetailRequest, db: Session 
             currency=request.currency,
             product_url=request.product_url,
             component_library_id=request.component_library_id,
+            selected_supplier=request.selected_supplier,
         )
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc))

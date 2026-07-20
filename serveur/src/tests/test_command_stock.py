@@ -37,3 +37,21 @@ def test_export_respects_manual_override():
 def test_export_exact_cover_is_excluded():
     lines = [{"key": "A", "quantity": 60, "stock_available": 60, "component_library_id": 1}]
     assert _rows(lines) == []
+
+
+def test_export_line_offer_override_wins_over_global():
+    """Feature B : l'offre du fournisseur choisi par ligne prime sur le meilleur global."""
+    lines = [{"key": "A", "quantity": 100, "stock_available": 0, "component_library_id": 1}]
+    global_offers = {1: {"supplier": "MOUSER", "supplier_part": "M-123", "product_url": "http://m"}}
+    line_override = {"A": {"supplier": "RS", "supplier_part": "RS-999", "product_url": "http://rs"}}
+    rows = CommandService._build_erp_export_rows(
+        {"aggregated_components": lines},
+        defaults={},
+        offers_by_component=global_offers,
+        line_overrides=None,
+        line_offer_override=line_override,
+    )
+    assert len(rows) == 1
+    assert rows[0]["Référence fournisseur"] == "RS-999"
+    assert rows[0]["Fournisseur"] == "RS"
+    assert rows[0]["Lien web"] == "http://rs"

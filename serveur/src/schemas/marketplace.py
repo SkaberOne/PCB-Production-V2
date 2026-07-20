@@ -56,6 +56,7 @@ class SetLineDetailRequest(BaseModel):
     currency: Optional[str] = Field(default=None, max_length=8)
     product_url: Optional[str] = Field(default=None, max_length=2000)
     component_library_id: Optional[int] = Field(default=None, gt=0)
+    selected_supplier: Optional[str] = Field(default=None, max_length=20)
 
 
 class CreateProductionRequest(BaseModel):
