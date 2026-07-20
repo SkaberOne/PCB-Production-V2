@@ -205,22 +205,46 @@ def test_build_csv_number_formatting_no_float_artifact():
     assert out.strip().splitlines()[1] == "0.3,7.7,180"
 
 
-# ── Construction TXT (BOM agrégée) ──────────────────────────────────────────
+# ── Construction TXT (fichier centroïde de placement) ───────────────────────
 
-def test_build_txt_aggregates_by_value_and_footprint():
-    comp_r = _component(id=20, value="10k", footprint_pnp="0603")
+def test_build_txt_centroid_format_no_header():
+    """Une ligne par composant : 'Ref Valeur Empreinte X Y Angle Face', espaces,
+    sans en-tête, tri naturel par désignateur (C2 < C10)."""
     rows = [
-        (_bom_item(reference_item="R2", value_harmonized="10k", footprint_pnp="0603", quantity=1), comp_r),
-        (_bom_item(reference_item="R1", value_harmonized="10k", footprint_pnp="0603", quantity=1), comp_r),
-        (_bom_item(reference_item="C1", value_harmonized="100uF", footprint_pnp="PANASONIC", quantity=1),
-         _component(id=10, value="100uF", footprint_pnp="PANASONIC")),
+        (_bom_item(reference_item="C10", value_harmonized="100pF", footprint_pnp="0603",
+                   x=147.31, y=27.92, rotation=180, placement_side="Bottom"), _component()),
+        (_bom_item(reference_item="C2", value_harmonized="4.7uF/50V", footprint_pnp="1206",
+                   x=157.55, y=34.93, rotation=270, placement_side="B"), _component()),
     ]
     out = _build_txt(rows)
     lines = out.strip().splitlines()
-    assert lines[0] == "Reference\tValeur\tEmpreinte harmonisee\tQte"
-    # R1/R2 regroupés (refs triées), quantité sommée à 2.
-    assert "R1 R2\t10k\t0603\t2" in lines
-    assert "C1\t100uF\tPANASONIC\t1" in lines
+    # Pas d'en-tête ; C2 (numéro 2) avant C10 (tri naturel).
+    assert lines[0] == "C2 4.7uF/50V 1206 157.55 34.93 270 B"
+    assert lines[1] == "C10 100pF 0603 147.31 27.92 180 B"
+
+
+def test_build_txt_angle_defaults_to_zero_and_side_letter():
+    rows = [
+        (_bom_item(reference_item="R5", value_harmonized="10k", footprint_pnp="0603",
+                   x=1.0, y=2.0, rotation=None, placement_side="Top"), _component()),
+    ]
+    out = _build_txt(rows).strip()
+    assert out == "R5 10k 0603 1 2 0 T"
+
+
+def test_build_txt_internal_spaces_become_underscore():
+    """Les espaces DANS la valeur/empreinte deviennent '_' → 7 colonnes garanties."""
+    rows = [
+        (_bom_item(reference_item="D1", value_harmonized="US1G-E3_5AT", footprint_pnp="SMA (DO-214AC)",
+                   x=13.2, y=10.0, rotation=180, placement_side="Top"), _component()),
+        (_bom_item(reference_item="LED1", value_harmonized="LTST-C190KRKT RED", footprint_pnp="0603",
+                   x=44.5, y=37.3, rotation=0, placement_side="Top"), _component()),
+    ]
+    lines = _build_txt(rows).strip().splitlines()
+    assert lines[0] == "D1 US1G-E3_5AT SMA_(DO-214AC) 13.2 10 180 T"
+    assert lines[1] == "LED1 LTST-C190KRKT_RED 0603 44.5 37.3 0 T"
+    # Chaque ligne a exactement 7 colonnes.
+    assert all(len(line.split(" ")) == 7 for line in lines)
 
 
 # ── build_pnp_export : choix de format / nom de fichier ─────────────────────
@@ -228,14 +252,14 @@ def test_build_txt_aggregates_by_value_and_footprint():
 def test_build_pnp_export_txt_filename_and_media(monkeypatch):
     machine = SimpleNamespace(name="SMT 1010", export_format="CSV", export_columns=None, export_separator=None)
     production = SimpleNamespace(name="Carte A", bom_links=[])
-    # Override format → TXT ; pas de lignes (bom_links vide) mais l'en-tête doit sortir.
+    # Override format → TXT ; aucune ligne (bom_links vide) → contenu vide, sans en-tête.
     monkeypatch.setattr("src.services.pnp_export_service._iter_export_items", lambda db, prod, rev: [])
     filename, media_type, content = build_pnp_export(
         db=None, machine=machine, production=production, export_format="TXT",
     )
     assert filename == "SMT_1010_Carte_A_pnp.txt"
     assert media_type.startswith("text/plain")
-    assert content.startswith("Reference\tValeur")
+    assert content == ""
 
 
 def test_build_pnp_export_csv_uses_machine_config(monkeypatch):

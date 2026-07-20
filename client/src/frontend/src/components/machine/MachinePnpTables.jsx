@@ -144,7 +144,7 @@ const ExportFormatChip = React.memo(function ExportFormatChip({ machine }) {
         return (
             <Chip
                 size="small"
-                label="TXT · BOM"
+                label="TXT · XY"
                 sx={{ backgroundColor: 'rgba(167,139,250,0.12)', color: '#c4b5fd', border: '1px solid rgba(167,139,250,0.3)' }}
             />
         );

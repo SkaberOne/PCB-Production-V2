@@ -5,8 +5,9 @@ Deux formats :
     par la machine (Position, Component Name, Footprint, X, Y, Angle, Top/Bottom,
     Feeder, Nozzle, Group). Le slot feeder et la nozzle proviennent de l'implantation
     calculée (get_machine_production_feeder_plan).
-  - TXT : la BOM agrégée avec empreintes harmonisées (Référence(s), Valeur, Empreinte,
-    Qté), séparée par tabulation.
+  - TXT : un fichier centroïde de placement, une ligne par composant posé
+    (Reference Valeur Empreinte X Y Angle Face), séparé par des espaces, sans
+    en-tête. Valeur harmonisée + empreinte PnP normalisée, face en une lettre.
 
 Le fichier reprend la production affectée à la machine ; il peut être filtré sur une
 face (bom_revision_id).
@@ -248,28 +249,61 @@ def _build_csv(
     return output.getvalue()
 
 
+def _side_letter(raw: Optional[str]) -> str:
+    """Face en une seule lettre pour le fichier centroïde : 'T' / 'B'."""
+    if not raw:
+        return ""
+    return str(raw).strip().upper()[:1]
+
+
+def _no_space(text: str) -> str:
+    """Remplace tout espace INTERNE d'un champ par un underscore, afin de garantir
+    exactement 7 colonnes par ligne dans un fichier séparé par des espaces
+    (ex. 'SMA (DO-214AC)' -> 'SMA_(DO-214AC)', 'LTST-C190KRKT RED' -> 'LTST-C190KRKT_RED')."""
+    return re.sub(r"\s+", "_", str(text or "").strip())
+
+
+def _natural_ref_key(reference: Optional[str]) -> Tuple:
+    """Clé de tri « naturel » d'un désignateur : préfixe alpha puis nombre
+    (C2 < C10 < C15), avec repli sur la chaîne brute."""
+    ref = reference or ""
+    match = re.match(r"^([A-Za-z]*)(\d+)", ref)
+    if match:
+        return (match.group(1).upper(), int(match.group(2)), ref)
+    return (ref.upper(), 0, ref)
+
+
 def _build_txt(rows) -> str:
-    """BOM agrégée par (valeur, empreinte harmonisée) : Référence(s), Valeur, Empreinte, Qté."""
-    groups: Dict[Tuple[str, str], Dict] = {}
+    """Fichier centroïde (placement) : une ligne par composant posé, colonnes
+    « Reference Valeur Empreinte X Y Angle Face » séparées par un espace, **sans
+    en-tête**. Valeur harmonisée, empreinte PnP normalisée, face en une lettre
+    (T/B), angle entier (défaut 0). Trié par désignateur (ordre naturel). Les
+    espaces internes d'un champ sont remplacés par '_' (7 colonnes garanties)."""
+    items: List[Tuple] = []
     for bom_item, component in rows:
-        name = bom_item.value_harmonized or bom_item.value_raw or (component.value if component else "") or ""
+        ref = bom_item.reference_item or ""
+        value = bom_item.value_harmonized or bom_item.value_raw or (component.value if component else "") or ""
         footprint = (
             bom_item.footprint_pnp
             or (component.footprint_pnp if component else None)
             or (component.package if component else None)
             or ""
         )
-        key = (name, footprint)
-        bucket = groups.setdefault(key, {"refs": [], "qty": 0})
-        if bom_item.reference_item:
-            bucket["refs"].append(bom_item.reference_item)
-        bucket["qty"] += max(int(bom_item.quantity or 1), 1)
+        x = _fmt_number(bom_item.x)
+        y = _fmt_number(bom_item.y)
+        angle = _fmt_number(bom_item.rotation) or "0"
+        side = _side_letter(bom_item.placement_side)
+        items.append((ref, value, footprint, x, y, angle, side))
 
-    lines = ["Reference\tValeur\tEmpreinte harmonisee\tQte"]
-    for (name, footprint), bucket in sorted(groups.items(), key=lambda kv: (kv[0][0], kv[0][1])):
-        refs = " ".join(sorted(bucket["refs"]))
-        lines.append(f"{_sanitize(refs)}\t{_sanitize(name)}\t{_sanitize(footprint)}\t{bucket['qty']}")
-    return "\n".join(lines) + "\n"
+    items.sort(key=lambda row: _natural_ref_key(row[0]))
+
+    lines: List[str] = []
+    for ref, value, footprint, x, y, angle, side in items:
+        # Chaque champ : ASCII (sanitize) puis espaces internes -> underscore, pour
+        # que chaque ligne ait exactement 7 colonnes séparées par un espace.
+        parts = [_no_space(_sanitize(p) or "") for p in (ref, value, footprint, x, y, angle, side)]
+        lines.append(" ".join(parts).rstrip())
+    return "\n".join(lines) + ("\n" if lines else "")
 
 
 def build_pnp_export(
