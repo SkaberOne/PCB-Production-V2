@@ -764,6 +764,7 @@ class CommandService:
                         "feeder_type": normalize_component_feeder_type(library_match.feeder_type) if library_match else None,
                         "component_library_id": library_match.id if library_match else None,
                         "lifecycle_status": library_match.lifecycle_status if library_match else None,
+                        "qty_per_reel": library_match.qty_per_reel if library_match else None,
                         "manual_placement": False,
                         "quantity": 0,
                         "references": [],
@@ -784,6 +785,7 @@ class CommandService:
                     aggregated_components[aggregate_key]["feeder_type"] = normalize_component_feeder_type(library_match.feeder_type)
                     aggregated_components[aggregate_key]["component_library_id"] = library_match.id
                     aggregated_components[aggregate_key]["lifecycle_status"] = library_match.lifecycle_status
+                    aggregated_components[aggregate_key]["qty_per_reel"] = library_match.qty_per_reel
                 aggregated_components[aggregate_key]["references"].append(bom_item.reference_item)
                 aggregated_components[aggregate_key]["sources"].append(
                     {
@@ -838,6 +840,7 @@ class CommandService:
                     "feeder_type": line["feeder_type"],
                     "component_library_id": line["component_library_id"],
                     "lifecycle_status": line["lifecycle_status"],
+                    "qty_per_reel": line.get("qty_per_reel"),
                     "manual_placement": line["manual_placement"],
                     "quantity": line["quantity"],
                     "references": references,
