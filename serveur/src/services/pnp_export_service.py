@@ -256,6 +256,13 @@ def _side_letter(raw: Optional[str]) -> str:
     return str(raw).strip().upper()[:1]
 
 
+def _no_space(text: str) -> str:
+    """Remplace tout espace INTERNE d'un champ par un underscore, afin de garantir
+    exactement 7 colonnes par ligne dans un fichier séparé par des espaces
+    (ex. 'SMA (DO-214AC)' -> 'SMA_(DO-214AC)', 'LTST-C190KRKT RED' -> 'LTST-C190KRKT_RED')."""
+    return re.sub(r"\s+", "_", str(text or "").strip())
+
+
 def _natural_ref_key(reference: Optional[str]) -> Tuple:
     """Clé de tri « naturel » d'un désignateur : préfixe alpha puis nombre
     (C2 < C10 < C15), avec repli sur la chaîne brute."""
@@ -270,7 +277,8 @@ def _build_txt(rows) -> str:
     """Fichier centroïde (placement) : une ligne par composant posé, colonnes
     « Reference Valeur Empreinte X Y Angle Face » séparées par un espace, **sans
     en-tête**. Valeur harmonisée, empreinte PnP normalisée, face en une lettre
-    (T/B), angle entier (défaut 0). Trié par désignateur (ordre naturel)."""
+    (T/B), angle entier (défaut 0). Trié par désignateur (ordre naturel). Les
+    espaces internes d'un champ sont remplacés par '_' (7 colonnes garanties)."""
     items: List[Tuple] = []
     for bom_item, component in rows:
         ref = bom_item.reference_item or ""
@@ -291,7 +299,9 @@ def _build_txt(rows) -> str:
 
     lines: List[str] = []
     for ref, value, footprint, x, y, angle, side in items:
-        parts = [_sanitize(p) or "" for p in (ref, value, footprint, x, y, angle, side)]
+        # Chaque champ : ASCII (sanitize) puis espaces internes -> underscore, pour
+        # que chaque ligne ait exactement 7 colonnes séparées par un espace.
+        parts = [_no_space(_sanitize(p) or "") for p in (ref, value, footprint, x, y, angle, side)]
         lines.append(" ".join(parts).rstrip())
     return "\n".join(lines) + ("\n" if lines else "")
 

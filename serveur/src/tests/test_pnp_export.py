@@ -232,6 +232,21 @@ def test_build_txt_angle_defaults_to_zero_and_side_letter():
     assert out == "R5 10k 0603 1 2 0 T"
 
 
+def test_build_txt_internal_spaces_become_underscore():
+    """Les espaces DANS la valeur/empreinte deviennent '_' → 7 colonnes garanties."""
+    rows = [
+        (_bom_item(reference_item="D1", value_harmonized="US1G-E3_5AT", footprint_pnp="SMA (DO-214AC)",
+                   x=13.2, y=10.0, rotation=180, placement_side="Top"), _component()),
+        (_bom_item(reference_item="LED1", value_harmonized="LTST-C190KRKT RED", footprint_pnp="0603",
+                   x=44.5, y=37.3, rotation=0, placement_side="Top"), _component()),
+    ]
+    lines = _build_txt(rows).strip().splitlines()
+    assert lines[0] == "D1 US1G-E3_5AT SMA_(DO-214AC) 13.2 10 180 T"
+    assert lines[1] == "LED1 LTST-C190KRKT_RED 0603 44.5 37.3 0 T"
+    # Chaque ligne a exactement 7 colonnes.
+    assert all(len(line.split(" ")) == 7 for line in lines)
+
+
 # ── build_pnp_export : choix de format / nom de fichier ─────────────────────
 
 def test_build_pnp_export_txt_filename_and_media(monkeypatch):
