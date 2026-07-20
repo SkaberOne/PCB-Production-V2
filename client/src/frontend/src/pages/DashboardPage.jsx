@@ -13,6 +13,7 @@ import DeleteProductionDialog from '../components/dashboard/DeleteProductionDial
 import ProductionsTable from '../components/dashboard/ProductionsTable';
 import ProductionSummaryCards from '../components/dashboard/ProductionSummaryCards';
 import ProductionFollowupPanel from '../components/dashboard/ProductionFollowupPanel';
+import CardsToProducePanel from '../components/dashboard/CardsToProducePanel';
 import ReactivateProductionDialog from '../components/dashboard/ReactivateProductionDialog';
 import RenameProductionDialog from '../components/dashboard/RenameProductionDialog';
 import { useBomSession } from '../context/BomSessionContext';
@@ -250,6 +251,8 @@ function DashboardPage() {
             </Grid>
 
             <ProductionFollowupPanel onReintegrated={loadProductions} />
+
+            <CardsToProducePanel />
 
             <CreateProductionDialog
                 open={createDialogOpen}
