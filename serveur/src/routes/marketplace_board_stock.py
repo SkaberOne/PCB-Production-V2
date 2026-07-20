@@ -11,7 +11,12 @@ from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from ..database import get_db
-from ..services.board_stock_service import BoardStockService, ClientOrderService
+from ..services.board_stock_service import (
+    BoardStockService,
+    ClientOrderService,
+    ClientService,
+    MachineModelService,
+)
 
 router = APIRouter(tags=["board-stock"])
 
@@ -41,10 +46,36 @@ class OrderLineInput(BaseModel):
 
 class ClientOrderCreate(BaseModel):
     order_type: str = Field(default="CLIENT")
+    client_id: Optional[int] = Field(default=None, gt=0)
     recipient: Optional[str] = Field(default=None, max_length=200)
     due_date: Optional[datetime] = None
     notes: Optional[str] = Field(default=None, max_length=1000)
     lines: List[OrderLineInput] = Field(default_factory=list)
+    machine_model_id: Optional[int] = Field(default=None, gt=0)
+    machine_count: Optional[int] = Field(default=None, ge=1)
+
+
+class ClientCreate(BaseModel):
+    name: str = Field(..., min_length=1, max_length=200)
+    contact: Optional[str] = Field(default=None, max_length=300)
+    notes: Optional[str] = Field(default=None, max_length=1000)
+
+
+class ClientUpdate(BaseModel):
+    name: Optional[str] = Field(default=None, max_length=200)
+    contact: Optional[str] = Field(default=None, max_length=300)
+    notes: Optional[str] = Field(default=None, max_length=1000)
+
+
+class MachineCardInput(BaseModel):
+    bom_reference_id: int = Field(..., gt=0)
+    quantity: int = Field(..., ge=1)
+
+
+class MachineModelInput(BaseModel):
+    name: Optional[str] = Field(default=None, max_length=200)
+    notes: Optional[str] = Field(default=None, max_length=1000)
+    cards: Optional[List[MachineCardInput]] = None
 
 
 class ClientOrderUpdate(BaseModel):
@@ -112,14 +143,103 @@ def list_client_orders(db: Session = Depends(get_db)):
 
 @router.post("/client-orders")
 def create_client_order(request: ClientOrderCreate, db: Session = Depends(get_db)):
-    return ClientOrderService.create_order(
-        db,
-        order_type=request.order_type,
-        recipient=request.recipient,
-        due_date=request.due_date,
-        notes=request.notes,
-        lines=[line.model_dump() for line in request.lines],
-    )
+    try:
+        return ClientOrderService.create_order(
+            db,
+            order_type=request.order_type,
+            client_id=request.client_id,
+            recipient=request.recipient,
+            due_date=request.due_date,
+            notes=request.notes,
+            lines=[line.model_dump() for line in request.lines],
+            machine_model_id=request.machine_model_id,
+            machine_count=request.machine_count,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+
+
+# ─────────────────────────── Clients ───────────────────────────
+
+@router.get("/clients")
+def list_clients(db: Session = Depends(get_db)):
+    return ClientService.list_clients(db)
+
+
+@router.post("/clients")
+def create_client(request: ClientCreate, db: Session = Depends(get_db)):
+    try:
+        return ClientService.create_client(db, name=request.name, contact=request.contact, notes=request.notes)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+
+@router.get("/clients/{client_id}/detail")
+def client_detail(client_id: int, db: Session = Depends(get_db)):
+    try:
+        return ClientService.client_detail(db, client_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+
+
+@router.put("/clients/{client_id}")
+def update_client(client_id: int, request: ClientUpdate, db: Session = Depends(get_db)):
+    try:
+        return ClientService.update_client(db, client_id, name=request.name, contact=request.contact, notes=request.notes)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+
+
+@router.delete("/clients/{client_id}")
+def delete_client(client_id: int, db: Session = Depends(get_db)):
+    try:
+        ClientService.delete_client(db, client_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+    return {"deleted": client_id}
+
+
+# ─────────────────────────── Modèles de machine ───────────────────────────
+
+@router.get("/machine-models")
+def list_machine_models(db: Session = Depends(get_db)):
+    return MachineModelService.list_models(db)
+
+
+@router.post("/machine-models")
+def create_machine_model(request: MachineModelInput, db: Session = Depends(get_db)):
+    try:
+        return MachineModelService.create_model(
+            db,
+            name=request.name or "",
+            notes=request.notes,
+            cards=[c.model_dump() for c in (request.cards or [])],
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+
+@router.put("/machine-models/{model_id}")
+def update_machine_model(model_id: int, request: MachineModelInput, db: Session = Depends(get_db)):
+    try:
+        return MachineModelService.update_model(
+            db,
+            model_id,
+            name=request.name,
+            notes=request.notes,
+            cards=([c.model_dump() for c in request.cards] if request.cards is not None else None),
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+
+
+@router.delete("/machine-models/{model_id}")
+def delete_machine_model(model_id: int, db: Session = Depends(get_db)):
+    try:
+        MachineModelService.delete_model(db, model_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+    return {"deleted": model_id}
 
 
 @router.get("/client-orders/{order_id}")

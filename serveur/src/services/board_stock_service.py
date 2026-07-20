@@ -9,7 +9,14 @@ from typing import Dict, List, Optional
 from sqlalchemy.orm import Session, joinedload
 
 from ..database import utcnow
-from ..models.board_stock import BoardStock, ClientOrder, ClientOrderLine
+from ..models.board_stock import (
+    BoardStock,
+    Client,
+    ClientOrder,
+    ClientOrderLine,
+    MachineModel,
+    MachineModelCard,
+)
 from ..models.bom import BomReference
 from ..models.costing import ProductionCosting
 
@@ -201,11 +208,21 @@ class ClientOrderService:
         lines = [cls._serialize_line(line) for line in order.lines]
         total_qty = sum(line["quantity"] for line in lines)
         total_prepared = sum(line["quantity_prepared"] for line in lines)
+        machine_name = order.machine_model.name if order.machine_model else None
         return {
             "id": order.id,
             "reference": order.reference,
             "order_type": order.order_type,
+            "client_id": order.client_id,
+            "machine_model_id": order.machine_model_id,
+            "machine_model_name": machine_name,
+            "machine_count": order.machine_count,
             "recipient": order.recipient,
+            "label": (
+                f"{machine_name} ×{order.machine_count}"
+                if order.order_type == "MACHINE" and machine_name
+                else (order.recipient or order.reference)
+            ),
             "status": order.status,
             "due_date": order.due_date.isoformat() if order.due_date else None,
             "notes": order.notes,
@@ -240,32 +257,50 @@ class ClientOrderService:
         db: Session,
         *,
         order_type: str = "CLIENT",
+        client_id: Optional[int] = None,
         recipient: Optional[str] = None,
         due_date=None,
         notes: Optional[str] = None,
         lines: Optional[List[Dict]] = None,
+        machine_model_id: Optional[int] = None,
+        machine_count: Optional[int] = None,
     ) -> Dict:
+        otype = (order_type or "CLIENT").upper()
+        if otype not in ("CLIENT", "MACHINE"):
+            otype = "CLIENT"
         order = ClientOrder(
             reference=cls._next_reference(db),
-            order_type=(order_type or "CLIENT").upper() if (order_type or "").upper() in ("CLIENT", "MACHINE") else "CLIENT",
+            order_type=otype,
+            client_id=client_id,
             recipient=(recipient or "").strip() or None,
             status="OPEN",
             due_date=due_date,
             notes=(notes or "").strip() or None,
         )
+
+        materialized: Dict[int, int] = {}
+        if otype == "MACHINE" and machine_model_id:
+            model = db.query(MachineModel).filter(MachineModel.id == machine_model_id).first()
+            if model is None:
+                raise ValueError(f"Modèle de machine {machine_model_id} introuvable")
+            count = max(int(machine_count or 1), 1)
+            order.machine_model_id = model.id
+            order.machine_count = count
+            # Cartes de la machine × nombre de machines.
+            for card in model.cards:
+                materialized[card.bom_reference_id] = materialized.get(card.bom_reference_id, 0) + int(card.quantity or 0) * count
+        else:
+            for line in (lines or []):
+                ref_id = line.get("bom_reference_id")
+                qty = max(int(line.get("quantity") or 0), 0)
+                if ref_id and qty > 0:
+                    materialized[int(ref_id)] = materialized.get(int(ref_id), 0) + qty
+
         db.add(order)
         db.flush()
-        for line in (lines or []):
-            ref_id = line.get("bom_reference_id")
-            qty = max(int(line.get("quantity") or 0), 0)
-            if not ref_id or qty <= 0:
-                continue
-            db.add(ClientOrderLine(
-                order_id=order.id,
-                bom_reference_id=int(ref_id),
-                quantity=qty,
-                notes=(line.get("notes") or "").strip() or None,
-            ))
+        for ref_id, qty in materialized.items():
+            if qty > 0:
+                db.add(ClientOrderLine(order_id=order.id, bom_reference_id=ref_id, quantity=qty))
         db.commit()
         db.refresh(order)
         return cls._serialize(order)
@@ -366,3 +401,184 @@ class ClientOrderService:
         db.commit()
         db.refresh(order)
         return cls._serialize(order)
+
+
+class ClientService:
+    """Clients de l'entreprise + vue détaillée (commandes/machines + à préparer)."""
+
+    @classmethod
+    def list_clients(cls, db: Session) -> List[Dict]:
+        clients = db.query(Client).order_by(Client.name).all()
+        out: List[Dict] = []
+        for client in clients:
+            active_orders = [o for o in client.orders if o.status in _ACTIVE_ORDER_STATUSES]
+            to_prepare = 0
+            for order in active_orders:
+                for line in order.lines:
+                    to_prepare += max(int(line.quantity or 0) - int(line.quantity_prepared or 0), 0)
+            out.append({
+                "id": client.id,
+                "name": client.name,
+                "contact": client.contact,
+                "notes": client.notes,
+                "order_count": len(client.orders),
+                "active_order_count": len(active_orders),
+                "cards_to_prepare": to_prepare,
+            })
+        return out
+
+    @classmethod
+    def create_client(cls, db: Session, *, name: str, contact: Optional[str] = None, notes: Optional[str] = None) -> Dict:
+        clean = (name or "").strip()
+        if not clean:
+            raise ValueError("Nom du client requis")
+        if db.query(Client).filter(Client.name == clean).first():
+            raise ValueError(f"Le client « {clean} » existe déjà")
+        client = Client(name=clean, contact=(contact or "").strip() or None, notes=(notes or "").strip() or None)
+        db.add(client)
+        db.commit()
+        db.refresh(client)
+        return {"id": client.id, "name": client.name}
+
+    @classmethod
+    def update_client(cls, db: Session, client_id: int, *, name=None, contact=None, notes=None) -> Dict:
+        client = db.query(Client).filter(Client.id == client_id).first()
+        if client is None:
+            raise ValueError(f"Client {client_id} introuvable")
+        if name is not None and name.strip():
+            client.name = name.strip()
+        if contact is not None:
+            client.contact = contact.strip() or None
+        if notes is not None:
+            client.notes = notes.strip() or None
+        db.commit()
+        return {"id": client.id, "name": client.name}
+
+    @classmethod
+    def delete_client(cls, db: Session, client_id: int) -> None:
+        client = db.query(Client).filter(Client.id == client_id).first()
+        if client is None:
+            raise ValueError(f"Client {client_id} introuvable")
+        for order in client.orders:  # détache sans supprimer les commandes
+            order.client_id = None
+        db.delete(client)
+        db.commit()
+
+    @classmethod
+    def client_detail(cls, db: Session, client_id: int) -> Dict:
+        client = db.query(Client).filter(Client.id == client_id).first()
+        if client is None:
+            raise ValueError(f"Client {client_id} introuvable")
+        orders = [ClientOrderService._serialize(o) for o in sorted(client.orders, key=lambda o: -o.id)]
+
+        ref_names = {r.id: r.reference for r in db.query(BomReference).all()}
+        stocks = {s.bom_reference_id: s.qty_in_stock for s in db.query(BoardStock).all()}
+        to_prepare: Dict[int, int] = {}
+        for order in client.orders:
+            if order.status not in _ACTIVE_ORDER_STATUSES:
+                continue
+            for line in order.lines:
+                remaining = max(int(line.quantity or 0) - int(line.quantity_prepared or 0), 0)
+                if remaining:
+                    to_prepare[line.bom_reference_id] = to_prepare.get(line.bom_reference_id, 0) + remaining
+        cards_to_prepare = [
+            {
+                "bom_reference_id": ref_id,
+                "reference": ref_names.get(ref_id),
+                "to_prepare": qty,
+                "in_stock": int(stocks.get(ref_id, 0)),
+                "shortage": max(qty - int(stocks.get(ref_id, 0)), 0),
+            }
+            for ref_id, qty in sorted(to_prepare.items(), key=lambda kv: -kv[1])
+        ]
+        return {
+            "id": client.id,
+            "name": client.name,
+            "contact": client.contact,
+            "notes": client.notes,
+            "orders": orders,
+            "cards_to_prepare": cards_to_prepare,
+        }
+
+
+class MachineModelService:
+    """Catalogue de modèles de machine (nom + liste de cartes)."""
+
+    @classmethod
+    def _serialize(cls, model: MachineModel) -> Dict:
+        cards = [
+            {
+                "id": c.id,
+                "bom_reference_id": c.bom_reference_id,
+                "reference": c.reference.reference if c.reference else None,
+                "quantity": c.quantity,
+            }
+            for c in model.cards
+        ]
+        return {
+            "id": model.id,
+            "name": model.name,
+            "notes": model.notes,
+            "cards": cards,
+            "card_types": len(cards),
+            "total_cards": sum(int(c["quantity"] or 0) for c in cards),
+        }
+
+    @classmethod
+    def list_models(cls, db: Session) -> List[Dict]:
+        models = (
+            db.query(MachineModel)
+            .options(joinedload(MachineModel.cards).joinedload(MachineModelCard.reference))
+            .order_by(MachineModel.name)
+            .all()
+        )
+        return [cls._serialize(m) for m in models]
+
+    @classmethod
+    def create_model(cls, db: Session, *, name: str, notes: Optional[str] = None, cards: Optional[List[Dict]] = None) -> Dict:
+        clean = (name or "").strip()
+        if not clean:
+            raise ValueError("Nom de la machine requis")
+        if db.query(MachineModel).filter(MachineModel.name == clean).first():
+            raise ValueError(f"La machine « {clean} » existe déjà")
+        model = MachineModel(name=clean, notes=(notes or "").strip() or None)
+        db.add(model)
+        db.flush()
+        cls._apply_cards(db, model, cards or [])
+        db.commit()
+        db.refresh(model)
+        return cls._serialize(model)
+
+    @classmethod
+    def update_model(cls, db: Session, model_id: int, *, name=None, notes=None, cards=None) -> Dict:
+        model = db.query(MachineModel).filter(MachineModel.id == model_id).first()
+        if model is None:
+            raise ValueError(f"Machine {model_id} introuvable")
+        if name is not None and name.strip():
+            model.name = name.strip()
+        if notes is not None:
+            model.notes = notes.strip() or None
+        if cards is not None:
+            for card in list(model.cards):
+                db.delete(card)
+            db.flush()
+            cls._apply_cards(db, model, cards)
+        db.commit()
+        db.refresh(model)
+        return cls._serialize(model)
+
+    @staticmethod
+    def _apply_cards(db: Session, model: MachineModel, cards: List[Dict]) -> None:
+        for card in cards:
+            ref_id = card.get("bom_reference_id")
+            qty = max(int(card.get("quantity") or 0), 0)
+            if ref_id and qty > 0:
+                db.add(MachineModelCard(machine_model_id=model.id, bom_reference_id=int(ref_id), quantity=qty))
+
+    @classmethod
+    def delete_model(cls, db: Session, model_id: int) -> None:
+        model = db.query(MachineModel).filter(MachineModel.id == model_id).first()
+        if model is None:
+            raise ValueError(f"Machine {model_id} introuvable")
+        db.delete(model)
+        db.commit()
