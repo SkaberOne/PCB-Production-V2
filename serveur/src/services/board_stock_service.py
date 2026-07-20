@@ -225,6 +225,7 @@ class ClientOrderService:
             ),
             "status": order.status,
             "due_date": order.due_date.isoformat() if order.due_date else None,
+            "delivered_at": order.delivered_at.isoformat() if order.delivered_at else None,
             "notes": order.notes,
             "created_at": order.created_at.isoformat() if order.created_at else None,
             "updated_at": order.updated_at.isoformat() if order.updated_at else None,
@@ -326,7 +327,12 @@ class ClientOrderService:
         if order_type is not None and order_type.upper() in ("CLIENT", "MACHINE"):
             order.order_type = order_type.upper()
         if status is not None and status.upper() in ("OPEN", "READY", "DELIVERED", "CANCELLED"):
-            order.status = status.upper()
+            new_status = status.upper()
+            if new_status == "DELIVERED" and order.status != "DELIVERED":
+                order.delivered_at = utcnow()  # date de livraison
+            elif new_status != "DELIVERED":
+                order.delivered_at = None
+            order.status = new_status
         if due_date_provided:
             order.due_date = due_date
         if notes is not None:

@@ -191,6 +191,15 @@ function ClientDetailDialog({ clientId, refs, machines, onClose, onChanged, setE
     const removeOrder = (orderId) => call(() => apiClient.delete(`/marketplace/client-orders/${orderId}`));
     const removeClient = () => call(async () => { await apiClient.delete(`/marketplace/clients/${clientId}`); onClose(); });
 
+    const allOrders = data?.orders || [];
+    const activeOrders = allOrders.filter((o) => o.status !== 'DELIVERED');
+    const deliveredOrders = allOrders.filter((o) => o.status === 'DELIVERED');
+    const fmtDate = (iso) => {
+        if (!iso) return '—';
+        try { return new Date(iso).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' }); }
+        catch (_) { return '—'; }
+    };
+
     return (
         <Dialog open={Boolean(clientId)} onClose={() => !busy && onClose()} maxWidth="md" fullWidth>
             <DialogTitle>
@@ -203,9 +212,9 @@ function ClientDetailDialog({ clientId, refs, machines, onClose, onChanged, setE
                     <Button size="small" startIcon={<AddRoundedIcon />} onClick={() => setNewOrderOpen(true)}>Nouvelle commande / machine</Button>
                 </Stack>
 
-                {(data?.orders || []).length === 0 ? (
-                    <Typography variant="body2" sx={{ color: colors.textSecondary, mb: 2 }}>Aucune commande pour ce client.</Typography>
-                ) : (data.orders.map((order) => (
+                {activeOrders.length === 0 ? (
+                    <Typography variant="body2" sx={{ color: colors.textSecondary, mb: 2 }}>Aucune commande en cours pour ce client.</Typography>
+                ) : (activeOrders.map((order) => (
                     <Accordion key={order.id} disableGutters sx={{ backgroundColor: 'transparent', border: `1px solid ${colors.border}`, mb: 1 }}>
                         <AccordionSummary expandIcon={<ExpandMoreRoundedIcon />}>
                             <Stack direction="row" spacing={1} alignItems="center" sx={{ flex: 1 }} flexWrap="wrap" useFlexGap>
@@ -277,6 +286,42 @@ function ClientDetailDialog({ clientId, refs, machines, onClose, onChanged, setE
                         </Table>
                     </TableContainer>
                 )}
+
+                <Divider sx={{ my: 2 }} />
+                <Accordion disableGutters sx={{ backgroundColor: 'transparent', border: `1px solid ${colors.border}` }}>
+                    <AccordionSummary expandIcon={<ExpandMoreRoundedIcon />}>
+                        <Typography variant="subtitle2">
+                            Historique des commandes livrées{deliveredOrders.length ? ` (${deliveredOrders.length})` : ''}
+                        </Typography>
+                    </AccordionSummary>
+                    <AccordionDetails>
+                        {deliveredOrders.length === 0 ? (
+                            <Typography variant="body2" sx={{ color: colors.textSecondary }}>Aucune commande livrée pour l'instant.</Typography>
+                        ) : (
+                            <Table size="small">
+                                <TableHead>
+                                    <TableRow>
+                                        <TableCell>Commande / machine</TableCell>
+                                        <TableCell align="right">Cartes</TableCell>
+                                        <TableCell align="right">Livrée le</TableCell>
+                                    </TableRow>
+                                </TableHead>
+                                <TableBody>
+                                    {deliveredOrders.map((order) => (
+                                        <TableRow key={order.id}>
+                                            <TableCell>
+                                                <Chip size="small" label={order.order_type === 'MACHINE' ? 'Machine' : 'Commande'} variant="outlined" sx={{ mr: 0.75 }} />
+                                                {order.label}
+                                            </TableCell>
+                                            <TableCell align="right">{order.total_quantity}</TableCell>
+                                            <TableCell align="right" sx={{ color: colors.textSecondary }}>{fmtDate(order.delivered_at)}</TableCell>
+                                        </TableRow>
+                                    ))}
+                                </TableBody>
+                            </Table>
+                        )}
+                    </AccordionDetails>
+                </Accordion>
             </DialogContent>
             <DialogActions sx={{ justifyContent: 'space-between' }}>
                 <Button color="error" onClick={removeClient} disabled={busy}>Supprimer le client</Button>

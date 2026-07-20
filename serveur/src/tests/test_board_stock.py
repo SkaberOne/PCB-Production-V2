@@ -153,6 +153,21 @@ def test_client_detail_aggregates_cards_to_prepare():
     db.close()
 
 
+def test_delivered_at_set_on_delivery():
+    db = TestingSessionLocal()
+    ref = _ref(db, "DL-A")
+    db.commit()
+    order = ClientOrderService.create_order(db, lines=[{"bom_reference_id": ref.id, "quantity": 2}])
+    assert order["delivered_at"] is None
+    delivered = ClientOrderService.update_order(db, order["id"], status="DELIVERED")
+    assert delivered["status"] == "DELIVERED"
+    assert delivered["delivered_at"] is not None
+    # Repasser en OPEN efface la date de livraison.
+    reopened = ClientOrderService.update_order(db, order["id"], status="OPEN")
+    assert reopened["delivered_at"] is None
+    db.close()
+
+
 def test_duplicate_client_rejected():
     db = TestingSessionLocal()
     ClientService.create_client(db, name="Doublon")

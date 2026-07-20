@@ -113,6 +113,7 @@ class ClientOrder(Base):
     recipient = Column(String(200), nullable=True)  # libellé libre (repli / besoin interne)
     status = Column(String(12), nullable=False, default="OPEN", server_default="OPEN")  # OPEN|READY|DELIVERED|CANCELLED
     due_date = Column(DateTime, nullable=True)
+    delivered_at = Column(DateTime, nullable=True)  # date de livraison (statut DELIVERED)
     notes = Column(Text, nullable=True)
     created_at = Column(DateTime, default=utcnow)
     updated_at = Column(DateTime, default=utcnow, onupdate=utcnow)
