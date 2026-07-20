@@ -15,6 +15,8 @@ from ..schemas.bom import (
     MissingComponentResolutionResponse,
     MissingFootprintResolutionRequest,
 )
+from ..services.harmony_rules import harmonize_resistor_value
+from ..utils.file_parser import infer_component_type
 from .bom import get_db
 from .bom_support import (
     _apply_machine_footprint_catalog_defaults,
@@ -36,6 +38,19 @@ from .bom_support import (
 )
 
 router = APIRouter(tags=["bom"])
+
+
+def _normalize_edited_resistor_value(reference: str, value):
+    """Ré-harmonise une valeur éditée à la main quand le composant est une
+    résistance (préfixe de désignateur `R`) : décode la notation RKM
+    (49K9 -> 49.9K, 4R7 -> 4.7R) et met l'unité en majuscule. Les autres types
+    sont laissés tels quels. Idempotent (une valeur déjà normalisée ne bouge pas).
+    """
+    if not value:
+        return value
+    if infer_component_type(reference or "") == "R":
+        return harmonize_resistor_value(value)
+    return value
 
 
 def _get_revision_or_404(db: Session, bom_id: int, revision_id: int) -> BomRevision:
@@ -100,7 +115,10 @@ def save_bom_review(
                 raise HTTPException(status_code=422, detail=error_message)
 
         if item_update.value_harmonized is not None:
-            db_item.value_harmonized = item_update.value_harmonized.strip() or None
+            cleaned_value = item_update.value_harmonized.strip() or None
+            db_item.value_harmonized = _normalize_edited_resistor_value(
+                db_item.reference_item, cleaned_value
+            )
         if item_update.footprint_pnp is not None:
             db_item.footprint_pnp = item_update.footprint_pnp.strip() or None
         db_item.component_type = requested_component_type
@@ -369,7 +387,9 @@ def update_bom_item_inline(
     payload_fields = getattr(payload, "__fields_set__", set())
 
     if "value_harmonized" in payload_fields:
-        db_item.value_harmonized = _clean_optional_text(payload.value_harmonized)
+        db_item.value_harmonized = _normalize_edited_resistor_value(
+            db_item.reference_item, _clean_optional_text(payload.value_harmonized)
+        )
 
     if "footprint_pnp" in payload_fields:
         updated_footprint = _clean_optional_text(payload.footprint_pnp)

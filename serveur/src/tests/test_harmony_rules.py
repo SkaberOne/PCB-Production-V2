@@ -101,6 +101,45 @@ class TestHarmonizeResistorValue:
         assert harmonize_value("NC", "R") == "NC"
 
 
+class TestHarmonizeResistorRKM:
+    """Notation RKM (BS 1852) : la lettre d'unité sert de séparateur décimal."""
+
+    def test_rkm_decoded_to_decimal(self):
+        assert harmonize_resistor_value("49K9") == "49.9K"
+        assert harmonize_resistor_value("4R7") == "4.7R"
+        assert harmonize_resistor_value("2M2") == "2.2M"
+        assert harmonize_resistor_value("0R5") == "0.5R"
+        assert harmonize_resistor_value("1K5") == "1.5K"
+
+    def test_rkm_lowercase_uppercased(self):
+        assert harmonize_resistor_value("49k9") == "49.9K"
+        assert harmonize_resistor_value("4r7") == "4.7R"
+        assert harmonize_resistor_value("2m2") == "2.2M"
+
+    def test_rkm_trailing_zero_stripped(self):
+        # Décimales nulles -> entier seul.
+        assert harmonize_resistor_value("1R0") == "1R"
+        assert harmonize_resistor_value("4K70") == "4.7K"
+        assert harmonize_resistor_value("10R00") == "10R"
+
+    def test_rkm_idempotent(self):
+        # Une valeur déjà décimale ne doit pas être re-décodée.
+        assert harmonize_resistor_value("49.9K") == "49.9K"
+        assert harmonize_resistor_value("4.7R") == "4.7R"
+        assert harmonize_resistor_value("2.2M") == "2.2M"
+
+    def test_plain_values_unchanged(self):
+        # Pas de notation RKM : comportement inchangé.
+        assert harmonize_resistor_value("10K") == "10K"
+        assert harmonize_resistor_value("470R") == "470R"
+        assert harmonize_resistor_value("100") == "100R"
+
+    def test_dispatcher_applies_rkm(self):
+        assert harmonize_value("49K9", "R") == "49.9K"
+        # Un condensateur n'est pas concerné (pas de règle RKM condo).
+        assert harmonize_value("4n7", "C") == "4n7"
+
+
 class TestHarmonizeCapacitorValue:
     """Test capacitor value harmonization"""
     
@@ -316,6 +355,27 @@ class TestRealWorldExamples:
         assert harmonized[1]["value_harmonized"] == "100nF"
         assert harmonized[0]["position_x"] == 10.0  # Original data preserved
         assert harmonized[1]["rotation"] == 90
+
+
+class TestManualEditNormalization:
+    """Normalisation RKM appliquée à l'édition manuelle (résistances uniquement)."""
+
+    def test_resistor_reference_normalized(self):
+        from src.routes.bom_revision_mutations import _normalize_edited_resistor_value
+        assert _normalize_edited_resistor_value("R5", "49K9") == "49.9K"
+        assert _normalize_edited_resistor_value("R12", "4r7") == "4.7R"
+
+    def test_non_resistor_left_untouched(self):
+        from src.routes.bom_revision_mutations import _normalize_edited_resistor_value
+        # Condensateur : pas de normalisation RKM.
+        assert _normalize_edited_resistor_value("C3", "49K9") == "49K9"
+        # Préfixe RN/RV/RT hors périmètre.
+        assert _normalize_edited_resistor_value("RN1", "49K9") == "49K9"
+
+    def test_none_and_empty(self):
+        from src.routes.bom_revision_mutations import _normalize_edited_resistor_value
+        assert _normalize_edited_resistor_value("R5", None) is None
+        assert _normalize_edited_resistor_value("R5", "") == ""
 
 
 if __name__ == "__main__":
