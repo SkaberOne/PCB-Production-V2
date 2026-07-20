@@ -53,7 +53,7 @@ function ExportFormatSection({ format, setFormat, columns, setColumns, separator
                 }}
             >
                 <ToggleButton value="CSV">CSV (colonnes personnalisées)</ToggleButton>
-                <ToggleButton value="TXT">TXT (BOM empreintes harmonisées)</ToggleButton>
+                <ToggleButton value="TXT">TXT (placement X/Y — valeur + empreinte)</ToggleButton>
             </ToggleButtonGroup>
 
             {format === 'CSV' ? (
