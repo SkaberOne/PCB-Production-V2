@@ -5,7 +5,7 @@ Mis à jour par l'orchestrateur à chaque exécution (le plus récent en haut).
 
 | ID | Feature | Type | Statut | Branche | Résultat | Date |
 |----|---------|------|--------|---------|----------|------|
-| —  | *(aucune feature exécutée pour l'instant)* | — | — | — | — | — |
+| 001 | Fusion « BOM enregistrées » + « Cartes » & fiche éditable | feat | ✅ terminé | feat/cartes-unifie-editable | [PR #78](https://github.com/SkaberOne/PCB-Production-V2/pull/78) → dev (CI verte) | 2026-07-21 |
 
 ---
 
