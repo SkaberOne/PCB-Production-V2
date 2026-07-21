@@ -23,6 +23,8 @@ _LINE_RE = re.compile(
 )
 # Code KELENN : préfixe lettres+chiffres, dernière lettre = révision.
 _REV_RE = re.compile(r"^([A-Z]+\d+)([A-Z])$")
+# Référence du bon de commande : ligne « Réf. : CO2601-10180 » (pas « Réf. client », ni « Réf. expédition »).
+_ORDER_REF_RE = re.compile(r"^R[ée]f\.\s*:\s*([A-Za-z0-9][A-Za-z0-9/\-]*)\s*$")
 
 
 def _clean(s: str) -> str:
@@ -61,9 +63,15 @@ def parse_order_pdf(data: bytes) -> Dict:
         words = page.extract_words()
 
     client = _extract_client(words)
+    order_reference = None
     lines: List[Dict] = []
     for raw in text.splitlines():
-        m = _LINE_RE.match(_clean(raw).strip())
+        stripped = _clean(raw).strip()
+        if order_reference is None:
+            rm = _ORDER_REF_RE.match(stripped)
+            if rm:
+                order_reference = rm.group(1)
+        m = _LINE_RE.match(stripped)
         if not m:
             continue
         code, name, _tva, _pu, qty, _tot = m.groups()
@@ -76,7 +84,7 @@ def parse_order_pdf(data: bytes) -> Dict:
             "name": name.strip(),
             "quantity": int(qty),
         })
-    return {"client_name": client, "lines": lines}
+    return {"client_name": client, "order_reference": order_reference, "lines": lines}
 
 
 class PdfOrderImportService:
@@ -97,8 +105,13 @@ class PdfOrderImportService:
                 matched.append(entry)
             else:
                 unmatched.append(entry)
+        order_ref = parsed.get("order_reference")
+        existing = ClientOrderService.find_by_external_reference(db, order_ref) if order_ref else None
         return {
             "client_name": parsed["client_name"],
+            "order_reference": order_ref,
+            "already_imported": existing is not None,
+            "already_imported_as": existing.reference if existing is not None else None,
             "matched": matched,
             "unmatched": unmatched,
         }
@@ -123,6 +136,7 @@ class PdfOrderImportService:
         client_name: str,
         lines: List[Dict],
         mappings: Optional[List[Dict]] = None,
+        order_reference: Optional[str] = None,
     ) -> Dict:
         """Applique les mappings (code -> carte, mémorisés sur la carte), trouve/crée
         le client, crée la commande avec les lignes résolues.
@@ -157,4 +171,5 @@ class PdfOrderImportService:
             client_id=client_id,
             recipient=client_name,
             lines=order_lines,
+            external_reference=order_reference,
         )

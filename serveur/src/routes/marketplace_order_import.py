@@ -30,6 +30,7 @@ class ImportCommit(BaseModel):
     client_name: str = Field(..., min_length=1, max_length=200)
     lines: List[ImportLine] = Field(default_factory=list)
     mappings: List[ImportMapping] = Field(default_factory=list)
+    order_reference: Optional[str] = Field(default=None, max_length=60)
 
 
 @router.post("/client-orders/import-pdf")
@@ -53,6 +54,7 @@ def import_pdf_commit(request: ImportCommit, db: Session = Depends(get_db)):
             client_name=request.client_name,
             lines=[l.model_dump() for l in request.lines],
             mappings=[m.model_dump() for m in request.mappings],
+            order_reference=request.order_reference,
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))

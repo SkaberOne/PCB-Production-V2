@@ -21,6 +21,7 @@ def _pdf_bytes():
 def test_parse_extracts_client_and_lines():
     parsed = parse_order_pdf(_pdf_bytes())
     assert parsed["client_name"] == "SPEOS"
+    assert parsed["order_reference"] == "CO2601-10180"
     by_pn = {l["part_number"]: l for l in parsed["lines"]}
     # 7 lignes codées ; « Frais de livraison » (sans code) ignoré.
     assert len(parsed["lines"]) == 7
@@ -72,4 +73,30 @@ def test_commit_maps_unknown_code_and_creates_order():
     assert by_ref[control.id]["revision"] == "F"
     # Le mapping a été mémorisé sur la carte.
     assert CardCatalogService.find_by_part_number(db, "KTE140007").id == control.id
+    db.close()
+
+
+def test_external_reference_stored_and_duplicate_flagged():
+    db = TestingSessionLocal()
+    otr = BomReference(reference="OTR board Bicolor", part_number="KT240576")
+    db.add(otr)
+    db.commit()
+
+    # 1er import : pas encore vu.
+    prev1 = PdfOrderImportService.preview(db, _pdf_bytes())
+    assert prev1["order_reference"] == "CO2601-10180"
+    assert prev1["already_imported"] is False
+
+    order = PdfOrderImportService.commit(
+        db,
+        client_name="SPEOS",
+        lines=[{"bom_reference_id": otr.id, "revision": "A", "quantity": 4}],
+        order_reference="CO2601-10180",
+    )
+    assert order["external_reference"] == "CO2601-10180"
+
+    # 2e aperçu du même bon : signalé comme déjà importé.
+    prev2 = PdfOrderImportService.preview(db, _pdf_bytes())
+    assert prev2["already_imported"] is True
+    assert prev2["already_imported_as"] == order["reference"]
     db.close()

@@ -109,6 +109,8 @@ class ClientOrder(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     reference = Column(String(40), unique=True, nullable=False, index=True)
+    # Référence du bon de commande source (import PDF, ex. « CO2601-10180 »).
+    external_reference = Column(String(60), nullable=True)
     order_type = Column(String(10), nullable=False, default="CLIENT", server_default="CLIENT")  # CLIENT | MACHINE
     client_id = Column(Integer, ForeignKey("CLIENTS.id"), nullable=True)
     machine_model_id = Column(Integer, ForeignKey("MACHINE_MODELS.id"), nullable=True)

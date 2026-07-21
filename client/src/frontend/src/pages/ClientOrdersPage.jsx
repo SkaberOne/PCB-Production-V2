@@ -243,6 +243,7 @@ function ClientDetailDialog({ clientId, refs, refRevisions, machines, onClose, o
                             <Stack direction="row" spacing={1} alignItems="center" sx={{ flex: 1 }} flexWrap="wrap" useFlexGap>
                                 <Chip size="small" label={order.order_type === 'MACHINE' ? 'Machine' : 'Commande'} variant="outlined" />
                                 <Typography sx={{ fontWeight: 600 }}>{order.label}</Typography>
+                                {order.external_reference ? <Chip size="small" label={`Bon ${order.external_reference}`} variant="outlined" sx={{ color: colors.textSecondary }} /> : null}
                                 <Chip size="small" label={STATUS_LABELS[order.status] || order.status} color={STATUS_COLOR[order.status] || 'default'} />
                                 <Box sx={{ flex: 1 }} />
                                 <Typography variant="body2" sx={{ color: colors.textSecondary }}>{order.total_prepared}/{order.total_quantity} préparées</Typography>
@@ -660,6 +661,7 @@ function ImportOrderTab({ refs, setError, onImported }) {
                 client_name: clientName.trim(),
                 lines,
                 mappings,
+                order_reference: preview.order_reference || null,
             });
             setDone(res.data);
             setPreview(null);
@@ -714,6 +716,17 @@ function ImportOrderTab({ refs, setError, onImported }) {
                 </Typography> : null
             ) : (
                 <Stack spacing={2}>
+                    {preview.order_reference ? (
+                        <Stack direction="row" spacing={1} alignItems="center">
+                            <Typography variant="body2" sx={{ color: colors.textSecondary }}>Bon de commande :</Typography>
+                            <Chip size="small" label={preview.order_reference} variant="outlined" />
+                        </Stack>
+                    ) : null}
+                    {preview.already_imported ? (
+                        <Alert severity="warning" variant="outlined">
+                            Ce bon ({preview.order_reference}) a déjà été importé (commande {preview.already_imported_as}). Tu peux quand même le recréer si besoin.
+                        </Alert>
+                    ) : null}
                     <TextField size="small" label="Client" value={clientName} onChange={(e) => setClientName(e.target.value)} sx={{ maxWidth: 320 }} helperText="Détecté depuis le PDF, modifiable. Créé s'il n'existe pas." />
 
                     <Typography variant="subtitle2">Cartes reconnues ({matchedCount})</Typography>

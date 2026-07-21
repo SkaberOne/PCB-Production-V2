@@ -247,6 +247,7 @@ class ClientOrderService:
         return {
             "id": order.id,
             "reference": order.reference,
+            "external_reference": order.external_reference,
             "order_type": order.order_type,
             "client_id": order.client_id,
             "machine_model_id": order.machine_model_id,
@@ -281,6 +282,13 @@ class ClientOrderService:
         return [cls._serialize(o) for o in orders]
 
     @classmethod
+    def find_by_external_reference(cls, db: Session, external_reference: str) -> Optional[ClientOrder]:
+        ext = (external_reference or "").strip()
+        if not ext:
+            return None
+        return db.query(ClientOrder).filter(ClientOrder.external_reference == ext).first()
+
+    @classmethod
     def get_order(cls, db: Session, order_id: int) -> Dict:
         order = db.query(ClientOrder).filter(ClientOrder.id == order_id).first()
         if order is None:
@@ -300,12 +308,14 @@ class ClientOrderService:
         lines: Optional[List[Dict]] = None,
         machine_model_id: Optional[int] = None,
         machine_count: Optional[int] = None,
+        external_reference: Optional[str] = None,
     ) -> Dict:
         otype = (order_type or "CLIENT").upper()
         if otype not in ("CLIENT", "MACHINE"):
             otype = "CLIENT"
         order = ClientOrder(
             reference=cls._next_reference(db),
+            external_reference=(external_reference or "").strip() or None,
             order_type=otype,
             client_id=client_id,
             recipient=(recipient or "").strip() or None,
