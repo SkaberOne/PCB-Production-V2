@@ -65,8 +65,11 @@ function CardsToProducePanel() {
                             </TableHead>
                             <TableBody>
                                 {rows.map((r) => (
-                                    <TableRow key={r.bom_reference_id} hover>
-                                        <TableCell sx={compactCellSx}>{r.reference}</TableCell>
+                                    <TableRow key={`${r.bom_reference_id}::${r.revision || ''}`} hover>
+                                        <TableCell sx={compactCellSx}>
+                                            {r.reference}
+                                            {r.revision ? <Chip size="small" label={r.revision} variant="outlined" sx={{ ml: 0.75 }} /> : null}
+                                        </TableCell>
                                         <TableCell sx={{ ...compactCellSx, color: '#a1a1aa' }} align="right">{r.demand_remaining}</TableCell>
                                         <TableCell sx={{ ...compactCellSx, color: '#a1a1aa' }} align="right">{r.in_stock}</TableCell>
                                         <TableCell sx={{ ...compactCellSx, fontWeight: 700, color: '#f59e0b' }} align="right">{r.to_produce}</TableCell>

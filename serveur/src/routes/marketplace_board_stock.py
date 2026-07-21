@@ -24,6 +24,7 @@ router = APIRouter(tags=["board-stock"])
 # ─────────────────────────── Schémas ───────────────────────────
 
 class BoardStockUpsert(BaseModel):
+    revision: str = Field(default="", max_length=20)
     qty_in_stock: Optional[int] = Field(default=None, ge=0)
     min_stock: Optional[int] = Field(default=None, ge=0)
     unit_price_override: Optional[float] = Field(default=None, ge=0)
@@ -36,10 +37,12 @@ class BoardStockUpsert(BaseModel):
 
 class BoardStockAdjust(BaseModel):
     delta: int
+    revision: str = Field(default="", max_length=20)
 
 
 class OrderLineInput(BaseModel):
     bom_reference_id: int = Field(..., gt=0)
+    revision: str = Field(default="", max_length=20)
     quantity: int = Field(..., ge=0)
     notes: Optional[str] = Field(default=None, max_length=500)
 
@@ -69,6 +72,7 @@ class ClientUpdate(BaseModel):
 
 class MachineCardInput(BaseModel):
     bom_reference_id: int = Field(..., gt=0)
+    revision: str = Field(default="", max_length=20)
     quantity: int = Field(..., ge=1)
 
 
@@ -114,6 +118,7 @@ def upsert_board_stock(bom_reference_id: int, request: BoardStockUpsert, db: Ses
         row = BoardStockService.upsert(
             db,
             bom_reference_id,
+            revision=request.revision,
             qty_in_stock=request.qty_in_stock,
             min_stock=request.min_stock,
             unit_price_override=request.unit_price_override,
@@ -130,7 +135,7 @@ def upsert_board_stock(bom_reference_id: int, request: BoardStockUpsert, db: Ses
 
 @router.post("/board-stock/{bom_reference_id}/adjust")
 def adjust_board_stock(bom_reference_id: int, request: BoardStockAdjust, db: Session = Depends(get_db)):
-    row = BoardStockService.adjust_qty(db, bom_reference_id, request.delta)
+    row = BoardStockService.adjust_qty(db, bom_reference_id, request.delta, request.revision)
     return {"bom_reference_id": row.bom_reference_id, "qty_in_stock": row.qty_in_stock}
 
 

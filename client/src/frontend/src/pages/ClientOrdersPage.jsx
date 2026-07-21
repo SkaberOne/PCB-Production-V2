@@ -41,6 +41,7 @@ function ClientOrdersPage() {
     const [tab, setTab] = React.useState(0);
     const [error, setError] = React.useState(null);
     const [refs, setRefs] = React.useState([]);
+    const [refRevisions, setRefRevisions] = React.useState({});
     const [machines, setMachines] = React.useState([]);
 
     const loadShared = React.useCallback(async () => {
@@ -49,7 +50,20 @@ function ClientOrdersPage() {
                 apiClient.get('/marketplace/board-stock'),
                 apiClient.get('/marketplace/machine-models'),
             ]);
-            setRefs((Array.isArray(r.data) ? r.data : []).map((x) => ({ id: x.bom_reference_id, label: x.reference })));
+            const rows = Array.isArray(r.data) ? r.data : [];
+            // Références distinctes (le board-stock renvoie une ligne par révision).
+            const byId = new Map();
+            const revs = {};
+            rows.forEach((x) => {
+                if (!byId.has(x.bom_reference_id)) byId.set(x.bom_reference_id, { id: x.bom_reference_id, label: x.reference });
+                if (x.revision) {
+                    revs[x.bom_reference_id] = revs[x.bom_reference_id] || [];
+                    if (!revs[x.bom_reference_id].includes(x.revision)) revs[x.bom_reference_id].push(x.revision);
+                }
+            });
+            Object.values(revs).forEach((arr) => arr.sort());
+            setRefs(Array.from(byId.values()));
+            setRefRevisions(revs);
             setMachines(Array.isArray(m.data) ? m.data : []);
         } catch (e) { /* ignore */ }
     }, []);
@@ -70,17 +84,17 @@ function ClientOrdersPage() {
             </Tabs>
 
             <Box sx={{ display: tab === 0 ? 'block' : 'none' }}>
-                <ClientsTab refs={refs} machines={machines} setError={setError} onNeedRefresh={loadShared} />
+                <ClientsTab refs={refs} refRevisions={refRevisions} machines={machines} setError={setError} onNeedRefresh={loadShared} />
             </Box>
             <Box sx={{ display: tab === 1 ? 'block' : 'none' }}>
-                <MachinesTab refs={refs} setError={setError} onChanged={loadShared} />
+                <MachinesTab refs={refs} refRevisions={refRevisions} setError={setError} onChanged={loadShared} />
             </Box>
         </Box>
     );
 }
 
 // ══════════════════════════ Onglet Clients ══════════════════════════
-function ClientsTab({ refs, machines, setError, onNeedRefresh }) {
+function ClientsTab({ refs, refRevisions, machines, setError, onNeedRefresh }) {
     const [clients, setClients] = React.useState(null);
     const [createOpen, setCreateOpen] = React.useState(false);
     const [detailId, setDetailId] = React.useState(null);
@@ -131,6 +145,7 @@ function ClientsTab({ refs, machines, setError, onNeedRefresh }) {
             <ClientDetailDialog
                 clientId={detailId}
                 refs={refs}
+                refRevisions={refRevisions}
                 machines={machines}
                 onClose={() => setDetailId(null)}
                 onChanged={async () => { await load(); await onNeedRefresh(); }}
@@ -168,7 +183,7 @@ function CreateClientDialog({ open, onClose, onCreated, setError }) {
     );
 }
 
-function ClientDetailDialog({ clientId, refs, machines, onClose, onChanged, setError }) {
+function ClientDetailDialog({ clientId, refs, refRevisions, machines, onClose, onChanged, setError }) {
     const [data, setData] = React.useState(null);
     const [busy, setBusy] = React.useState(false);
     const [newOrderOpen, setNewOrderOpen] = React.useState(false);
@@ -238,7 +253,10 @@ function ClientDetailDialog({ clientId, refs, machines, onClose, onChanged, setE
                                 <TableBody>
                                     {order.lines.map((line) => (
                                         <TableRow key={line.id}>
-                                            <TableCell>{line.reference}</TableCell>
+                                            <TableCell>
+                                                {line.reference}
+                                                {line.revision ? <Chip size="small" label={line.revision} variant="outlined" sx={{ ml: 0.75 }} /> : null}
+                                            </TableCell>
                                             <TableCell align="right">{line.quantity}</TableCell>
                                             <TableCell align="right" sx={{ fontWeight: 600 }}>{line.quantity_prepared}</TableCell>
                                             <TableCell align="center">
@@ -275,8 +293,11 @@ function ClientDetailDialog({ clientId, refs, machines, onClose, onChanged, setE
                             </TableHead>
                             <TableBody>
                                 {data.cards_to_prepare.map((c) => (
-                                    <TableRow key={c.bom_reference_id}>
-                                        <TableCell>{c.reference}</TableCell>
+                                    <TableRow key={`${c.bom_reference_id}::${c.revision || ''}`}>
+                                        <TableCell>
+                                            {c.reference}
+                                            {c.revision ? <Chip size="small" label={c.revision} variant="outlined" sx={{ ml: 0.75 }} /> : null}
+                                        </TableCell>
                                         <TableCell align="right" sx={{ fontWeight: 600 }}>{c.to_prepare}</TableCell>
                                         <TableCell align="right" sx={{ color: colors.textSecondary }}>{c.in_stock}</TableCell>
                                         <TableCell align="right" sx={{ color: c.shortage > 0 ? '#f59e0b' : colors.textSecondary, fontWeight: c.shortage > 0 ? 700 : 400 }}>{c.shortage > 0 ? c.shortage : '—'}</TableCell>
@@ -332,6 +353,7 @@ function ClientDetailDialog({ clientId, refs, machines, onClose, onChanged, setE
                 open={newOrderOpen}
                 clientId={clientId}
                 refs={refs}
+                refRevisions={refRevisions}
                 machines={machines}
                 onClose={() => setNewOrderOpen(false)}
                 onCreated={async () => { setNewOrderOpen(false); await load(); await onChanged(); }}
@@ -341,14 +363,14 @@ function ClientDetailDialog({ clientId, refs, machines, onClose, onChanged, setE
     );
 }
 
-function NewOrderDialog({ open, clientId, refs, machines, onClose, onCreated, setError }) {
+function NewOrderDialog({ open, clientId, refs, refRevisions, machines, onClose, onCreated, setError }) {
     const [type, setType] = React.useState('CLIENT');
     const [machine, setMachine] = React.useState(null);
     const [count, setCount] = React.useState('1');
-    const [lines, setLines] = React.useState([{ ref: null, qty: '1' }]);
+    const [lines, setLines] = React.useState([{ ref: null, revision: '', qty: '1' }]);
     const [saving, setSaving] = React.useState(false);
 
-    React.useEffect(() => { if (open) { setType('CLIENT'); setMachine(null); setCount('1'); setLines([{ ref: null, qty: '1' }]); } }, [open]);
+    React.useEffect(() => { if (open) { setType('CLIENT'); setMachine(null); setCount('1'); setLines([{ ref: null, revision: '', qty: '1' }]); } }, [open]);
 
     const setLine = (i, patch) => setLines((prev) => prev.map((l, idx) => (idx === i ? { ...l, ...patch } : l)));
 
@@ -360,7 +382,7 @@ function NewOrderDialog({ open, clientId, refs, machines, onClose, onCreated, se
                 body.machine_model_id = machine?.id;
                 body.machine_count = Math.max(parseInt(count, 10) || 1, 1);
             } else {
-                body.lines = lines.filter((l) => l.ref && (parseInt(l.qty, 10) || 0) > 0).map((l) => ({ bom_reference_id: l.ref.id, quantity: parseInt(l.qty, 10) || 0 }));
+                body.lines = lines.filter((l) => l.ref && (parseInt(l.qty, 10) || 0) > 0).map((l) => ({ bom_reference_id: l.ref.id, revision: l.revision || '', quantity: parseInt(l.qty, 10) || 0 }));
             }
             await apiClient.post('/marketplace/client-orders', body);
             onCreated();
@@ -392,20 +414,31 @@ function NewOrderDialog({ open, clientId, refs, machines, onClose, onCreated, se
                     ) : (
                         <>
                             <Typography variant="subtitle2">Cartes demandées</Typography>
-                            {lines.map((l, i) => (
+                            {lines.map((l, i) => {
+                                const revOptions = (l.ref && refRevisions?.[l.ref.id]) || [];
+                                return (
                                 <Stack key={i} direction="row" spacing={1} alignItems="center">
                                     <Autocomplete
                                         size="small" sx={{ flex: 1 }} options={refs} value={l.ref}
-                                        onChange={(_e, v) => setLine(i, { ref: v })}
+                                        onChange={(_e, v) => setLine(i, { ref: v, revision: '' })}
                                         getOptionLabel={(o) => o?.label || ''}
                                         isOptionEqualToValue={(o, v) => o.id === v.id}
                                         renderInput={(params) => <TextField {...params} label="Référence carte" />}
                                     />
+                                    <TextField
+                                        select size="small" label="Rév." value={l.revision}
+                                        onChange={(e) => setLine(i, { revision: e.target.value })}
+                                        disabled={revOptions.length === 0} sx={{ width: 110 }}
+                                    >
+                                        <MenuItem value="">—</MenuItem>
+                                        {revOptions.map((rev) => <MenuItem key={rev} value={rev}>{rev}</MenuItem>)}
+                                    </TextField>
                                     <TextField size="small" type="number" label="Qté" value={l.qty} onChange={(e) => setLine(i, { qty: e.target.value })} inputProps={{ min: 1 }} sx={{ width: 90 }} />
                                     <IconButton size="small" onClick={() => setLines((p) => p.filter((_, idx) => idx !== i))} disabled={lines.length <= 1}><DeleteOutlineRoundedIcon fontSize="small" /></IconButton>
                                 </Stack>
-                            ))}
-                            <Button size="small" startIcon={<AddRoundedIcon />} onClick={() => setLines((p) => [...p, { ref: null, qty: '1' }])}>Ajouter une carte</Button>
+                                );
+                            })}
+                            <Button size="small" startIcon={<AddRoundedIcon />} onClick={() => setLines((p) => [...p, { ref: null, revision: '', qty: '1' }])}>Ajouter une carte</Button>
                         </>
                     )}
                 </Stack>
@@ -419,7 +452,7 @@ function NewOrderDialog({ open, clientId, refs, machines, onClose, onCreated, se
 }
 
 // ══════════════════════════ Onglet Machines ══════════════════════════
-function MachinesTab({ refs, setError, onChanged }) {
+function MachinesTab({ refs, refRevisions, setError, onChanged }) {
     const [models, setModels] = React.useState(null);
     const [editing, setEditing] = React.useState(null); // {id?...} ou 'new'
 
@@ -462,6 +495,7 @@ function MachinesTab({ refs, setError, onChanged }) {
             <MachineEditDialog
                 model={editing}
                 refs={refs}
+                refRevisions={refRevisions}
                 onClose={() => setEditing(null)}
                 onSaved={async () => { setEditing(null); await load(); await onChanged(); }}
                 setError={setError}
@@ -470,20 +504,20 @@ function MachinesTab({ refs, setError, onChanged }) {
     );
 }
 
-function MachineEditDialog({ model, refs, onClose, onSaved, setError }) {
+function MachineEditDialog({ model, refs, refRevisions, onClose, onSaved, setError }) {
     const isNew = model === 'new';
     const open = Boolean(model);
     const [name, setName] = React.useState('');
-    const [cards, setCards] = React.useState([{ ref: null, qty: '1' }]);
+    const [cards, setCards] = React.useState([{ ref: null, revision: '', qty: '1' }]);
     const [saving, setSaving] = React.useState(false);
 
     React.useEffect(() => {
         if (!open) return;
-        if (isNew) { setName(''); setCards([{ ref: null, qty: '1' }]); }
+        if (isNew) { setName(''); setCards([{ ref: null, revision: '', qty: '1' }]); }
         else {
             setName(model.name || '');
-            const existing = (model.cards || []).map((c) => ({ ref: { id: c.bom_reference_id, label: c.reference }, qty: String(c.quantity) }));
-            setCards(existing.length ? existing : [{ ref: null, qty: '1' }]);
+            const existing = (model.cards || []).map((c) => ({ ref: { id: c.bom_reference_id, label: c.reference }, revision: c.revision || '', qty: String(c.quantity) }));
+            setCards(existing.length ? existing : [{ ref: null, revision: '', qty: '1' }]);
         }
     }, [open, isNew, model]);
 
@@ -493,7 +527,7 @@ function MachineEditDialog({ model, refs, onClose, onSaved, setError }) {
         setSaving(true);
         const payload = {
             name: name.trim(),
-            cards: cards.filter((c) => c.ref && (parseInt(c.qty, 10) || 0) > 0).map((c) => ({ bom_reference_id: c.ref.id, quantity: parseInt(c.qty, 10) || 0 })),
+            cards: cards.filter((c) => c.ref && (parseInt(c.qty, 10) || 0) > 0).map((c) => ({ bom_reference_id: c.ref.id, revision: c.revision || '', quantity: parseInt(c.qty, 10) || 0 })),
         };
         try {
             if (isNew) await apiClient.post('/marketplace/machine-models', payload);
@@ -518,20 +552,31 @@ function MachineEditDialog({ model, refs, onClose, onSaved, setError }) {
                     <TextField autoFocus fullWidth size="small" label="Nom de la machine" value={name} onChange={(e) => setName(e.target.value)} />
                     <Divider />
                     <Typography variant="subtitle2">Cartes composant la machine</Typography>
-                    {cards.map((c, i) => (
+                    {cards.map((c, i) => {
+                        const revOptions = (c.ref && refRevisions?.[c.ref.id]) || [];
+                        return (
                         <Stack key={i} direction="row" spacing={1} alignItems="center">
                             <Autocomplete
                                 size="small" sx={{ flex: 1 }} options={refs} value={c.ref}
-                                onChange={(_e, v) => setCard(i, { ref: v })}
+                                onChange={(_e, v) => setCard(i, { ref: v, revision: '' })}
                                 getOptionLabel={(o) => o?.label || ''}
                                 isOptionEqualToValue={(o, v) => o.id === v.id}
                                 renderInput={(params) => <TextField {...params} label="Référence carte" />}
                             />
+                            <TextField
+                                select size="small" label="Rév." value={c.revision}
+                                onChange={(e) => setCard(i, { revision: e.target.value })}
+                                disabled={revOptions.length === 0} sx={{ width: 110 }}
+                            >
+                                <MenuItem value="">—</MenuItem>
+                                {revOptions.map((rev) => <MenuItem key={rev} value={rev}>{rev}</MenuItem>)}
+                            </TextField>
                             <TextField size="small" type="number" label="Qté" value={c.qty} onChange={(e) => setCard(i, { qty: e.target.value })} inputProps={{ min: 1 }} sx={{ width: 90 }} />
                             <IconButton size="small" onClick={() => setCards((p) => p.filter((_, idx) => idx !== i))} disabled={cards.length <= 1}><DeleteOutlineRoundedIcon fontSize="small" /></IconButton>
                         </Stack>
-                    ))}
-                    <Button size="small" startIcon={<AddRoundedIcon />} onClick={() => setCards((p) => [...p, { ref: null, qty: '1' }])}>Ajouter une carte</Button>
+                        );
+                    })}
+                    <Button size="small" startIcon={<AddRoundedIcon />} onClick={() => setCards((p) => [...p, { ref: null, revision: '', qty: '1' }])}>Ajouter une carte</Button>
                 </Stack>
             </DialogContent>
             <DialogActions sx={{ justifyContent: 'space-between' }}>

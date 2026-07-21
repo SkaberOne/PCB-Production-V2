@@ -177,6 +177,53 @@ def test_duplicate_client_rejected():
     db.close()
 
 
+def test_board_stock_revisions_are_independent():
+    """Deux révisions d'une même carte = deux lignes de stock distinctes."""
+    db = TestingSessionLocal()
+    ref = _ref(db, "REV-CARTE")
+    db.commit()
+    BoardStockService.upsert(db, ref.id, revision="REV_A", qty_in_stock=5)
+    BoardStockService.upsert(db, ref.id, revision="REV_B", qty_in_stock=8)
+    rows = [r for r in BoardStockService.list_board_stock(db) if r["bom_reference_id"] == ref.id]
+    by_rev = {r["revision"]: r["qty_in_stock"] for r in rows}
+    assert by_rev.get("REV_A") == 5
+    assert by_rev.get("REV_B") == 8
+    db.close()
+
+
+def test_order_revision_decrements_correct_stock():
+    """Préparer une ligne REV_B ne touche que le stock REV_B."""
+    db = TestingSessionLocal()
+    ref = _ref(db, "REV-CMD")
+    db.commit()
+    BoardStockService.upsert(db, ref.id, revision="REV_A", qty_in_stock=10)
+    BoardStockService.upsert(db, ref.id, revision="REV_B", qty_in_stock=10)
+    order = ClientOrderService.create_order(
+        db, lines=[{"bom_reference_id": ref.id, "revision": "REV_B", "quantity": 4}],
+    )
+    assert order["lines"][0]["revision"] == "REV_B"
+    line_id = order["lines"][0]["id"]
+    ClientOrderService.prepare(db, order["id"], line_id, 4)
+    rows = {r["revision"]: r["qty_in_stock"]
+            for r in BoardStockService.list_board_stock(db) if r["bom_reference_id"] == ref.id}
+    assert rows["REV_A"] == 10  # intact
+    assert rows["REV_B"] == 6   # 10 − 4
+    db.close()
+
+
+def test_cards_to_produce_per_revision():
+    db = TestingSessionLocal()
+    ref = _ref(db, "REV-TODO")
+    db.commit()
+    BoardStockService.upsert(db, ref.id, revision="REV_A", qty_in_stock=1)
+    ClientOrderService.create_order(db, lines=[{"bom_reference_id": ref.id, "revision": "REV_A", "quantity": 5}])
+    ClientOrderService.create_order(db, lines=[{"bom_reference_id": ref.id, "revision": "REV_B", "quantity": 2}])
+    todo = {r["revision"]: r for r in BoardStockService.cards_to_produce(db) if r["bom_reference_id"] == ref.id}
+    assert todo["REV_A"]["to_produce"] == 4  # 5 − 1
+    assert todo["REV_B"]["to_produce"] == 2  # 2 − 0
+    db.close()
+
+
 def test_set_lines_preserves_prepared():
     db = TestingSessionLocal()
     ref = _ref(db, "CARTE-F")

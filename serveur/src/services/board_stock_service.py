@@ -17,10 +17,35 @@ from ..models.board_stock import (
     MachineModel,
     MachineModelCard,
 )
-from ..models.bom import BomReference
+from ..models.bom import BomReference, BomRevision
 from ..models.costing import ProductionCosting
 
 _ACTIVE_ORDER_STATUSES = ("OPEN", "READY")
+
+
+def _norm_rev(revision) -> str:
+    """Normalise une révision (None/espaces -> '')."""
+    return (revision or "").strip()
+
+
+def _reference_revisions(db: Session) -> Dict[int, List[str]]:
+    """{bom_reference_id: [révisions distinctes connues]} depuis les BOM importées."""
+    rows = (
+        db.query(BomRevision.bom_ref_id, BomRevision.revision)
+        .distinct()
+        .all()
+    )
+    out: Dict[int, List[str]] = {}
+    for ref_id, rev in rows:
+        rev = _norm_rev(rev)
+        if not rev:
+            continue
+        out.setdefault(ref_id, [])
+        if rev not in out[ref_id]:
+            out[ref_id].append(rev)
+    for ref_id in out:
+        out[ref_id].sort()
+    return out
 
 
 def _reference_prices(db: Session) -> Dict[int, float]:
@@ -50,22 +75,30 @@ class BoardStockService:
 
     @classmethod
     def list_board_stock(cls, db: Session) -> List[Dict]:
-        """Toutes les références de carte + leur stock (défauts 0 si aucune ligne)."""
+        """Stock par (référence, révision). Une ligne par révision connue de la
+        référence ; une ligne '' si la référence n'a aucune révision importée."""
         refs = db.query(BomReference).order_by(BomReference.reference).all()
-        stocks = {s.bom_reference_id: s for s in db.query(BoardStock).all()}
+        stocks = {(s.bom_reference_id, _norm_rev(s.revision)): s for s in db.query(BoardStock).all()}
         ref_prices = _reference_prices(db)
+        ref_revs = _reference_revisions(db)
 
         out: List[Dict] = []
         for ref in refs:
-            stock = stocks.get(ref.id)
-            qty = stock.qty_in_stock if stock else 0
-            min_stock = stock.min_stock if stock else 0
-            ref_price = ref_prices.get(ref.id)
-            effective = cls._effective_price(stock, ref_price)
-            out.append(
-                {
+            revisions = ref_revs.get(ref.id) or [""]
+            # Inclure aussi les révisions ayant déjà une ligne de stock (hors BOM).
+            for key_rev in [r for (rid, r) in stocks if rid == ref.id]:
+                if key_rev not in revisions:
+                    revisions.append(key_rev)
+            for rev in revisions:
+                stock = stocks.get((ref.id, rev))
+                qty = stock.qty_in_stock if stock else 0
+                min_stock = stock.min_stock if stock else 0
+                ref_price = ref_prices.get(ref.id)
+                effective = cls._effective_price(stock, ref_price)
+                out.append({
                     "bom_reference_id": ref.id,
                     "reference": ref.reference,
+                    "revision": rev,
                     "category": ref.category,
                     "qty_in_stock": qty,
                     "min_stock": min_stock,
@@ -79,19 +112,19 @@ class BoardStockService:
                     "cards_to_debug": stock.cards_to_debug if stock else 0,
                     "notes": stock.notes if stock else None,
                     "has_row": stock is not None,
-                }
-            )
+                })
         return out
 
     @staticmethod
-    def _get_or_create(db: Session, bom_reference_id: int) -> BoardStock:
+    def _get_or_create(db: Session, bom_reference_id: int, revision: str = "") -> BoardStock:
+        revision = _norm_rev(revision)
         row = (
             db.query(BoardStock)
-            .filter(BoardStock.bom_reference_id == bom_reference_id)
+            .filter(BoardStock.bom_reference_id == bom_reference_id, BoardStock.revision == revision)
             .first()
         )
         if row is None:
-            row = BoardStock(bom_reference_id=bom_reference_id)
+            row = BoardStock(bom_reference_id=bom_reference_id, revision=revision)
             db.add(row)
         return row
 
@@ -101,6 +134,7 @@ class BoardStockService:
         db: Session,
         bom_reference_id: int,
         *,
+        revision: str = "",
         qty_in_stock: Optional[int] = None,
         min_stock: Optional[int] = None,
         unit_price_override: Optional[float] = None,
@@ -113,7 +147,7 @@ class BoardStockService:
         ref = db.query(BomReference).filter(BomReference.id == bom_reference_id).first()
         if ref is None:
             raise ValueError(f"Référence de carte {bom_reference_id} introuvable")
-        row = cls._get_or_create(db, bom_reference_id)
+        row = cls._get_or_create(db, bom_reference_id, revision)
         if qty_in_stock is not None:
             row.qty_in_stock = max(int(qty_in_stock), 0)
         if min_stock is not None:
@@ -135,8 +169,8 @@ class BoardStockService:
         return row
 
     @classmethod
-    def adjust_qty(cls, db: Session, bom_reference_id: int, delta: int) -> BoardStock:
-        row = cls._get_or_create(db, bom_reference_id)
+    def adjust_qty(cls, db: Session, bom_reference_id: int, delta: int, revision: str = "") -> BoardStock:
+        row = cls._get_or_create(db, bom_reference_id, revision)
         row.qty_in_stock = max(int(row.qty_in_stock or 0) + int(delta), 0)
         db.commit()
         db.refresh(row)
@@ -144,12 +178,12 @@ class BoardStockService:
 
     @classmethod
     def cards_to_produce(cls, db: Session) -> List[Dict]:
-        """Manques de cartes = demande restante des commandes actives − stock dispo."""
+        """Manques de cartes = demande restante des commandes actives − stock dispo,
+        par (référence, révision)."""
         ref_names = {r.id: r for r in db.query(BomReference).all()}
-        stocks = {s.bom_reference_id: s.qty_in_stock for s in db.query(BoardStock).all()}
+        stocks = {(s.bom_reference_id, _norm_rev(s.revision)): s.qty_in_stock for s in db.query(BoardStock).all()}
 
-        # Demande restante (quantity − prepared) par référence, commandes OPEN/READY.
-        demand: Dict[int, int] = {}
+        demand: Dict[tuple, int] = {}
         lines = (
             db.query(ClientOrderLine)
             .join(ClientOrder, ClientOrder.id == ClientOrderLine.order_id)
@@ -159,24 +193,24 @@ class BoardStockService:
         for line in lines:
             remaining = max(int(line.quantity or 0) - int(line.quantity_prepared or 0), 0)
             if remaining:
-                demand[line.bom_reference_id] = demand.get(line.bom_reference_id, 0) + remaining
+                key = (line.bom_reference_id, _norm_rev(line.revision))
+                demand[key] = demand.get(key, 0) + remaining
 
         out: List[Dict] = []
-        for ref_id, needed in demand.items():
-            available = int(stocks.get(ref_id, 0))
+        for (ref_id, rev), needed in demand.items():
+            available = int(stocks.get((ref_id, rev), 0))
             shortage = max(needed - available, 0)
             if shortage <= 0:
                 continue
             ref = ref_names.get(ref_id)
-            out.append(
-                {
-                    "bom_reference_id": ref_id,
-                    "reference": ref.reference if ref else None,
-                    "demand_remaining": needed,
-                    "in_stock": available,
-                    "to_produce": shortage,
-                }
-            )
+            out.append({
+                "bom_reference_id": ref_id,
+                "reference": ref.reference if ref else None,
+                "revision": rev,
+                "demand_remaining": needed,
+                "in_stock": available,
+                "to_produce": shortage,
+            })
         out.sort(key=lambda r: -r["to_produce"])
         return out
 
@@ -197,6 +231,7 @@ class ClientOrderService:
             "id": line.id,
             "bom_reference_id": line.bom_reference_id,
             "reference": ref.reference if ref else None,
+            "revision": _norm_rev(line.revision),
             "quantity": line.quantity,
             "quantity_prepared": line.quantity_prepared,
             "remaining": max(int(line.quantity or 0) - int(line.quantity_prepared or 0), 0),
@@ -279,7 +314,8 @@ class ClientOrderService:
             notes=(notes or "").strip() or None,
         )
 
-        materialized: Dict[int, int] = {}
+        # Matérialisation par (référence, révision).
+        materialized: Dict[tuple, int] = {}
         if otype == "MACHINE" and machine_model_id:
             model = db.query(MachineModel).filter(MachineModel.id == machine_model_id).first()
             if model is None:
@@ -287,21 +323,22 @@ class ClientOrderService:
             count = max(int(machine_count or 1), 1)
             order.machine_model_id = model.id
             order.machine_count = count
-            # Cartes de la machine × nombre de machines.
             for card in model.cards:
-                materialized[card.bom_reference_id] = materialized.get(card.bom_reference_id, 0) + int(card.quantity or 0) * count
+                key = (card.bom_reference_id, _norm_rev(card.revision))
+                materialized[key] = materialized.get(key, 0) + int(card.quantity or 0) * count
         else:
             for line in (lines or []):
                 ref_id = line.get("bom_reference_id")
                 qty = max(int(line.get("quantity") or 0), 0)
                 if ref_id and qty > 0:
-                    materialized[int(ref_id)] = materialized.get(int(ref_id), 0) + qty
+                    key = (int(ref_id), _norm_rev(line.get("revision")))
+                    materialized[key] = materialized.get(key, 0) + qty
 
         db.add(order)
         db.flush()
-        for ref_id, qty in materialized.items():
+        for (ref_id, rev), qty in materialized.items():
             if qty > 0:
-                db.add(ClientOrderLine(order_id=order.id, bom_reference_id=ref_id, quantity=qty))
+                db.add(ClientOrderLine(order_id=order.id, bom_reference_id=ref_id, revision=(rev or None), quantity=qty))
         db.commit()
         db.refresh(order)
         return cls._serialize(order)
@@ -347,7 +384,7 @@ class ClientOrderService:
         order = db.query(ClientOrder).filter(ClientOrder.id == order_id).first()
         if order is None:
             raise ValueError(f"Commande {order_id} introuvable")
-        prepared_by_ref = {line.bom_reference_id: line.quantity_prepared for line in order.lines}
+        prepared_by_ref = {(line.bom_reference_id, _norm_rev(line.revision)): line.quantity_prepared for line in order.lines}
         for line in list(order.lines):
             db.delete(line)
         db.flush()
@@ -356,10 +393,12 @@ class ClientOrderService:
             qty = max(int(line.get("quantity") or 0), 0)
             if not ref_id or qty <= 0:
                 continue
-            prepared = min(int(prepared_by_ref.get(int(ref_id), 0)), qty)
+            rev = _norm_rev(line.get("revision"))
+            prepared = min(int(prepared_by_ref.get((int(ref_id), rev), 0)), qty)
             db.add(ClientOrderLine(
                 order_id=order.id,
                 bom_reference_id=int(ref_id),
+                revision=(rev or None),
                 quantity=qty,
                 quantity_prepared=prepared,
                 notes=(line.get("notes") or "").strip() or None,
@@ -401,8 +440,8 @@ class ClientOrderService:
         applied = max(-int(line.quantity_prepared or 0), min(qty, room))
         if applied != 0:
             line.quantity_prepared = int(line.quantity_prepared or 0) + applied
-            # Retire du stock ce qui est ajouté à la boîte (et rend au stock si retrait).
-            BoardStockService.adjust_qty(db, line.bom_reference_id, -applied)
+            # Retire du stock (référence + révision) ce qui est ajouté à la boîte.
+            BoardStockService.adjust_qty(db, line.bom_reference_id, -applied, _norm_rev(line.revision))
         cls._recompute_status(order, db)
         db.commit()
         db.refresh(order)
@@ -478,24 +517,26 @@ class ClientService:
         orders = [ClientOrderService._serialize(o) for o in sorted(client.orders, key=lambda o: -o.id)]
 
         ref_names = {r.id: r.reference for r in db.query(BomReference).all()}
-        stocks = {s.bom_reference_id: s.qty_in_stock for s in db.query(BoardStock).all()}
-        to_prepare: Dict[int, int] = {}
+        stocks = {(s.bom_reference_id, _norm_rev(s.revision)): s.qty_in_stock for s in db.query(BoardStock).all()}
+        to_prepare: Dict[tuple, int] = {}
         for order in client.orders:
             if order.status not in _ACTIVE_ORDER_STATUSES:
                 continue
             for line in order.lines:
                 remaining = max(int(line.quantity or 0) - int(line.quantity_prepared or 0), 0)
                 if remaining:
-                    to_prepare[line.bom_reference_id] = to_prepare.get(line.bom_reference_id, 0) + remaining
+                    key = (line.bom_reference_id, _norm_rev(line.revision))
+                    to_prepare[key] = to_prepare.get(key, 0) + remaining
         cards_to_prepare = [
             {
                 "bom_reference_id": ref_id,
                 "reference": ref_names.get(ref_id),
+                "revision": rev,
                 "to_prepare": qty,
-                "in_stock": int(stocks.get(ref_id, 0)),
-                "shortage": max(qty - int(stocks.get(ref_id, 0)), 0),
+                "in_stock": int(stocks.get((ref_id, rev), 0)),
+                "shortage": max(qty - int(stocks.get((ref_id, rev), 0)), 0),
             }
-            for ref_id, qty in sorted(to_prepare.items(), key=lambda kv: -kv[1])
+            for (ref_id, rev), qty in sorted(to_prepare.items(), key=lambda kv: -kv[1])
         ]
         return {
             "id": client.id,
@@ -517,6 +558,7 @@ class MachineModelService:
                 "id": c.id,
                 "bom_reference_id": c.bom_reference_id,
                 "reference": c.reference.reference if c.reference else None,
+                "revision": _norm_rev(c.revision),
                 "quantity": c.quantity,
             }
             for c in model.cards
@@ -579,7 +621,13 @@ class MachineModelService:
             ref_id = card.get("bom_reference_id")
             qty = max(int(card.get("quantity") or 0), 0)
             if ref_id and qty > 0:
-                db.add(MachineModelCard(machine_model_id=model.id, bom_reference_id=int(ref_id), quantity=qty))
+                rev = _norm_rev(card.get("revision"))
+                db.add(MachineModelCard(
+                    machine_model_id=model.id,
+                    bom_reference_id=int(ref_id),
+                    revision=(rev or None),
+                    quantity=qty,
+                ))
 
     @classmethod
     def delete_model(cls, db: Session, model_id: int) -> None:

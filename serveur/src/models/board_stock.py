@@ -19,11 +19,13 @@ class BoardStock(Base):
 
     __tablename__ = "BOARD_STOCK"
     __table_args__ = (
-        UniqueConstraint("bom_reference_id", name="uq_board_stock_reference"),
+        UniqueConstraint("bom_reference_id", "revision", name="uq_board_stock_ref_rev"),
     )
 
     id = Column(Integer, primary_key=True, index=True)
     bom_reference_id = Column(Integer, ForeignKey("BOM_REFERENCES.id"), nullable=False, index=True)
+    # Révision de la carte (REV_A, REV_C…). '' = non précisée (référence sans révision).
+    revision = Column(String(20), nullable=False, default="", server_default="")
 
     qty_in_stock = Column(Integer, nullable=False, default=0, server_default="0")
     min_stock = Column(Integer, nullable=False, default=0, server_default="0")
@@ -92,6 +94,7 @@ class MachineModelCard(Base):
     id = Column(Integer, primary_key=True, index=True)
     machine_model_id = Column(Integer, ForeignKey("MACHINE_MODELS.id"), nullable=False, index=True)
     bom_reference_id = Column(Integer, ForeignKey("BOM_REFERENCES.id"), nullable=False, index=True)
+    revision = Column(String(20), nullable=True)  # révision de la carte pour ce modèle
     quantity = Column(Integer, nullable=False, default=1, server_default="1")
 
     model = relationship("MachineModel", back_populates="cards")
@@ -138,6 +141,7 @@ class ClientOrderLine(Base):
     id = Column(Integer, primary_key=True, index=True)
     order_id = Column(Integer, ForeignKey("CLIENT_ORDERS.id"), nullable=False, index=True)
     bom_reference_id = Column(Integer, ForeignKey("BOM_REFERENCES.id"), nullable=False, index=True)
+    revision = Column(String(20), nullable=True)  # révision commandée (REV_A…)
 
     quantity = Column(Integer, nullable=False, default=1, server_default="1")
     quantity_prepared = Column(Integer, nullable=False, default=0, server_default="0")

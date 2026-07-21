@@ -62,6 +62,7 @@ function BoardStockPage() {
 
     const openEditor = (row) => {
         setForm({
+            revision: row.revision || '',
             qty_in_stock: String(row.qty_in_stock ?? 0),
             min_stock: String(row.min_stock ?? 0),
             unit_price_override: row.unit_price_override != null ? String(row.unit_price_override) : '',
@@ -81,6 +82,7 @@ function BoardStockPage() {
         const priceRaw = form.unit_price_override.trim();
         try {
             await apiClient.put(`/marketplace/board-stock/${editing.bom_reference_id}`, {
+                revision: form.revision || '',
                 qty_in_stock: Math.max(parseInt(form.qty_in_stock, 10) || 0, 0),
                 min_stock: Math.max(parseInt(form.min_stock, 10) || 0, 0),
                 unit_price_override: priceRaw === '' ? null : Math.max(parseFloat(priceRaw.replace(',', '.')) || 0, 0),
@@ -121,6 +123,7 @@ function BoardStockPage() {
                     <TableHead>
                         <TableRow>
                             <TableCell>Référence carte</TableCell>
+                            <TableCell>Révision</TableCell>
                             <TableCell align="right">En stock</TableCell>
                             <TableCell align="right">Min.</TableCell>
                             <TableCell align="right">Prix / carte</TableCell>
@@ -132,12 +135,12 @@ function BoardStockPage() {
                     </TableHead>
                     <TableBody>
                         {rows === null ? (
-                            <TableRow><TableCell colSpan={8} sx={{ py: 3, textAlign: 'center', color: colors.textSecondary }}>Chargement…</TableCell></TableRow>
+                            <TableRow><TableCell colSpan={9} sx={{ py: 3, textAlign: 'center', color: colors.textSecondary }}>Chargement…</TableCell></TableRow>
                         ) : rows.length === 0 ? (
-                            <TableRow><TableCell colSpan={8} sx={{ py: 3, textAlign: 'center', color: colors.textSecondary }}>Aucune référence de carte.</TableCell></TableRow>
+                            <TableRow><TableCell colSpan={9} sx={{ py: 3, textAlign: 'center', color: colors.textSecondary }}>Aucune référence de carte.</TableCell></TableRow>
                         ) : rows.map((row) => (
                             <TableRow
-                                key={row.bom_reference_id}
+                                key={`${row.bom_reference_id}::${row.revision || ''}`}
                                 hover
                                 onClick={() => openEditor(row)}
                                 sx={{ cursor: 'pointer', ...(row.below_min ? { backgroundColor: BELOW_MIN_BG, '&:hover': { backgroundColor: BELOW_MIN_BG } } : {}) }}
@@ -145,6 +148,9 @@ function BoardStockPage() {
                                 <TableCell>
                                     {row.reference}
                                     {row.below_min ? <Chip size="small" label="sous min." color="error" sx={{ ml: 0.75 }} /> : null}
+                                </TableCell>
+                                <TableCell>
+                                    {row.revision ? <Chip size="small" label={row.revision} variant="outlined" /> : <span style={{ color: colors.textSecondary }}>—</span>}
                                 </TableCell>
                                 <TableCell align="right" sx={{ fontWeight: 600 }}>{row.qty_in_stock}</TableCell>
                                 <TableCell align="right" sx={{ color: colors.textSecondary }}>{row.min_stock}</TableCell>
@@ -167,6 +173,7 @@ function BoardStockPage() {
             <Dialog open={Boolean(editing)} onClose={() => !saving && setEditing(null)} maxWidth="sm" fullWidth>
                 <DialogTitle>
                     {editing?.reference}
+                    {editing?.revision ? <Chip size="small" label={editing.revision} variant="outlined" sx={{ ml: 1 }} /> : null}
                     <Typography variant="body2" sx={{ color: colors.textSecondary }}>
                         Prix Costing de référence : {eur(editing?.reference_unit_cost_ht)}
                     </Typography>
