@@ -601,9 +601,23 @@ function ImportOrderTab({ refs, setError, onImported }) {
     const [maps, setMaps] = React.useState({}); // part_number -> {id, label} (mapping manuel)
     const [busy, setBusy] = React.useState(false);
     const [done, setDone] = React.useState(null);
+    const [drag, setDrag] = React.useState(false);
     const fileRef = React.useRef(null);
 
     const reset = () => { setPreview(null); setClientName(''); setMaps({}); setDone(null); };
+
+    const handleDrop = (e) => {
+        e.preventDefault();
+        setDrag(false);
+        if (busy) return;
+        const file = e.dataTransfer?.files?.[0];
+        if (!file) return;
+        if (file.type && file.type !== 'application/pdf' && !file.name.toLowerCase().endsWith('.pdf')) {
+            setError('Merci de déposer un fichier PDF.');
+            return;
+        }
+        upload(file);
+    };
 
     const upload = async (file) => {
         if (!file) return;
@@ -658,13 +672,31 @@ function ImportOrderTab({ refs, setError, onImported }) {
 
     return (
         <Box>
-            <Stack direction="row" spacing={2} alignItems="center" sx={{ mb: 2 }}>
-                <Button variant="contained" component="label" disabled={busy}>
-                    Choisir un PDF de commande
-                    <input ref={fileRef} type="file" accept="application/pdf" hidden onChange={(e) => upload(e.target.files?.[0])} />
-                </Button>
-                {preview ? <Button color="inherit" onClick={reset} disabled={busy}>Réinitialiser</Button> : null}
-            </Stack>
+            <Box
+                onDragOver={(e) => { e.preventDefault(); if (!drag) setDrag(true); }}
+                onDragLeave={(e) => { e.preventDefault(); setDrag(false); }}
+                onDrop={handleDrop}
+                sx={{
+                    mb: 2,
+                    p: 3,
+                    borderRadius: 1,
+                    border: `2px dashed ${drag ? colors.primary || '#22c55e' : colors.border}`,
+                    backgroundColor: drag ? 'rgba(34,197,94,0.08)' : 'transparent',
+                    textAlign: 'center',
+                    transition: 'all 0.15s ease',
+                }}
+            >
+                <Typography variant="body1" sx={{ mb: 1.5, color: colors.textSecondary }}>
+                    {busy ? 'Lecture du PDF…' : 'Glisse-dépose un PDF de commande ici'}
+                </Typography>
+                <Stack direction="row" spacing={2} alignItems="center" justifyContent="center">
+                    <Button variant="contained" component="label" disabled={busy}>
+                        Choisir un PDF de commande
+                        <input ref={fileRef} type="file" accept="application/pdf" hidden onChange={(e) => upload(e.target.files?.[0])} />
+                    </Button>
+                    {preview ? <Button color="inherit" onClick={reset} disabled={busy}>Réinitialiser</Button> : null}
+                </Stack>
+            </Box>
 
             {done ? (
                 <Alert severity="success" sx={{ mb: 2 }} onClose={() => setDone(null)}>
