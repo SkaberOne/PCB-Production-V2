@@ -3,32 +3,41 @@
 | De | orch |
 | Pour | planif |
 | Prompt lié | 003 |
-| Statut | OUVERT |
+| Statut | **RÉPONDU** |
 | Créé le | 2026-07-21 |
 
 ## Blocage / question
 
-Le prompt 003 (import direct de fichiers CAO Eagle → BOM + centroïde) est **bloqué par des inputs que l'orchestrateur ne peut pas produire seul** :
+Le 003 est bloqué par deux inputs que l'orchestrateur ne peut pas produire seul : (1) le code
+`parser_eagle.py` (repo privé inaccessible), (2) les fixtures de calibration OTR (`.brd`, `.sch`,
+fichier machine attendu). Recommandation orch : **option A** (fournir les inputs).
 
-1. **Code `parser_eagle.py`** — le prompt indique explicitement « **porter** `parser_eagle.py` du repo `SkaberOne/pcb-debug-assistant` — **Eric fournit le code** » (§3 et §4.1). Ce repo n'est pas accessible depuis l'environnement de l'orchestrateur.
-2. **Fixtures de calibration OTR** — les tests exigés (§5) valident le parseur au **fichier machine de référence près** : `.brd` + `.sch` réels de la carte « OTR board Bicolor » **et** le fichier de placement machine attendu (49 lignes). Sans ces fichiers de référence, impossible d'écrire/valider la transformation (top identité ; bottom `y→H−y`, `rot+180`, `H` déduit de la géométrie) ni de garantir l'égalité exacte demandée.
+---
 
-Écrire un parseur Eagle « à l'aveugle » (sans le code de référence ni la BOM/centroïde attendus) produirait un résultat **non validable** contre l'acceptance — donc non livrable.
+## Réponse / décision (planif)
 
-## Options envisagées
+**Option A retenue — les inputs sont fournis.** Ils sont dans `serveur/src/tests/fixtures/eagle_otr/` :
+`OTR.brd`, `OTR.sch`, `OTR_machine_TOP.txt`, `OTR_machine_BOT.txt`, `parser_eagle_reference.py` (+ `README.md`).
 
-- **A) Fournir les deux inputs** : déposer `parser_eagle.py` (ou le rendre accessible) **et** les fixtures OTR (`.brd`, `.sch`, fichier machine attendu) dans le repo (ex. `serveur/src/tests/fixtures/eagle_otr/`). → l'orchestrateur porte le parseur, câble détection dossier + endpoint + transform, et ajoute les tests de non-régression. **Voie recommandée.**
-- **B) Démarrer d'abord la partie non bloquée** : interface parseur commune (`ParserBase`), `detect.py` (extensions Eagle/KiCad), UI « sélection dossier + auto-détection » + message « KiCad à venir », **sans** le parseur Eagle ni les tests de calibration. Livrable partiel, mais l'acceptance Eagle reste ouverte jusqu'aux inputs.
-- **C) Reporter 003** entièrement jusqu'à disponibilité des inputs.
+1. **Code parseur** : **pas besoin du repo privé.** Utilise `parser_eagle_reference.py` fourni — il est
+   **validé** (extrait les 60 composants + centroïde de l'OTR). Porte-le / adapte-le dans
+   `serveur/src/services/cao/parser_eagle.py` (conventions projet : package `src`, `utcnow`, etc.).
+2. **`H` (hauteur de retournement)** : déduite du **contour** (layer 20 « Dimension ») du `.brd`,
+   `H = y_min + y_max` du bounding box. Sur OTR = **34.20**. Les `.txt` permettent de le vérifier
+   exactement (`y_brd + y_machine = H` pour tout composant bottom).
+3. **Transform** (confirmée) : top = identité ; bottom `x` inchangé, `y → H − y`, `rot → (rot+180) mod 360`.
+4. **MPN** : attribut `MANUFACTURER_PART_NUMBER` (techno du device dans la librairie du `.sch`). Confirmé.
+5. **C1/C4** : Eric confirme **probable erreur d'export** — **pas de règle** à créer. Décision produit :
+   **le parseur extrait TOUT** (C1/C4 inclus) ; l'exclusion du placement machine (connecteurs, TP, logo,
+   DNP, + retraits manuels comme C1/C4) est une **curation en aval** (Revue / règle PnP), pas une règle
+   du parseur.
 
-**Recommandation orch : A.** Si tu veux avancer en parallèle sans les fixtures, **B** est possible (scaffolding testable a minima), mais le cœur (parseur + calibration) attend **A**.
+**Acceptance §2 ajustée en conséquence :** le test de non-régression compare (a) l'**extraction complète**
+= 60 composants depuis le `.brd`, et (b) la **transformation** sur les **références communes** au `.brd`
+et aux `.txt` machine — **sans hard-fail sur C1/C4** (les 2 seules réf du `.brd` absentes du `.txt`, +
+les non-PnP connecteurs/TP/logo). KiCad reste **hors périmètre** (reporté).
 
-## Précisions utiles (si A)
+## Suite (émetteur, après application)
 
-- Confirmer `H` (hauteur de retournement) : déduit du bounding box du `.brd` ? (OTR : `H = 34.20`) — fournir la règle exacte attendue.
-- Confirmer la liste d'**exclusions** placement PnP (connecteurs J1-J6, test points SCL/SDA, logo U$1, DNP C1/C4 à confirmer).
-- Attribut MPN dans le `.sch` : `MANUFACTURER_PART_NUMBER` (techno du device) — confirmer.
-
-## Impact / en pause
-
-Prompt 003 **EN PAUSE** (déplacé en `2-en-cours/` avec note « EN ATTENTE échange E02 »). Les autres prompts continuent. Dès réception des inputs (option A) ou du feu vert scaffolding (option B), je reprends 003.
+<!-- À remplir par l'orchestrateur : reprendre le 003 avec ces inputs, ajouter les fixtures aux tests,
+     puis déplacer cet échange dans resolus/. -->

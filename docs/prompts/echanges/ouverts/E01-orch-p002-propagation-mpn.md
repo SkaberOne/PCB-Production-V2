@@ -3,29 +3,45 @@
 | De | orch |
 | Pour | planif |
 | Prompt lié | 002 |
-| Statut | OUVERT |
+| Statut | **RÉPONDU** |
 | Créé le | 2026-07-21 |
 
 ## Blocage / question
 
-Le prompt 002 (renommage de valeur avec portée) est **livré côté Revue BOM** (dialog de portée, « tous », persistance — PR #79, CI verte, vérifié staging). Reste l'**acceptance #6** : « le changement de valeur se répercute sur la commande — la ligne reflète la nouvelle valeur ET le MPN / fournisseur associé, plus l'ancien MPN ».
+`match_bom_item` essaie `[value_raw, value_harmonized]` (raw d'abord). Après renommage de la valeur
+harmonisée, `value_raw` (inchangée) matche encore l'**ancien** composant → la ligne de commande reste
+sur l'**ancien MPN** alors que l'agrégation affiche la **nouvelle** valeur. Options A (harmonisé d'abord,
+global) / B (commande seule) / C (ne rien changer). Reco orch : B.
 
-Or la commande résout le composant/MPN via `ComponentLibraryService.match_bom_item` (`serveur/src/services/component_library_service.py:152`), qui essaie les valeurs dans l'ordre **`[value_raw, value_harmonized]`** — donc **`value_raw` d'abord**. Après un renommage de la **valeur harmonisée**, `value_raw` (inchangée) matche encore l'**ancien** composant → la ligne de commande peut rester sur l'**ancien MPN**. Le regroupement (`aggregate_key`) utilise pourtant bien la valeur harmonisée (`command_service.py:777-782`) : la ligne s'affiche donc à la **nouvelle** valeur mais avec l'**ancien** MPN → incohérence.
+---
 
-Je ne tranche pas seul car `match_bom_item` est **transverse** : utilisé dans **8+ endroits** — commande (`command_service`), PnP (`assignment_fixed_feeders`, `assignment_planning`, `pnp_export_service`), costing (`costing_service`), stock/prod (`production_service`, `production_stock_service`), mutations revue (`bom_revision_mutations`). Changer sa précédence globalement impacte tout le mapping valeur→composant du produit.
+## Réponse / décision (planif) — validée par Eric
 
-## Options envisagées
+**Option A retenue** : préférer la **valeur harmonisée** dans le matching composant, **globalement**.
 
-- **A) Précédence globale « harmonisé d'abord ».** Inverser `match_candidates` en `[value_harmonized, value_raw]` partout. Cohérent (commande, PnP, costing suivent la valeur curée), mais **fort blast radius** — change le comportement de matching de toute l'app (à re-tester : PnP, costing, stock).
-- **B) Précédence « harmonisé d'abord » **commande seule**.** Ne changer que `get_command_summary` (matcher local préférant l'harmonisé), laisser PnP/costing/stock inchangés. **Faible risque**, satisfait #6, mais introduit une **incohérence** commande vs PnP (le placement machine resterait sur l'ancienne valeur).
-- **C) Ne rien changer au matcher** : considérer que renommer la valeur harmonisée n'a pas vocation à changer le composant commandé tant que la **bibliothèque composants** n'a pas d'entrée pour la nouvelle valeur — et plutôt guider l'utilisateur à créer/enrichir le composant (MPN) de la nouvelle valeur. #6 alors reformulé.
+**Implémentation** : dans `match_bom_item` (`component_library_service.py:152`), inverser l'ordre des
+candidats en **`[value_harmonized, value_raw]`** — en ignorant les valeurs vides et en dédupliquant
+(`candidates = [v for v in (value_harmonized, value_raw) if v]`). La brute reste donc en **fallback**.
 
-**Recommandation orch : B** (commande seule, faible risque, répond au besoin métier immédiat « ma commande doit refléter la valeur que j'ai décidée »), avec traitement explicite du cas « nouvelle valeur sans composant en bibliothèque » → ligne sans MPN (à enrichir) plutôt que l'ancien MPN.
+**Pourquoi A (et pas B) :**
+1. **Cohérence** : l'agrégation (`aggregate_key`) et les feeders utilisent **déjà** la valeur harmonisée ;
+   `match_bom_item` était l'intrus. A corrige une incohérence **existante**.
+2. **Sécurité prod** : B ferait diverger **commande** (nouvelle valeur) et **placement PnP** (ancienne)
+   → commander une pièce et en placer une autre. A fait tout suivre la valeur curée.
+3. **Régression faible** : `value_raw` reste candidat → **aucun match qui réussit aujourd'hui ne casse** ;
+   seule la **précédence** change, et uniquement quand `harmonisé ≠ raw` (curation délibérée = cas voulu).
 
-## Question annexe (à trancher aussi)
+**Nouvelle valeur sans composant en bibliothèque** → ligne de commande **sans MPN**, marquée
+« à enrichir ». **Jamais** de fallback sur l'ancien MPN.
 
-Quand la **nouvelle** valeur n'a **aucun** composant en bibliothèque : la ligne de commande doit-elle rester **sans MPN** (forçant l'enrichissement) ou retomber sur un fallback ? (La reco B implique « sans MPN ».)
+**Tests exigés (blast radius) :** relancer **toute** la suite `pytest` (PnP, costing, stock, commande)
+— tout consommateur de `match_bom_item`. Ajouter des tests ciblés :
+- renommage d'une valeur → **Commande** reflète le nouveau MPN (ou « sans MPN » si nouvelle valeur inconnue) ;
+- renommage d'une valeur → **PnP / placement** reflète aussi la nouvelle valeur (cohérence commande ↔ machine).
+Validation staging : renommer une valeur (ex. `10µF`→`10µF/35V` « tous ») → Commande **et** Machine PnP
+suivent la nouvelle valeur.
 
-## Impact / en pause
+## Suite (émetteur, après application)
 
-Prompt 002 **livré avec réserve** (frontend en prod-candidate via PR #79). Seule l'acceptance #6 (propagation commande) est en attente de cette décision. Dès réponse, j'implémente le backend retenu + tests + vérif staging (renommer une valeur → Commande reflète le nouveau MPN) sur une branche de suivi.
+<!-- À remplir par l'orchestrateur : implémenter A + tests, vérifier staging, PR de suivi vers dev,
+     puis déplacer cet échange dans resolus/. -->
