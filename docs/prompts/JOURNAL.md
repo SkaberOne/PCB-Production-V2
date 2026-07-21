@@ -5,7 +5,8 @@ Mis à jour par l'orchestrateur à chaque exécution (le plus récent en haut).
 
 | ID | Feature | Type | Statut | Branche | Résultat | Date |
 |----|---------|------|--------|---------|----------|------|
-| 001 | Fusion « BOM enregistrées » + « Cartes » & fiche éditable | feat | ✅ terminé | feat/cartes-unifie-editable | [PR #78](https://github.com/SkaberOne/PCB-Production-V2/pull/78) → dev (CI verte) | 2026-07-21 |
+| 002 | Renommage de valeur avec choix de portée (ce composant / tous) | feat | ⚠ terminé avec réserves | feat/renommage-valeur-portee | [PR #79](https://github.com/SkaberOne/PCB-Production-V2/pull/79) → dev (CI verte) ; propagation commande/MPN escaladée architecte | 2026-07-21 |
+| 001 | Fusion « BOM enregistrées » + « Cartes » & fiche éditable | feat | ✅ terminé | feat/cartes-unifie-editable | [PR #78](https://github.com/SkaberOne/PCB-Production-V2/pull/78) → dev (mergé) | 2026-07-21 |
 
 ---
 
