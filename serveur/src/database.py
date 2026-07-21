@@ -200,7 +200,17 @@ def init_or_upgrade_schema() -> None:
             # tente de résoudre la révision orpheline et échoue.
             _alembic_command.stamp(cfg, "head", purge=True)
         else:
-            logger.info("Schéma : base existante → alembic upgrade head")
+            # Base existante à jour ou en retard. On crée d'abord les tables
+            # MANQUANTES via create_all : contrairement à la séquence de migrations
+            # (qui crée certaines tables depuis les modèles ORM avec des FK vers des
+            # tables créées à une migration ultérieure → échec d'ordre des FK sur une
+            # base MSSQL vierge), create_all respecte l'ordre de dépendance des FK.
+            # Idempotent (checkfirst) ; upgrade head applique ensuite les ajouts de
+            # colonnes (add_column gardés) sur les tables existantes et cale la révision.
+            logger.info(
+                "Schéma : base existante → create_all (tables manquantes) + upgrade head"
+            )
+            Base.metadata.create_all(bind=engine)
             _alembic_command.upgrade(cfg, "head")
 
 
