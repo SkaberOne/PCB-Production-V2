@@ -8,7 +8,7 @@ from .board_stock import (
     MachineModel,
     MachineModelCard,
 )
-from .bom import BomCategory, BomItem, BomReference, BomRevision, Component, FootprintMapping
+from .bom import AssemblyItem, BomCategory, BomItem, BomReference, BomRevision, Component, FootprintMapping
 from .costing import CostParameters, ProductionCostInput, ProductionCosting
 from .commands import (
     Command,
@@ -32,6 +32,7 @@ from .stock import (
 )
 
 __all__ = [
+    "AssemblyItem",
     "BoardStock",
     "Client",
     "ClientOrder",

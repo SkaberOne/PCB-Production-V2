@@ -17,13 +17,48 @@ class BomReference(Base):
     reference = Column(String(100), unique=True, nullable=False, index=True)
     category = Column(String(100), nullable=True, index=True)
     description = Column(String(500), nullable=True)
+    # Catalogue Cartes (ADR 0018) — additifs nullable :
+    # nom lisible, code KELENN (« notre référence », matching import PDF),
+    # type SIMPLE (carte assemblée) ou ASSEMBLY (kit multi-niveaux).
+    name = Column(String(200), nullable=True)
+    part_number = Column(String(100), nullable=True)
+    card_type = Column(String(20), nullable=False, default="SIMPLE", server_default="SIMPLE")
     created_at = Column(DateTime, default=utcnow)
     updated_at = Column(DateTime, default=utcnow, onupdate=utcnow)
 
     revisions = relationship("BomRevision", back_populates="reference", cascade="all, delete-orphan")
+    # Enfants si cette carte est un assemblage (ADR 0018).
+    assembly_items = relationship(
+        "AssemblyItem",
+        back_populates="parent",
+        foreign_keys="AssemblyItem.parent_reference_id",
+        cascade="all, delete-orphan",
+    )
 
     def __repr__(self):
         return f"<BomReference {self.reference}>"
+
+
+class AssemblyItem(Base):
+    """Un enfant d'une carte « assemblage » (ADR 0018) : soit une sous-carte
+    (``child_reference_id`` -> BOM_REFERENCES, récursif), soit un composant en
+    vrac (``component_id`` -> COMPONENTS). Exactement l'un des deux est défini."""
+
+    __tablename__ = "ASSEMBLY_ITEMS"
+
+    id = Column(Integer, primary_key=True, index=True)
+    parent_reference_id = Column(Integer, ForeignKey("BOM_REFERENCES.id"), nullable=False, index=True)
+    child_reference_id = Column(Integer, ForeignKey("BOM_REFERENCES.id"), nullable=True)
+    component_id = Column(Integer, ForeignKey("COMPONENTS.id"), nullable=True)
+    quantity = Column(Integer, nullable=False, default=1, server_default="1")
+    notes = Column(Text, nullable=True)
+
+    parent = relationship("BomReference", foreign_keys=[parent_reference_id], back_populates="assembly_items")
+    child = relationship("BomReference", foreign_keys=[child_reference_id])
+    component = relationship("Component")
+
+    def __repr__(self):
+        return f"<AssemblyItem parent={self.parent_reference_id} child={self.child_reference_id} comp={self.component_id} q={self.quantity}>"
 
 
 class BomCategory(Base):
