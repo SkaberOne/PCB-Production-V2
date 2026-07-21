@@ -231,9 +231,13 @@ describe('importReview helpers', () => {
             { signal: undefined },
         );
         expect(axios.get).toHaveBeenCalledWith('/bom/files/5/session', { signal: undefined });
-        // Le flux ne fait plus de PUT /review ni d'appel à setImportedBom : il persiste
-        // les métadonnées par lot et retourne { settledResults, activeRevisionMeta }.
-        expect(axios.put).not.toHaveBeenCalled();
+        // Le flux persiste aussi le nom + type carte via PUT /marketplace/cards/{id}
+        // (name/card_type vides -> null = on ne touche pas côté backend).
+        expect(axios.put).toHaveBeenCalledWith(
+            '/marketplace/cards/33',
+            { name: null, card_type: null },
+            { signal: undefined },
+        );
         expect(setImportedBom).not.toHaveBeenCalled();
         expect(persistedBom.activeRevisionMeta).toMatchObject({
             bom_reference_id: 33,

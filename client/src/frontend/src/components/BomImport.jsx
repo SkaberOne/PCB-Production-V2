@@ -532,6 +532,8 @@ function BomImport({ showVisualizationAction = true }) {
                 const revision = String(row.revision || '').trim();
                 const side = String(row.side || DEFAULT_IMPORT_FORM.side).trim().toUpperCase();
                 const category = String(row.category || '').trim();
+                const name = String(row.name || '').trim();
+                const cardType = String(row.card_type || '').trim().toUpperCase();
 
                 if (!reference) {
                     completedCount += 1;
@@ -582,6 +584,8 @@ function BomImport({ showVisualizationAction = true }) {
                                 revision,
                                 side,
                                 category: category || undefined,
+                                name: name || undefined,
+                                card_type: cardType || undefined,
                             },
                         }
                     );
@@ -732,6 +736,8 @@ function BomImport({ showVisualizationAction = true }) {
         const reference = String(batchItem.reference || '').trim();
         const revision = String(batchItem.revision || '').trim();
         const category = String(batchItem.category || '').trim();
+        const name = String(batchItem.name || '').trim();
+        const cardType = String(batchItem.card_type || '').trim().toUpperCase();
 
         if (!reference || !revision) {
             setWorkspaceError('La référence et la révision doivent être renseignées avant sauvegarde.');
@@ -748,6 +754,8 @@ function BomImport({ showVisualizationAction = true }) {
                     reference,
                     revision,
                     category,
+                    name,
+                    card_type: cardType,
                 },
             });
             syncResultPayload(persistedEntry);
