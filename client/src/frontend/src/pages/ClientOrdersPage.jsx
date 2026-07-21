@@ -43,6 +43,10 @@ function ClientOrdersPage() {
     const [refs, setRefs] = React.useState([]);
     const [refRevisions, setRefRevisions] = React.useState({});
     const [machines, setMachines] = React.useState([]);
+    // Bumpé pour forcer le rechargement de la liste des clients (import PDF,
+    // retour sur l'onglet Clients) : les onglets restent montés donc la liste
+    // ne se recharge pas d'elle-même.
+    const [clientsRefresh, setClientsRefresh] = React.useState(0);
 
     const loadShared = React.useCallback(async () => {
         try {
@@ -78,27 +82,27 @@ function ClientOrdersPage() {
             />
             {error ? <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>{error}</Alert> : null}
 
-            <Tabs value={tab} onChange={(_e, v) => setTab(v)} sx={{ mb: 2, borderBottom: `1px solid ${colors.border}` }}>
+            <Tabs value={tab} onChange={(_e, v) => { setTab(v); if (v === 0) setClientsRefresh((x) => x + 1); }} sx={{ mb: 2, borderBottom: `1px solid ${colors.border}` }}>
                 <Tab label="Clients" />
                 <Tab label="Machines" />
                 <Tab label="Import commande PDF" />
             </Tabs>
 
             <Box sx={{ display: tab === 0 ? 'block' : 'none' }}>
-                <ClientsTab refs={refs} refRevisions={refRevisions} machines={machines} setError={setError} onNeedRefresh={loadShared} />
+                <ClientsTab refs={refs} refRevisions={refRevisions} machines={machines} setError={setError} onNeedRefresh={loadShared} refresh={clientsRefresh} />
             </Box>
             <Box sx={{ display: tab === 1 ? 'block' : 'none' }}>
                 <MachinesTab refs={refs} refRevisions={refRevisions} setError={setError} onChanged={loadShared} />
             </Box>
             <Box sx={{ display: tab === 2 ? 'block' : 'none' }}>
-                <ImportOrderTab refs={refs} setError={setError} onImported={loadShared} />
+                <ImportOrderTab refs={refs} setError={setError} onImported={() => { loadShared(); setClientsRefresh((x) => x + 1); }} />
             </Box>
         </Box>
     );
 }
 
 // ══════════════════════════ Onglet Clients ══════════════════════════
-function ClientsTab({ refs, refRevisions, machines, setError, onNeedRefresh }) {
+function ClientsTab({ refs, refRevisions, machines, setError, onNeedRefresh, refresh }) {
     const [clients, setClients] = React.useState(null);
     const [createOpen, setCreateOpen] = React.useState(false);
     const [detailId, setDetailId] = React.useState(null);
@@ -109,7 +113,7 @@ function ClientsTab({ refs, refRevisions, machines, setError, onNeedRefresh }) {
             setClients(Array.isArray(res.data) ? res.data : []);
         } catch (e) { setClients([]); }
     }, []);
-    React.useEffect(() => { load(); }, [load]);
+    React.useEffect(() => { load(); }, [load, refresh]);
 
     return (
         <Box>
