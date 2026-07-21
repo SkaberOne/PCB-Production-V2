@@ -81,6 +81,7 @@ function ClientOrdersPage() {
             <Tabs value={tab} onChange={(_e, v) => setTab(v)} sx={{ mb: 2, borderBottom: `1px solid ${colors.border}` }}>
                 <Tab label="Clients" />
                 <Tab label="Machines" />
+                <Tab label="Import commande PDF" />
             </Tabs>
 
             <Box sx={{ display: tab === 0 ? 'block' : 'none' }}>
@@ -88,6 +89,9 @@ function ClientOrdersPage() {
             </Box>
             <Box sx={{ display: tab === 1 ? 'block' : 'none' }}>
                 <MachinesTab refs={refs} refRevisions={refRevisions} setError={setError} onChanged={loadShared} />
+            </Box>
+            <Box sx={{ display: tab === 2 ? 'block' : 'none' }}>
+                <ImportOrderTab refs={refs} setError={setError} onImported={loadShared} />
             </Box>
         </Box>
     );
@@ -587,6 +591,172 @@ function MachineEditDialog({ model, refs, refRevisions, onClose, onSaved, setErr
                 </Box>
             </DialogActions>
         </Dialog>
+    );
+}
+
+// ══════════════════════════ Onglet Import commande PDF ══════════════════════════
+function ImportOrderTab({ refs, setError, onImported }) {
+    const [preview, setPreview] = React.useState(null);
+    const [clientName, setClientName] = React.useState('');
+    const [maps, setMaps] = React.useState({}); // part_number -> {id, label} (mapping manuel)
+    const [busy, setBusy] = React.useState(false);
+    const [done, setDone] = React.useState(null);
+    const fileRef = React.useRef(null);
+
+    const reset = () => { setPreview(null); setClientName(''); setMaps({}); setDone(null); };
+
+    const upload = async (file) => {
+        if (!file) return;
+        setBusy(true); setError(null); setDone(null);
+        try {
+            const fd = new FormData();
+            fd.append('file', file);
+            const res = await apiClient.post('/marketplace/client-orders/import-pdf', fd, {
+                headers: { 'Content-Type': 'multipart/form-data' },
+            });
+            setPreview(res.data);
+            setClientName(res.data.client_name || '');
+            setMaps({});
+        } catch (e) {
+            setError(e?.response?.data?.detail || 'Import du PDF impossible.');
+        } finally {
+            setBusy(false);
+            if (fileRef.current) fileRef.current.value = '';
+        }
+    };
+
+    const commit = async () => {
+        setBusy(true); setError(null);
+        try {
+            const lines = [];
+            const mappings = [];
+            (preview.matched || []).forEach((m) => lines.push({ bom_reference_id: m.bom_reference_id, revision: m.revision || '', quantity: m.quantity }));
+            (preview.unmatched || []).forEach((u) => {
+                const chosen = maps[u.part_number];
+                if (chosen) {
+                    lines.push({ bom_reference_id: chosen.id, revision: u.revision || '', quantity: u.quantity });
+                    mappings.push({ part_number: u.part_number, bom_reference_id: chosen.id });
+                }
+            });
+            const res = await apiClient.post('/marketplace/client-orders/import-pdf/commit', {
+                client_name: clientName.trim(),
+                lines,
+                mappings,
+            });
+            setDone(res.data);
+            setPreview(null);
+            await onImported();
+        } catch (e) {
+            setError(e?.response?.data?.detail || 'Création de la commande impossible.');
+        } finally {
+            setBusy(false);
+        }
+    };
+
+    const matchedCount = preview?.matched?.length || 0;
+    const mappedCount = Object.values(maps).filter(Boolean).length;
+
+    return (
+        <Box>
+            <Stack direction="row" spacing={2} alignItems="center" sx={{ mb: 2 }}>
+                <Button variant="contained" component="label" disabled={busy}>
+                    Choisir un PDF de commande
+                    <input ref={fileRef} type="file" accept="application/pdf" hidden onChange={(e) => upload(e.target.files?.[0])} />
+                </Button>
+                {preview ? <Button color="inherit" onClick={reset} disabled={busy}>Réinitialiser</Button> : null}
+            </Stack>
+
+            {done ? (
+                <Alert severity="success" sx={{ mb: 2 }} onClose={() => setDone(null)}>
+                    Commande {done.reference} créée pour « {done.recipient || done.label} » ({done.total_quantity} carte(s)).
+                </Alert>
+            ) : null}
+
+            {!preview ? (
+                !done ? <Typography variant="body2" sx={{ color: colors.textSecondary }}>
+                    Glisse un bon de commande PDF : les cartes qu'on produit (reconnues par leur code) sont extraites avec leur révision et quantité, le client est détecté, et tu crées la commande.
+                </Typography> : null
+            ) : (
+                <Stack spacing={2}>
+                    <TextField size="small" label="Client" value={clientName} onChange={(e) => setClientName(e.target.value)} sx={{ maxWidth: 320 }} helperText="Détecté depuis le PDF, modifiable. Créé s'il n'existe pas." />
+
+                    <Typography variant="subtitle2">Cartes reconnues ({matchedCount})</Typography>
+                    <TableContainer sx={{ border: `1px solid ${colors.border}`, borderRadius: 1 }}>
+                        <Table size="small">
+                            <TableHead>
+                                <TableRow>
+                                    <TableCell>Code</TableCell>
+                                    <TableCell>Carte</TableCell>
+                                    <TableCell>Rév.</TableCell>
+                                    <TableCell align="right">Qté</TableCell>
+                                </TableRow>
+                            </TableHead>
+                            <TableBody>
+                                {matchedCount === 0 ? (
+                                    <TableRow><TableCell colSpan={4} sx={{ color: colors.textSecondary }}>Aucune carte reconnue. Mappe les codes ci-dessous.</TableCell></TableRow>
+                                ) : preview.matched.map((m) => (
+                                    <TableRow key={m.part_number}>
+                                        <TableCell>{m.part_number}</TableCell>
+                                        <TableCell>{m.reference}</TableCell>
+                                        <TableCell>{m.revision ? <Chip size="small" label={m.revision} variant="outlined" /> : '—'}</TableCell>
+                                        <TableCell align="right" sx={{ fontWeight: 600 }}>{m.quantity}</TableCell>
+                                    </TableRow>
+                                ))}
+                            </TableBody>
+                        </Table>
+                    </TableContainer>
+
+                    {(preview.unmatched || []).length ? (
+                        <>
+                            <Typography variant="subtitle2">
+                                Codes non reconnus ({preview.unmatched.length}) — mappe ceux qui sont des cartes qu'on produit
+                            </Typography>
+                            <TableContainer sx={{ border: `1px solid ${colors.border}`, borderRadius: 1 }}>
+                                <Table size="small">
+                                    <TableHead>
+                                        <TableRow>
+                                            <TableCell>Code PDF</TableCell>
+                                            <TableCell>Nom PDF</TableCell>
+                                            <TableCell>Rév.</TableCell>
+                                            <TableCell align="right">Qté</TableCell>
+                                            <TableCell>Rattacher à…</TableCell>
+                                        </TableRow>
+                                    </TableHead>
+                                    <TableBody>
+                                        {preview.unmatched.map((u) => (
+                                            <TableRow key={u.part_number}>
+                                                <TableCell>{u.part_number}</TableCell>
+                                                <TableCell sx={{ color: colors.textSecondary }}>{u.name}</TableCell>
+                                                <TableCell>{u.revision ? <Chip size="small" label={u.revision} variant="outlined" /> : '—'}</TableCell>
+                                                <TableCell align="right">{u.quantity}</TableCell>
+                                                <TableCell sx={{ minWidth: 260 }}>
+                                                    <Autocomplete
+                                                        size="small" options={refs} value={maps[u.part_number] || null}
+                                                        onChange={(_e, v) => setMaps((p) => ({ ...p, [u.part_number]: v }))}
+                                                        getOptionLabel={(o) => o?.label || ''}
+                                                        isOptionEqualToValue={(o, v) => o.id === v.id}
+                                                        renderInput={(params) => <TextField {...params} placeholder="Ignorer / choisir une carte" />}
+                                                    />
+                                                </TableCell>
+                                            </TableRow>
+                                        ))}
+                                    </TableBody>
+                                </Table>
+                            </TableContainer>
+                            <Typography variant="caption" sx={{ color: colors.textSecondary }}>
+                                Le code d'une carte mappée est mémorisé : au prochain PDF elle sera reconnue automatiquement. Les codes laissés vides sont ignorés (non produits).
+                            </Typography>
+                        </>
+                    ) : null}
+
+                    <Stack direction="row" justifyContent="flex-end">
+                        <Button variant="contained" color="success" onClick={commit} disabled={busy || !clientName.trim() || (matchedCount + mappedCount) === 0}>
+                            Créer la commande ({matchedCount + mappedCount} carte(s))
+                        </Button>
+                    </Stack>
+                </Stack>
+            )}
+        </Box>
     );
 }
 
