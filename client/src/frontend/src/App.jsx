@@ -27,6 +27,7 @@ import ImportBomPage from './pages/ImportBomPage';
 import CostingPage from './pages/CostingPage';
 import MachinePnpPage from './pages/MachinePnpPage';
 import BaseDeDonneesPage from './pages/BaseDeDonneesPage';
+import CardCatalogPage from './pages/CardCatalogPage';
 import SettingsPage from './pages/SettingsPage';
 import './App.css';
 
@@ -97,6 +98,15 @@ const pages = [
         step: null
     },
     {
+        path: '/cartes',
+        label: 'Cartes',
+        title: 'Catalogue des cartes',
+        description: 'Fiche unifiée par carte : référence, code KELENN, nom, type, révisions, prix et assemblages.',
+        icon: DeveloperBoardRoundedIcon,
+        group: 'library',
+        step: null
+    },
+    {
         path: '/base-donnees',
         label: 'Base de données',
         title: 'Base de données',
@@ -161,6 +171,7 @@ function App() {
                 <Route path="/commande-composant" element={<ErrorBoundary context="Commande"><CommandPage /></ErrorBoundary>} />
                 <Route path="/machine-pnp" element={<ErrorBoundary context="Machine PnP"><MachinePnpPage /></ErrorBoundary>} />
                 <Route path="/prix-carte" element={<ErrorBoundary context="Prix carte"><CostingPage /></ErrorBoundary>} />
+                <Route path="/cartes" element={<ErrorBoundary context="Catalogue Cartes"><CardCatalogPage /></ErrorBoundary>} />
                 <Route path="/base-donnees" element={<ErrorBoundary context="Base de donnees"><BaseDeDonneesPage /></ErrorBoundary>} />
                 {featureFlags.libraryStock ? (
                     <Route path="/stock" element={<ErrorBoundary context="Stock"><StockPage /></ErrorBoundary>} />
