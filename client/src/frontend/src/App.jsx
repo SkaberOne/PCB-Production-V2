@@ -9,11 +9,15 @@ import StorageRoundedIcon from '@mui/icons-material/StorageRounded';
 import TableViewRoundedIcon from '@mui/icons-material/TableViewRounded';
 import UploadFileRoundedIcon from '@mui/icons-material/UploadFileRounded';
 import Inventory2RoundedIcon from '@mui/icons-material/Inventory2Rounded';
+import DeveloperBoardRoundedIcon from '@mui/icons-material/DeveloperBoardRounded';
+import LocalShippingRoundedIcon from '@mui/icons-material/LocalShippingRounded';
 import { Navigate, Route, Routes } from 'react-router-dom';
 import featureFlags from './utils/featureFlags';
 import AppShell from './components/layout/AppShell';
 import ErrorBoundary from './components/common/ErrorBoundary';
 import StockPage from './pages/StockPage';
+import BoardStockPage from './pages/BoardStockPage';
+import ClientOrdersPage from './pages/ClientOrdersPage';
 import BomFilesPage from './pages/BomFilesPage';
 import BomViewerPage from './pages/BomViewerPage';
 import CommandPage from './pages/CommandPage';
@@ -23,6 +27,7 @@ import ImportBomPage from './pages/ImportBomPage';
 import CostingPage from './pages/CostingPage';
 import MachinePnpPage from './pages/MachinePnpPage';
 import BaseDeDonneesPage from './pages/BaseDeDonneesPage';
+import CardCatalogPage from './pages/CardCatalogPage';
 import SettingsPage from './pages/SettingsPage';
 import './App.css';
 
@@ -93,12 +98,39 @@ const pages = [
         step: null
     },
     {
+        path: '/cartes',
+        label: 'Cartes',
+        title: 'Catalogue des cartes',
+        description: 'Fiche unifiée par carte : référence, code KELENN, nom, type, révisions, prix et assemblages.',
+        icon: DeveloperBoardRoundedIcon,
+        group: 'library',
+        step: null
+    },
+    {
         path: '/base-donnees',
         label: 'Base de données',
         title: 'Base de données',
         description: 'Empreintes machine, composants, règles de type et enrichissement MPN du référentiel.',
         icon: StorageRoundedIcon,
         group: 'library',
+        step: null
+    },
+    {
+        path: '/stock-cartes',
+        label: 'Stock Cartes',
+        title: 'Stock des cartes produites',
+        description: 'Stock de cartes finies par référence : quantité, minimum, prix, état QA.',
+        icon: DeveloperBoardRoundedIcon,
+        group: 'stock',
+        step: null
+    },
+    {
+        path: '/commande-client',
+        label: 'Commande Client/Machine',
+        title: 'Commandes client / machine',
+        description: 'Demandes de cartes (client ou machine), préparation de boîte et suivi.',
+        icon: LocalShippingRoundedIcon,
+        group: 'stock',
         step: null
     },
     {
@@ -121,7 +153,7 @@ if (featureFlags.libraryStock) {
         title: 'Stock',
         description: 'Inventaire physique interne des composants : soldes, seuils et mouvements.',
         icon: Inventory2RoundedIcon,
-        group: 'library',
+        group: 'stock',
         step: null
     });
 }
@@ -139,10 +171,13 @@ function App() {
                 <Route path="/commande-composant" element={<ErrorBoundary context="Commande"><CommandPage /></ErrorBoundary>} />
                 <Route path="/machine-pnp" element={<ErrorBoundary context="Machine PnP"><MachinePnpPage /></ErrorBoundary>} />
                 <Route path="/prix-carte" element={<ErrorBoundary context="Prix carte"><CostingPage /></ErrorBoundary>} />
+                <Route path="/cartes" element={<ErrorBoundary context="Catalogue Cartes"><CardCatalogPage /></ErrorBoundary>} />
                 <Route path="/base-donnees" element={<ErrorBoundary context="Base de donnees"><BaseDeDonneesPage /></ErrorBoundary>} />
                 {featureFlags.libraryStock ? (
                     <Route path="/stock" element={<ErrorBoundary context="Stock"><StockPage /></ErrorBoundary>} />
                 ) : null}
+                <Route path="/stock-cartes" element={<ErrorBoundary context="Stock Cartes"><BoardStockPage /></ErrorBoundary>} />
+                <Route path="/commande-client" element={<ErrorBoundary context="Commande Client"><ClientOrdersPage /></ErrorBoundary>} />
                 <Route path="/parametre" element={<ErrorBoundary context="Parametres"><SettingsPage /></ErrorBoundary>} />
                 <Route path="/parametre-erp" element={<ErrorBoundary context="Defauts ERP"><ErpDefaultsPage /></ErrorBoundary>} />
             </Routes>

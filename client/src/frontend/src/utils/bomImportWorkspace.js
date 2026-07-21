@@ -3,6 +3,8 @@ export const DEFAULT_IMPORT_FORM = {
     revision: 'REV_A',
     side: 'TOP',
     category: '',
+    name: '',
+    card_type: 'SIMPLE',
 };
 
 export function createDefaultImportWorkspace() {
@@ -57,6 +59,8 @@ export function buildBatchDraftFromFiles(selectedFiles, defaultRevision) {
             revision: defaultRevision || DEFAULT_IMPORT_FORM.revision,
             side: inferredImport.side || DEFAULT_IMPORT_FORM.side,
             category: DEFAULT_IMPORT_FORM.category,
+            name: DEFAULT_IMPORT_FORM.name,
+            card_type: DEFAULT_IMPORT_FORM.card_type,
         };
     });
 }
@@ -69,6 +73,8 @@ export function decorateBatchResult(entry, metadata = {}) {
         revision: entry.revision || metadata.revision || '',
         side: entry.side || metadata.side || DEFAULT_IMPORT_FORM.side,
         category: entry.category || metadata.category || '',
+        name: entry.name || metadata.name || '',
+        card_type: entry.card_type || metadata.card_type || DEFAULT_IMPORT_FORM.card_type,
         item_count: entry.item_count ?? entry.items?.length ?? 0,
         items: Array.isArray(entry.items) ? entry.items : [],
         warnings: Array.isArray(entry.warnings) ? entry.warnings : [],
@@ -290,6 +296,8 @@ export function buildSessionRows(draftBatch = [], batchResults = []) {
             stats: {},
             message: 'En attente d import',
             category: draftRow.category || '',
+            name: draftRow.name || '',
+            card_type: draftRow.card_type || DEFAULT_IMPORT_FORM.card_type,
         };
     });
 
