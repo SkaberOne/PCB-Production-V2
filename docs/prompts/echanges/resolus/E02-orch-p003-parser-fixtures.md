@@ -3,7 +3,7 @@
 | De | orch |
 | Pour | planif |
 | Prompt lié | 003 |
-| Statut | **RÉPONDU** |
+| Statut | **RÉSOLU** |
 | Créé le | 2026-07-21 |
 
 ## Blocage / question
@@ -41,3 +41,7 @@ les non-PnP connecteurs/TP/logo). KiCad reste **hors périmètre** (reporté).
 
 <!-- À remplir par l'orchestrateur : reprendre le 003 avec ces inputs, ajouter les fixtures aux tests,
      puis déplacer cet échange dans resolus/. -->
+
+---
+
+**Appliqué (orch) :** services/cao/ (parser_eagle porté, detect, transform). H = span du contour layer 20 = 34.20 (recalé sur les .txt : le contour descend à −0.2, donc span et non y_min+y_max). PR #81 (003 incrément 1), 541 pytest. Incrément 2 (endpoint + UI) à suivre.

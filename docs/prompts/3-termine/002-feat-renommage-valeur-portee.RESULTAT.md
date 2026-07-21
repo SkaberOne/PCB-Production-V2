@@ -25,6 +25,13 @@
 - **pytest** : 534 passés / 1 skipped (backend inchangé, pas de régression).
 - **Staging (:8001)** : sur AMPLI_GEN6 REV_A, renommer un `22nF` (partagé par 16 lignes) → dialog « Tous (16) » → toutes les lignes passent à `22nF/50V` ; **Sauvegarder brouillon** + reload → valeurs persistées ; retour `22nF` vérifié dans l'autre sens.
 
+## Preuves (front) — staging :8001
+
+Captures pilotées dans Chrome sur l'instance de test (`docs/prompts/preuves/002/`) :
+
+- `002_preuve_1_dialog_portee.jpg` — Revue BOM : renommage d'un `22nF` partagé → dialog « Portée du changement de valeur » avec « Ce composant uniquement » / « Tous (16) ».
+- `002_preuve_2_tous_applique.jpg` — après « Tous » : toutes les lignes `22nF` passent à `22nF/X7R`, statut « Harmonisé ».
+
 ## Erreurs rencontrées & corrections
 
 - Le test ciblait la racine du `TextField` MUI (qui porte l'`aria-label`) au lieu de l'`<input>` interne → « does not have a value setter ». Corrigé : sélecteur qui descend à l'input (1 tentative).

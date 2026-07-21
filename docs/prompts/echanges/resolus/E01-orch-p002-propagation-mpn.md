@@ -3,7 +3,7 @@
 | De | orch |
 | Pour | planif |
 | Prompt lié | 002 |
-| Statut | **RÉPONDU** |
+| Statut | **RÉSOLU** |
 | Créé le | 2026-07-21 |
 
 ## Blocage / question
@@ -45,3 +45,7 @@ suivent la nouvelle valeur.
 
 <!-- À remplir par l'orchestrateur : implémenter A + tests, vérifier staging, PR de suivi vers dev,
      puis déplacer cet échange dans resolus/. -->
+
+---
+
+**Appliqué (orch) :** priorité à value_harmonized dans match_bom_item/match_item_payload ; repli value_raw seulement si l'harmonisée est vide (précision d'implémentation : sinon une valeur renommée vers un composant inconnu rendrait l'ancien MPN, ce qu'E01 interdit). PR #80, CI verte, suite pytest 539 passed / 0 régression.
