@@ -1,7 +1,6 @@
 import React from 'react';
 import {
     Alert,
-    Autocomplete,
     Box,
     Button,
     Chip,
@@ -9,9 +8,6 @@ import {
     DialogActions,
     DialogContent,
     DialogTitle,
-    Divider,
-    IconButton,
-    MenuItem,
     Stack,
     Table,
     TableBody,
@@ -23,9 +19,11 @@ import {
     Typography,
 } from '@mui/material';
 import AddRoundedIcon from '@mui/icons-material/AddRounded';
-import DeleteOutlineRoundedIcon from '@mui/icons-material/DeleteOutlineRounded';
-import apiClient from '../api/client';
+import apiClient, { extractApiError } from '../api/client';
 import PageHeader from '../components/common/PageHeader';
+import ConfirmDialog from '../components/common/ConfirmDialog';
+import CardDetailDialog from '../components/library/CardDetailDialog';
+import { DEFAULT_UNCATEGORIZED_CATEGORY, groupStoredBomFiles } from '../utils/bomFileExplorer';
 import { colors } from '../theme';
 
 function eur(v) {
@@ -35,35 +33,98 @@ function eur(v) {
 }
 
 /**
- * Catalogue de cartes unifié (ADR 0018). Une fiche par référence de carte :
- * notre référence, code KELENN (part_number), nom, type (SIMPLE/ASSEMBLY),
- * révisions connues, prix (Costing ou somme des enfants). Cliquer une ligne
- * ouvre l'édition (nom / code / type / composition d'assemblage).
+ * Catalogue de cartes unifié (ADR 0018 + prompt 001). Entrée unique du catalogue :
+ * la fiche par carte regroupe métadonnées (nom / code KELENN / type / catégorie),
+ * composition d'assemblage, et les révisions/BOM de la carte (ouverture dans la
+ * Revue BOM éditable, suppression). L'onglet « BOM enregistrées » a été fusionné ici.
  */
 function CardCatalogPage() {
     const [rows, setRows] = React.useState(null);
+    const [files, setFiles] = React.useState([]);
+    const [categories, setCategories] = React.useState([]);
     const [error, setError] = React.useState(null);
     const [editing, setEditing] = React.useState(null);
+    const [categoryDialogOpen, setCategoryDialogOpen] = React.useState(false);
+    const [newCategoryName, setNewCategoryName] = React.useState('');
+    const [pendingDelete, setPendingDelete] = React.useState(null);
 
     const load = React.useCallback(async () => {
         setError(null);
         try {
-            const res = await apiClient.get('/marketplace/cards');
-            setRows(Array.isArray(res.data) ? res.data : []);
+            const [cardsRes, filesRes, catsRes] = await Promise.all([
+                apiClient.get('/marketplace/cards'),
+                apiClient.get('/bom/files'),
+                apiClient.get('/bom/categories'),
+            ]);
+            setRows(Array.isArray(cardsRes.data) ? cardsRes.data : []);
+            setFiles(filesRes?.data?.items || []);
+            setCategories(catsRes?.data?.items || []);
         } catch (e) {
-            setError(e?.response?.data?.detail || 'Chargement du catalogue impossible.');
+            setError(extractApiError(e) || 'Chargement du catalogue impossible.');
             setRows([]);
         }
     }, []);
     React.useEffect(() => { load(); }, [load]);
 
+    // Révisions/BOM groupées par référence de carte (repris de la bibliothèque BOM).
+    const nodeByReferenceId = React.useMemo(() => {
+        const grouped = groupStoredBomFiles(files, []);
+        const map = new Map();
+        grouped.forEach((cat) => cat.references.forEach((ref) => map.set(ref.bomReferenceId, ref)));
+        return map;
+    }, [files]);
+
+    const allCategoryNames = React.useMemo(() => {
+        const names = new Set(categories.map((c) => c.name).filter(Boolean));
+        names.add(DEFAULT_UNCATEGORIZED_CATEGORY);
+        return Array.from(names).sort();
+    }, [categories]);
+
+    // Garde la carte en cours d'édition synchronisée après un reload.
+    const editingCard = React.useMemo(() => {
+        if (!editing) return null;
+        return (rows || []).find((r) => r.bom_reference_id === editing.bom_reference_id) || editing;
+    }, [editing, rows]);
+
     const assemblies = (rows || []).filter((r) => r.card_type === 'ASSEMBLY').length;
+
+    const handleCreateCategory = async () => {
+        const name = newCategoryName.trim();
+        if (!name) return;
+        try {
+            await apiClient.post('/bom/categories', { name });
+            setNewCategoryName('');
+            setCategoryDialogOpen(false);
+            await load();
+        } catch (e) {
+            setError(extractApiError(e));
+        }
+    };
+
+    const confirmDelete = async () => {
+        if (!pendingDelete) return;
+        try {
+            await apiClient.delete(`/bom/files/${pendingDelete.bom_revision_id}`);
+            setPendingDelete(null);
+            await load();
+        } catch (e) {
+            setError(extractApiError(e));
+            setPendingDelete(null);
+        }
+    };
+
+    const headerActions = (
+        <Button variant="outlined" startIcon={<AddRoundedIcon />} onClick={() => setCategoryDialogOpen(true)}>
+            Catégorie
+        </Button>
+    );
 
     return (
         <Box>
             <PageHeader
                 title="Catalogue des cartes"
-                subtitle="Fiche unifiée : référence, code KELENN, nom, type, révisions, prix et composition (assemblages)."
+                description="Fiche unifiée : référence, code KELENN, nom, type, catégorie, révisions/BOM, prix et composition (assemblages)."
+                actions={headerActions}
             />
             {error ? <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>{error}</Alert> : null}
 
@@ -80,15 +141,16 @@ function CardCatalogPage() {
                             <TableCell>Nom</TableCell>
                             <TableCell>Code KELENN</TableCell>
                             <TableCell>Type</TableCell>
+                            <TableCell>Catégorie</TableCell>
                             <TableCell>Révisions</TableCell>
                             <TableCell align="right">Prix / carte</TableCell>
                         </TableRow>
                     </TableHead>
                     <TableBody>
                         {rows === null ? (
-                            <TableRow><TableCell colSpan={6} sx={{ py: 3, textAlign: 'center', color: colors.textSecondary }}>Chargement…</TableCell></TableRow>
+                            <TableRow><TableCell colSpan={7} sx={{ py: 3, textAlign: 'center', color: colors.textSecondary }}>Chargement…</TableCell></TableRow>
                         ) : rows.length === 0 ? (
-                            <TableRow><TableCell colSpan={6} sx={{ py: 3, textAlign: 'center', color: colors.textSecondary }}>Aucune carte.</TableCell></TableRow>
+                            <TableRow><TableCell colSpan={7} sx={{ py: 3, textAlign: 'center', color: colors.textSecondary }}>Aucune carte.</TableCell></TableRow>
                         ) : rows.map((row) => (
                             <TableRow key={row.bom_reference_id} hover onClick={() => setEditing(row)} sx={{ cursor: 'pointer' }}>
                                 <TableCell sx={{ fontWeight: 600 }}>{row.reference}</TableCell>
@@ -99,6 +161,7 @@ function CardCatalogPage() {
                                         ? <Chip size="small" label={`Assemblage (${row.assembly_items.length})`} color="secondary" variant="outlined" />
                                         : <Chip size="small" label="Simple" variant="outlined" />}
                                 </TableCell>
+                                <TableCell>{row.category || <span style={{ color: colors.textSecondary }}>—</span>}</TableCell>
                                 <TableCell>
                                     {(row.revisions || []).length
                                         ? row.revisions.map((r) => <Chip key={r} size="small" label={r} variant="outlined" sx={{ mr: 0.5 }} />)
@@ -116,143 +179,55 @@ function CardCatalogPage() {
                 </Table>
             </TableContainer>
 
-            <CardEditDialog
-                card={editing}
+            <CardDetailDialog
+                card={editingCard}
                 allCards={rows || []}
+                revisionsNode={editingCard ? (nodeByReferenceId.get(editingCard.bom_reference_id) || null) : null}
+                availableCategories={allCategoryNames}
                 onClose={() => setEditing(null)}
-                onSaved={async () => { setEditing(null); await load(); }}
+                onSaved={async () => { await load(); setEditing(null); }}
+                onDeleteRevision={(item) => setPendingDelete(item)}
+                onReload={load}
                 setError={setError}
             />
+
+            <Dialog open={categoryDialogOpen} onClose={() => setCategoryDialogOpen(false)} maxWidth="xs" fullWidth>
+                <DialogTitle>Nouvelle catégorie</DialogTitle>
+                <DialogContent>
+                    <Typography variant="body2" sx={{ color: colors.textSecondary, mb: 2 }}>
+                        Les catégories servent à organiser les cartes du catalogue.
+                    </Typography>
+                    <TextField
+                        autoFocus
+                        fullWidth
+                        size="small"
+                        placeholder="Ex : Cartes principales"
+                        aria-label="Nom de la nouvelle catégorie"
+                        value={newCategoryName}
+                        onChange={(e) => setNewCategoryName(e.target.value)}
+                        onKeyDown={(e) => { if (e.key === 'Enter') handleCreateCategory(); }}
+                    />
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={() => setCategoryDialogOpen(false)} color="inherit">Annuler</Button>
+                    <Button onClick={handleCreateCategory} variant="contained" disabled={!newCategoryName.trim()}>Créer</Button>
+                </DialogActions>
+            </Dialog>
+
+            <ConfirmDialog
+                open={Boolean(pendingDelete)}
+                title="Supprimer cette révision ?"
+                message={
+                    pendingDelete
+                        ? `La révision ${pendingDelete.revision} (${pendingDelete.side}) de ${pendingDelete.reference} sera définitivement supprimée. Cette action est irréversible.`
+                        : ''
+                }
+                confirmLabel="Supprimer"
+                severity="error"
+                onConfirm={confirmDelete}
+                onClose={() => setPendingDelete(null)}
+            />
         </Box>
-    );
-}
-
-function CardEditDialog({ card, allCards, onClose, onSaved, setError }) {
-    const open = Boolean(card);
-    const [name, setName] = React.useState('');
-    const [partNumber, setPartNumber] = React.useState('');
-    const [cardType, setCardType] = React.useState('SIMPLE');
-    const [items, setItems] = React.useState([]);
-    const [saving, setSaving] = React.useState(false);
-    const [compOptions, setCompOptions] = React.useState([]);
-
-    React.useEffect(() => {
-        if (!open) return;
-        setName(card.name || '');
-        setPartNumber(card.part_number || '');
-        setCardType(card.card_type || 'SIMPLE');
-        setItems((card.assembly_items || []).map((it) => ({
-            kind: it.kind,
-            child_reference_id: it.child_reference_id,
-            component_id: it.component_id,
-            label: it.label,
-            qty: String(it.quantity),
-        })));
-    }, [open, card]);
-
-    // Recherche de composants (pour les éléments en vrac d'un assemblage).
-    const searchComponents = React.useCallback(async (q) => {
-        try {
-            const res = await apiClient.get('/bom/components', { params: { search: q || '', limit: 25 } });
-            const list = Array.isArray(res.data) ? res.data : [];
-            setCompOptions(list.map((c) => ({ id: c.id, label: c.value || c.mpn || c.reference })));
-        } catch (e) { /* ignore */ }
-    }, []);
-
-    const cardOptions = (allCards || [])
-        .filter((c) => !card || c.bom_reference_id !== card.bom_reference_id)
-        .map((c) => ({ id: c.bom_reference_id, label: c.name ? `${c.reference} — ${c.name}` : c.reference }));
-
-    const setItem = (i, patch) => setItems((prev) => prev.map((it, idx) => (idx === i ? { ...it, ...patch } : it)));
-    const addCardItem = () => setItems((p) => [...p, { kind: 'card', child_reference_id: null, label: '', qty: '1' }]);
-    const addCompItem = () => setItems((p) => [...p, { kind: 'component', component_id: null, label: '', qty: '1' }]);
-
-    const save = async () => {
-        setSaving(true);
-        try {
-            await apiClient.put(`/marketplace/cards/${card.bom_reference_id}`, {
-                name: name.trim() || null,
-                part_number: partNumber.trim() || null,
-                card_type: cardType,
-            });
-            if (cardType === 'ASSEMBLY') {
-                const payload = items
-                    .filter((it) => (it.kind === 'card' ? it.child_reference_id : it.component_id) && (parseInt(it.qty, 10) || 0) > 0)
-                    .map((it) => (it.kind === 'card'
-                        ? { child_reference_id: it.child_reference_id, quantity: parseInt(it.qty, 10) || 1 }
-                        : { component_id: it.component_id, quantity: parseInt(it.qty, 10) || 1 }));
-                await apiClient.put(`/marketplace/cards/${card.bom_reference_id}/assembly`, { items: payload });
-            }
-            onSaved();
-        } catch (e) {
-            setError(e?.response?.data?.detail || 'Enregistrement impossible.');
-        } finally {
-            setSaving(false);
-        }
-    };
-
-    return (
-        <Dialog open={open} onClose={() => !saving && onClose()} maxWidth="sm" fullWidth>
-            <DialogTitle>
-                {card?.reference}
-                <Typography variant="body2" sx={{ color: colors.textSecondary }}>Fiche carte</Typography>
-            </DialogTitle>
-            <DialogContent dividers>
-                <Stack spacing={2} sx={{ mt: 0.5 }}>
-                    <TextField fullWidth size="small" label="Nom de la carte" value={name} onChange={(e) => setName(e.target.value)} />
-                    <TextField fullWidth size="small" label="Code KELENN (notre référence)" value={partNumber} onChange={(e) => setPartNumber(e.target.value)} helperText="Sert au matching des commandes PDF (ex. KT240576)" />
-                    <TextField select size="small" label="Type" value={cardType} onChange={(e) => setCardType(e.target.value)} sx={{ maxWidth: 240 }}>
-                        <MenuItem value="SIMPLE">Carte simple</MenuItem>
-                        <MenuItem value="ASSEMBLY">Assemblage (kit)</MenuItem>
-                    </TextField>
-
-                    {cardType === 'ASSEMBLY' ? (
-                        <>
-                            <Divider />
-                            <Typography variant="subtitle2">Composition de l'assemblage</Typography>
-                            {items.length === 0 ? (
-                                <Typography variant="body2" sx={{ color: colors.textSecondary }}>Aucun élément. Ajoute des sous-cartes ou des composants.</Typography>
-                            ) : items.map((it, i) => (
-                                <Stack key={i} direction="row" spacing={1} alignItems="center">
-                                    {it.kind === 'card' ? (
-                                        <Autocomplete
-                                            size="small" sx={{ flex: 1 }} options={cardOptions}
-                                            value={it.child_reference_id ? { id: it.child_reference_id, label: it.label } : null}
-                                            onChange={(_e, v) => setItem(i, { child_reference_id: v?.id || null, label: v?.label || '' })}
-                                            getOptionLabel={(o) => o?.label || ''}
-                                            isOptionEqualToValue={(o, v) => o.id === v.id}
-                                            renderInput={(params) => <TextField {...params} label="Sous-carte" />}
-                                        />
-                                    ) : (
-                                        <Autocomplete
-                                            size="small" sx={{ flex: 1 }} options={compOptions} filterOptions={(x) => x}
-                                            value={it.component_id ? { id: it.component_id, label: it.label } : null}
-                                            onChange={(_e, v) => setItem(i, { component_id: v?.id || null, label: v?.label || '' })}
-                                            onInputChange={(_e, val, reason) => { if (reason === 'input') searchComponents(val); }}
-                                            getOptionLabel={(o) => o?.label || ''}
-                                            isOptionEqualToValue={(o, v) => o.id === v.id}
-                                            renderInput={(params) => <TextField {...params} label="Composant" placeholder="Rechercher…" />}
-                                        />
-                                    )}
-                                    <Chip size="small" label={it.kind === 'card' ? 'carte' : 'composant'} variant="outlined" />
-                                    <TextField size="small" type="number" label="Qté" value={it.qty} onChange={(e) => setItem(i, { qty: e.target.value })} inputProps={{ min: 1 }} sx={{ width: 80 }} />
-                                    <IconButton size="small" onClick={() => setItems((p) => p.filter((_, idx) => idx !== i))}><DeleteOutlineRoundedIcon fontSize="small" /></IconButton>
-                                </Stack>
-                            ))}
-                            <Stack direction="row" spacing={1}>
-                                <Button size="small" startIcon={<AddRoundedIcon />} onClick={addCardItem}>Sous-carte</Button>
-                                <Button size="small" startIcon={<AddRoundedIcon />} onClick={addCompItem}>Composant</Button>
-                            </Stack>
-                            <Alert severity="info" variant="outlined" sx={{ py: 0 }}>Le prix de l'assemblage = somme automatique des prix des enfants.</Alert>
-                        </>
-                    ) : null}
-                </Stack>
-            </DialogContent>
-            <DialogActions>
-                <Button color="inherit" onClick={onClose} disabled={saving}>Annuler</Button>
-                <Button variant="contained" color="success" onClick={save} disabled={saving}>Enregistrer</Button>
-            </DialogActions>
-        </Dialog>
     );
 }
 

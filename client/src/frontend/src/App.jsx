@@ -1,6 +1,5 @@
 import React from 'react';
 import DashboardRoundedIcon from '@mui/icons-material/DashboardRounded';
-import FolderRoundedIcon from '@mui/icons-material/FolderRounded';
 import PrecisionManufacturingRoundedIcon from '@mui/icons-material/PrecisionManufacturingRounded';
 import PriceChangeRoundedIcon from '@mui/icons-material/PriceChangeRounded';
 import SettingsRoundedIcon from '@mui/icons-material/SettingsRounded';
@@ -18,13 +17,13 @@ import ErrorBoundary from './components/common/ErrorBoundary';
 import StockPage from './pages/StockPage';
 import BoardStockPage from './pages/BoardStockPage';
 import ClientOrdersPage from './pages/ClientOrdersPage';
-import BomFilesPage from './pages/BomFilesPage';
 import BomViewerPage from './pages/BomViewerPage';
 import CommandPage from './pages/CommandPage';
 import DashboardPage from './pages/DashboardPage';
 import ErpDefaultsPage from './pages/ErpDefaultsPage';
 import ImportBomPage from './pages/ImportBomPage';
 import CostingPage from './pages/CostingPage';
+// L'onglet « BOM enregistrées » (BomFilesPage) a été fusionné dans « Cartes » (prompt 001).
 import MachinePnpPage from './pages/MachinePnpPage';
 import BaseDeDonneesPage from './pages/BaseDeDonneesPage';
 import CardCatalogPage from './pages/CardCatalogPage';
@@ -85,15 +84,6 @@ const pages = [
         title: 'Prix carte à la production',
         description: 'Coût de revient HT/TTC d\'une carte produite et prix de référence par carte.',
         icon: PriceChangeRoundedIcon,
-        group: 'library',
-        step: null
-    },
-    {
-        path: '/fichier-bom',
-        label: 'BOM enregistrées',
-        title: 'BOM enregistrées',
-        description: 'Sélection de BOM harmonisées déjà importées et organisées par référence.',
-        icon: FolderRoundedIcon,
         group: 'library',
         step: null
     },
@@ -165,7 +155,8 @@ function App() {
                 <Route path="/" element={<Navigate to="/dashboard" replace />} />
                 <Route path="/dashboard" element={<ErrorBoundary context="Dashboard"><DashboardPage /></ErrorBoundary>} />
                 <Route path="/import-bom" element={<ErrorBoundary context="Import BOM"><ImportBomPage /></ErrorBoundary>} />
-                <Route path="/fichier-bom" element={<ErrorBoundary context="Fichier BOM"><BomFilesPage /></ErrorBoundary>} />
+                {/* « BOM enregistrées » fusionné dans « Cartes » (prompt 001) : redirection des anciens liens. */}
+                <Route path="/fichier-bom" element={<Navigate to="/cartes" replace />} />
                 <Route path="/bom" element={<ErrorBoundary context="BOM Viewer"><BomViewerPage /></ErrorBoundary>} />
                 <Route path="/visualisation-bom" element={<Navigate to="/bom" replace />} />
                 <Route path="/commande-composant" element={<ErrorBoundary context="Commande"><CommandPage /></ErrorBoundary>} />
