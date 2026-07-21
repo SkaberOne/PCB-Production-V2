@@ -17,6 +17,8 @@
 
 En Revue BOM, quand on renomme la valeur harmonisée d'un composant, on veut souvent **appliquer le même changement à tous les composants de la même valeur** — par exemple décider que tous les `10µF` deviennent des `10µF/35V`, ou que des `10k` deviennent des `11k`. Aujourd'hui l'édition ne porte que sur **une** ligne. On veut, au moment du renommage, **choisir la portée** : ce composant uniquement, ou tous les composants de cette valeur. C'est une édition **manuelle en temps réel** sur la production en cours — **pas** une table d'équivalences ni une règle harmony persistante.
 
+**Important :** le changement de valeur doit aussi **se répercuter sur les commandes** de composants. Si la valeur change, le **composant à commander change** — donc son **MPN** / référence fournisseur, son offre, etc. La commande générée doit refléter la nouvelle valeur, pas l'ancienne.
+
 ## 2. Spécification (le QUOI)
 
 Dans la colonne **« valeur harmonisée »** de la Revue BOM, quand on modifie une valeur et qu'on **valide** (blur / Entrée) :
@@ -32,6 +34,7 @@ Dans la colonne **« valeur harmonisée »** de la Revue BOM, quand on modifie u
 - [ ] Choix « **Ce composant** » → seule la ligne éditée change.
 - [ ] Valeur **non partagée** → pas de dialog, application directe.
 - [ ] Après **enregistrement + rechargement**, les changements sont bien persistés.
+- [ ] Le changement de valeur **se répercute sur la commande de composants** : la ligne de commande correspondante reflète la **nouvelle valeur** et le **MPN** / fournisseur associé (plus l'ancien MPN).
 - [ ] Aucune régression sur l'édition inline existante (footprint, type, DNP, notes, quantité).
 
 **Hors périmètre :** table d'équivalences ; règles harmony persistantes ; toute normalisation automatique supplémentaire des valeurs (le besoin est l'édition **manuelle** avec portée).
@@ -49,7 +52,9 @@ Dans la colonne **« valeur harmonisée »** de la Revue BOM, quand on modifie u
 - **Réutiliser** le mécanisme de sélection/action en masse déjà présent (`handleBulkTypeConfirm`, cases à cocher, `handleSelectItem`) plutôt que réinventer une logique de bulk update.
 - Comparer sur l'**ancienne** `value_harmonized` pour trouver les lignes concernées.
 
-**Backend :** aucun nouvel endpoint. La persistance passe par l'enregistrement de revue existant (`serveur/src/routes/bom_revision_mutations.py` : `PUT /{bom_id}/revisions/{revision_id}/review`), comme l'édition inline actuelle.
+**Backend (persistance revue) :** aucun nouvel endpoint pour l'édition ; la persistance passe par l'enregistrement de revue existant (`serveur/src/routes/bom_revision_mutations.py` : `PUT /{bom_id}/revisions/{revision_id}/review`), comme l'édition inline actuelle.
+
+**Propagation aux commandes (à vérifier / assurer) :** la génération de commande agrège les BOM et associe chaque composant à un **MPN** / offre fournisseur. Après un changement de valeur, la commande doit repartir de la **nouvelle** valeur (nouveau composant → nouveau MPN), pas de l'ancienne. Cartographier `client/src/frontend/src/pages/CommandPage.jsx` + `serveur/src/routes/marketplace_command_core.py`, `marketplace_command_plans.py`, `marketplace_supplier_offers.py` pour confirmer que le mapping *valeur → composant → MPN* se recalcule bien après édition (sinon l'ajuster). **Ne pas laisser une ligne de commande sur l'ancien MPN.**
 
 **Décisions actées (Eric, 2026-07-21) :**
 - Portée **demandée à chaque** renommage d'une valeur partagée (ce composant / tous).
@@ -62,7 +67,8 @@ Dans la colonne **« valeur harmonisée »** de la Revue BOM, quand on modifie u
 2. Ajouter un handler **bulk** : « appliquer `newValue` à tous les items dont `value_harmonized === oldValue` ».
 3. Dans la cellule valeur de `BomReviewTab.jsx` : à la validation (onBlur/Entrée) avec changement effectif, compter les frères de même ancienne valeur ; si > 0 → ouvrir un **dialog de portée** ; sinon appliquer directement.
 4. Dialog : deux actions — « Ce composant uniquement » / « Tous les composants de valeur X (N) » — + annuler (revient à l'ancienne valeur).
-5. Vérifier la persistance via l'enregistrement de revue ; ajouter les tests.
+5. Vérifier la persistance via l'enregistrement de revue.
+6. **Propagation commande** : vérifier que la Commande composants, après changement de valeur, repart de la **nouvelle** valeur et associe le bon **MPN**/fournisseur (recalcul du mapping) ; ajuster si la commande reste sur l'ancien MPN. Puis ajouter les tests.
 
 > ⚠ `BomReviewTab.jsx` fait déjà ~706 lignes : extraire la nouvelle logique dans un **hook** ou un **sous-composant** (dialog) plutôt que gonfler le fichier (CLAUDE.md : composants > 300 lignes à découper).
 
@@ -76,6 +82,7 @@ Dans la colonne **« valeur harmonisée »** de la Revue BOM, quand on modifie u
 - [ ] BOM avec plusieurs `10µF` → renommer un `10µF` en `10µF/35V` → « tous » → tous les `10µF` changent.
 - [ ] Renommer un `10k` en `11k` → « ce composant » → une seule ligne change.
 - [ ] Enregistrer, recharger → changements persistés.
+- [ ] Après un changement de valeur, ouvrir **Commande composants** → la ligne reflète la **nouvelle** valeur et le **MPN**/fournisseur correspondant (plus l'ancien).
 
 ## 6. Définition de « terminé »
 
