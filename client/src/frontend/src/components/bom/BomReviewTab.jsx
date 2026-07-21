@@ -36,6 +36,7 @@ import {
     compactWrapCellSx,
 } from '../../utils/compactTable';
 import { componentTypeOptions } from '../../utils/componentTypes';
+import ValueScopeDialog from './ValueScopeDialog';
 
 // ─── Dark-themed dialog paper ────────────────────────────────────────────────
 const DIALOG_PAPER_SX = {
@@ -112,6 +113,8 @@ const BomReviewTableRow = React.memo(function BomReviewTableRow({
     rowRef,
     onSelect,
     onValueChange,
+    onValueFocus,
+    onValueCommit,
     onFootprintChange,
     onComponentTypeChange,
     onDnpChange,
@@ -144,6 +147,9 @@ const BomReviewTableRow = React.memo(function BomReviewTableRow({
                     aria-label={`Valeur revue ${item.reference || item.reference_item || ''}`.trim()}
                     value={item.value_harmonized || ''}
                     onChange={(e) => onValueChange(item.id, e.target.value)}
+                    onFocus={() => onValueFocus(item.id, item.value_harmonized || '')}
+                    onBlur={(e) => onValueCommit(item.id, e.target.value)}
+                    onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); e.target.blur(); } }}
                     placeholder={item.value_raw || ''}
                     sx={compactInputSx}
                 />
@@ -216,6 +222,7 @@ function BomReviewTab({
     activeRevisionId,
     undoStackLength = 0,
     onValueChange,
+    onBulkValueChange,
     onFootprintChange,
     onComponentTypeChange,
     onDnpChange,
@@ -242,6 +249,10 @@ function BomReviewTab({
     const [focusedRowIndex, setFocusedRowIndex] = React.useState(null);
     const rowRefs = React.useRef({});
     const containerRef = React.useRef(null);
+    // ── Renommage de valeur avec portée (prompt 002) ─────────────────────────
+    // valeur au focus (ancienne) pour décider de la portée à la validation.
+    const valueFocusRef = React.useRef(null);
+    const [valueScope, setValueScope] = React.useState(null);
 
     const deferredSearch = React.useDeferredValue(search);
 
@@ -421,6 +432,41 @@ function BomReviewTab({
         setBulkTypeValue('');
         setSelectedItemIds(new Set());
     }, [bulkTypeValue, selectedItemIds, onBulkTypeChange]);
+
+    // ── Renommage de valeur : focus (mémorise l'ancienne) / validation (portée) ──
+    const handleValueFocus = React.useCallback((itemId, value) => {
+        valueFocusRef.current = { itemId, value: value || '' };
+    }, []);
+
+    const handleValueCommit = React.useCallback((itemId, newValueRaw) => {
+        const start = valueFocusRef.current;
+        valueFocusRef.current = null;
+        if (!start || start.itemId !== itemId) return;
+        const oldValue = start.value || '';
+        const newValue = newValueRaw || '';
+        if (newValue === oldValue) return; // pas de changement réel
+        // La ligne éditée est déjà à newValue (édition live) ; on compte les autres.
+        const count = items.filter((i) => i.id !== itemId && (i.value_harmonized || '') === oldValue).length;
+        if (count > 0) {
+            setValueScope({ itemId, oldValue, newValue, count });
+        }
+    }, [items]);
+
+    const handleScopeThis = React.useCallback(() => setValueScope(null), []);
+
+    const handleScopeAll = React.useCallback(() => {
+        setValueScope((current) => {
+            if (current && onBulkValueChange) onBulkValueChange(current.oldValue, current.newValue);
+            return null;
+        });
+    }, [onBulkValueChange]);
+
+    const handleScopeCancel = React.useCallback(() => {
+        setValueScope((current) => {
+            if (current) onValueChange(current.itemId, current.oldValue);
+            return null;
+        });
+    }, [onValueChange]);
 
     const allPageSelected = paginatedItems.length > 0
         && paginatedItems.every((i) => selectedItemIds.has(i.id));
@@ -643,6 +689,8 @@ function BomReviewTab({
                                     rowRef={(el) => { rowRefs.current[item.id] = el; }}
                                     onSelect={handleSelectItem}
                                     onValueChange={onValueChange}
+                                    onValueFocus={handleValueFocus}
+                                    onValueCommit={handleValueCommit}
                                     onFootprintChange={onFootprintChange}
                                     onComponentTypeChange={onComponentTypeChange}
                                     onDnpChange={onDnpChange}
@@ -699,6 +747,14 @@ function BomReviewTab({
                     </Button>
                 </DialogActions>
             </Dialog>
+
+            {/* ── Portée du renommage de valeur (prompt 002) ─────────────── */}
+            <ValueScopeDialog
+                scope={valueScope}
+                onThis={handleScopeThis}
+                onAll={handleScopeAll}
+                onCancel={handleScopeCancel}
+            />
         </Stack>
     );
 }
