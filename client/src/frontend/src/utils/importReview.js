@@ -48,6 +48,8 @@ export async function persistImportedBatchMetadata({
     const reference = String(batchItem.reference || '').trim();
     const revision = String(batchItem.revision || '').trim();
     const category = String(batchItem.category || '').trim();
+    const name = String(batchItem.name || '').trim();
+    const cardType = String(batchItem.card_type || '').trim().toUpperCase();
     if (!reference || !revision) {
         throw new Error('La reference et la revision doivent etre renseignees avant de continuer la revue.');
     }
@@ -64,6 +66,14 @@ export async function persistImportedBatchMetadata({
         }, { signal });
     }
 
+    // Nom + type carte (catalogue Cartes) : name vide -> null = on ne touche pas.
+    if (resolvedBomReferenceId) {
+        await apiClient.put(`/marketplace/cards/${resolvedBomReferenceId}`, {
+            name: name || null,
+            card_type: cardType || null,
+        }, { signal });
+    }
+
     const sessionResponse = await apiClient.get(`/bom/files/${batchItem.bom_revision_id}/session`, { signal });
     return {
         ...sessionResponse.data,
@@ -71,6 +81,8 @@ export async function persistImportedBatchMetadata({
         bom_revision_id: sessionResponse.data?.bom_revision_id || batchItem.bom_revision_id,
         file_name: batchItem.file_name || sessionResponse.data?.file_name || '',
         category,
+        name,
+        card_type: cardType,
     };
 }
 

@@ -11,6 +11,9 @@ from .marketplace_supplier_offers import router as marketplace_supplier_offers_r
 from .marketplace_erp_defaults import router as marketplace_erp_defaults_router
 from .marketplace_production_command import router as marketplace_production_command_router
 from .marketplace_stock import router as marketplace_stock_router
+from .marketplace_board_stock import router as marketplace_board_stock_router
+from .marketplace_cards import router as marketplace_cards_router
+from .marketplace_order_import import router as marketplace_order_import_router
 from .marketplace_presence import router as marketplace_presence_router
 from .marketplace_events import router as marketplace_events_router
 
@@ -24,5 +27,8 @@ router.include_router(marketplace_supplier_offers_router)
 router.include_router(marketplace_erp_defaults_router)
 router.include_router(marketplace_production_command_router)
 router.include_router(marketplace_stock_router)
+router.include_router(marketplace_board_stock_router)
+router.include_router(marketplace_cards_router)
+router.include_router(marketplace_order_import_router)
 router.include_router(marketplace_presence_router)
 router.include_router(marketplace_events_router)

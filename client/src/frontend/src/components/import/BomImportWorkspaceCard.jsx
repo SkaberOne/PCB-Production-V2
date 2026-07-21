@@ -101,6 +101,39 @@ const WorkspaceSessionRow = React.memo(function WorkspaceSessionRow({
                     fullWidth
                     size="small"
                     sx={compactInputSx}
+                    value={row.name || ''}
+                    placeholder="Ex: Ampli Gen6"
+                    aria-label={`Nom ${row.file_name}`}
+                    onChange={(event) => (
+                        row.isImported
+                            ? handleBatchResultFieldChange(rowKey, 'name', event.target.value)
+                            : handleDraftFieldChange(row.row_key, 'name', event.target.value)
+                    )}
+                />
+            </TableCell>
+            <TableCell>
+                <TextField
+                    select
+                    fullWidth
+                    size="small"
+                    sx={compactInputSx}
+                    value={row.card_type || 'SIMPLE'}
+                    aria-label={`Type ${row.file_name}`}
+                    onChange={(event) => (
+                        row.isImported
+                            ? handleBatchResultFieldChange(rowKey, 'card_type', event.target.value)
+                            : handleDraftFieldChange(row.row_key, 'card_type', event.target.value)
+                    )}
+                >
+                    <MenuItem value="SIMPLE">Simple</MenuItem>
+                    <MenuItem value="ASSEMBLY">Assemblage</MenuItem>
+                </TextField>
+            </TableCell>
+            <TableCell>
+                <TextField
+                    fullWidth
+                    size="small"
+                    sx={compactInputSx}
                     value={row.revision}
                     aria-label={`Révision ${row.file_name}`}
                     onChange={(event) => (
@@ -319,14 +352,16 @@ function BomImportWorkspaceCard({
                                 <Table sx={compactTableSx}>
                                     <TableHead>
                                         <TableRow>
-                                            <TableCell sx={{ width: '20%' }}>Fichier</TableCell>
-                                            <TableCell sx={{ width: '16%' }}>Catégorie</TableCell>
-                                            <TableCell sx={{ width: '16%' }}>Référence</TableCell>
-                                            <TableCell sx={{ width: '12%' }}>Révision</TableCell>
-                                            <TableCell sx={{ width: '8%' }}>Face</TableCell>
-                                            <TableCell sx={{ width: '8%' }}>Lignes</TableCell>
-                                            <TableCell sx={{ width: '10%' }}>État</TableCell>
-                                            <TableCell sx={{ width: '10%' }}>Actions</TableCell>
+                                            <TableCell sx={{ width: '15%' }}>Fichier</TableCell>
+                                            <TableCell sx={{ width: '12%' }}>Catégorie</TableCell>
+                                            <TableCell sx={{ width: '14%' }}>Référence</TableCell>
+                                            <TableCell sx={{ width: '14%' }}>Nom</TableCell>
+                                            <TableCell sx={{ width: '9%' }}>Type</TableCell>
+                                            <TableCell sx={{ width: '9%' }}>Révision</TableCell>
+                                            <TableCell sx={{ width: '6%' }}>Face</TableCell>
+                                            <TableCell sx={{ width: '5%' }}>Lignes</TableCell>
+                                            <TableCell sx={{ width: '9%' }}>État</TableCell>
+                                            <TableCell sx={{ width: '7%' }}>Actions</TableCell>
                                         </TableRow>
                                     </TableHead>
                                     <TableBody>

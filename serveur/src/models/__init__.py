@@ -1,6 +1,14 @@
 """SQLAlchemy models package."""
 
-from .bom import BomCategory, BomItem, BomReference, BomRevision, Component, FootprintMapping
+from .board_stock import (
+    BoardStock,
+    Client,
+    ClientOrder,
+    ClientOrderLine,
+    MachineModel,
+    MachineModelCard,
+)
+from .bom import AssemblyItem, BomCategory, BomItem, BomReference, BomRevision, Component, FootprintMapping
 from .costing import CostParameters, ProductionCostInput, ProductionCosting
 from .commands import (
     Command,
@@ -24,6 +32,13 @@ from .stock import (
 )
 
 __all__ = [
+    "AssemblyItem",
+    "BoardStock",
+    "Client",
+    "ClientOrder",
+    "ClientOrderLine",
+    "MachineModel",
+    "MachineModelCard",
     "BomItem",
     "BomCategory",
     "BomReference",

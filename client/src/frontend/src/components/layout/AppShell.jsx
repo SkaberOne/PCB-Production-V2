@@ -219,6 +219,7 @@ function AppShell({ pages, children }) {
         (p) => p.group === 'workflow' && !(isManualAssembly && p.path === '/machine-pnp'),
     );
     const libraryPages = pages.filter((p) => p.group === 'library');
+    const stockPages = pages.filter((p) => p.group === 'stock');
     const systemPages = pages.filter((p) => p.group === 'system');
 
     const workflowProgress = useMemo(
@@ -305,6 +306,13 @@ function AppShell({ pages, children }) {
                         <>
                             <Divider sx={{ borderColor: '#27272a', my: 1, mx: 1.5 }} />
                             <NavGroup label="Bibliothèque" pages={libraryPages} location={location} />
+                        </>
+                    )}
+
+                    {stockPages.length > 0 && (
+                        <>
+                            <Divider sx={{ borderColor: '#27272a', my: 1, mx: 1.5 }} />
+                            <NavGroup label="Gestion de stock" pages={stockPages} location={location} />
                         </>
                     )}
 

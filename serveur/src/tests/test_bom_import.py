@@ -10,7 +10,7 @@ from openpyxl import Workbook, load_workbook
 
 from sqlalchemy.orm import Session
 from src.tests.conftest import client, TestingSessionLocal
-from src.models.bom import Component, FootprintMapping
+from src.models.bom import BomReference, Component, FootprintMapping
 
 def test_bom_import_missing_file():
     """Test BOM import without file fails"""
@@ -512,3 +512,110 @@ R2 10R resc1608x55n 15.0 25.0 0 R
         os.unlink(path_b)
 
 
+
+def _simple_bom_file():
+    """Petit BOM valide -> chemin de fichier temporaire (.txt)."""
+    bom_content = (
+        "Reference Value Footprint X Y Rotation Type\n"
+        "R1 10 0805 10.0 20.0 0 R\n"
+        "C1 100nf 0805 20.0 30.0 0 C\n"
+    )
+    with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False) as f:
+        f.write(bom_content)
+        return f.name
+
+
+def test_bom_import_sets_name_and_card_type_on_create():
+    """Import avec name + card_type -> renseignés sur la carte (catalogue)."""
+    temp_path = _simple_bom_file()
+    try:
+        with open(temp_path, 'rb') as f:
+            response = client.post(
+                "/api/bom/import",
+                files={'file': ('name_card.txt', f, 'text/plain')},
+                params={
+                    "reference": "CARTE_NOMMEE",
+                    "revision": "REV_A",
+                    "side": "TOP",
+                    "name": "Ampli Gen6",
+                    "card_type": "ASSEMBLY",
+                },
+            )
+        assert response.status_code == 200
+        ref_id = response.json()["bom_reference_id"]
+
+        db: Session = TestingSessionLocal()
+        try:
+            ref = db.query(BomReference).filter(BomReference.id == ref_id).first()
+            assert ref is not None
+            assert ref.name == "Ampli Gen6"
+            assert ref.card_type == "ASSEMBLY"
+        finally:
+            db.close()
+    finally:
+        os.unlink(temp_path)
+
+
+def test_bom_import_defaults_card_type_simple_without_params():
+    """Sans name/card_type -> card_type=SIMPLE, name=None."""
+    temp_path = _simple_bom_file()
+    try:
+        with open(temp_path, 'rb') as f:
+            response = client.post(
+                "/api/bom/import",
+                files={'file': ('plain.txt', f, 'text/plain')},
+                params={"reference": "CARTE_SIMPLE", "revision": "REV_A", "side": "TOP"},
+            )
+        assert response.status_code == 200
+        ref_id = response.json()["bom_reference_id"]
+
+        db: Session = TestingSessionLocal()
+        try:
+            ref = db.query(BomReference).filter(BomReference.id == ref_id).first()
+            assert ref is not None
+            assert ref.card_type == "SIMPLE"
+            assert ref.name is None
+        finally:
+            db.close()
+    finally:
+        os.unlink(temp_path)
+
+
+def test_bom_import_reimport_empty_name_preserves_existing():
+    """Ré-import sans name ne doit pas effacer un nom déjà saisi."""
+    first_path = _simple_bom_file()
+    second_path = _simple_bom_file()
+    try:
+        with open(first_path, 'rb') as f:
+            r1 = client.post(
+                "/api/bom/import",
+                files={'file': ('a.txt', f, 'text/plain')},
+                params={
+                    "reference": "CARTE_PRESERVE",
+                    "revision": "REV_A",
+                    "side": "TOP",
+                    "name": "Nom initial",
+                },
+            )
+        assert r1.status_code == 200
+        ref_id = r1.json()["bom_reference_id"]
+
+        # Ré-import sans name (ni card_type) : le nom doit rester.
+        with open(second_path, 'rb') as f:
+            r2 = client.post(
+                "/api/bom/import",
+                files={'file': ('b.txt', f, 'text/plain')},
+                params={"reference": "CARTE_PRESERVE", "revision": "REV_B", "side": "TOP"},
+            )
+        assert r2.status_code == 200
+
+        db: Session = TestingSessionLocal()
+        try:
+            ref = db.query(BomReference).filter(BomReference.id == ref_id).first()
+            assert ref is not None
+            assert ref.name == "Nom initial"
+        finally:
+            db.close()
+    finally:
+        os.unlink(first_path)
+        os.unlink(second_path)

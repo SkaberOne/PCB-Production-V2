@@ -30,6 +30,11 @@ from .bom_support import (
 router = APIRouter(tags=["bom"])
 
 
+def _normalize_card_type(value: Optional[str]) -> str:
+    """SIMPLE par défaut ; ASSEMBLY seulement si explicitement demandé."""
+    return "ASSEMBLY" if str(value or "").strip().upper() == "ASSEMBLY" else "SIMPLE"
+
+
 @router.post("/import", response_model=BomImportResponse)
 async def import_bom_file(
     file: UploadFile = File(...),
@@ -38,6 +43,8 @@ async def import_bom_file(
     side: str = Query(default="TOP", pattern="^(TOP|BOT)$", description="PCB side: TOP or BOT"),
     category: Optional[str] = Query(None, description="Optional card category applied to the full reference"),
     description: Optional[str] = Query(None, description="BOM description"),
+    name: Optional[str] = Query(None, description="Nom lisible de la carte (catalogue Cartes)"),
+    card_type: Optional[str] = Query(None, description="Type de carte : SIMPLE ou ASSEMBLY"),
     db: Session = Depends(get_db),
 ):
     """Import an Eagle-style BOM text file, harmonize it, then persist it."""
@@ -69,6 +76,8 @@ async def import_bom_file(
                 reference=reference,
                 category=_ensure_bom_category(db, category),
                 description=description,
+                name=(name.strip() or None) if name is not None else None,
+                card_type=_normalize_card_type(card_type),
                 created_at=utcnow(),
                 updated_at=utcnow(),
             )
@@ -80,6 +89,14 @@ async def import_bom_file(
                 bom_ref.category = _ensure_bom_category(db, category)
             if description is not None:
                 bom_ref.description = description
+            # Nom : ne remplacer que si une valeur est fournie (vide = on ne touche pas,
+            # pour préserver un nom déjà saisi sur la page Cartes).
+            if name is not None and name.strip():
+                bom_ref.name = name.strip()
+            # Type : ne toucher que si explicitement fourni (évite de forcer SIMPLE
+            # sur une carte déjà marquée ASSEMBLY lors d'un ré-import).
+            if card_type is not None and card_type.strip():
+                bom_ref.card_type = _normalize_card_type(card_type)
 
         existing_revisions = _get_logical_revisions(db, bom_ref.id, revision, side)
         if existing_revisions:
