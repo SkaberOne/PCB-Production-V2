@@ -20,7 +20,7 @@ Jest (`npm test`), qui ne pilotent jamais l'app assemblée.
 
 - **Backend** : dépendances Python installées (`pip install -r serveur/requirements.txt`).
 - **Front** : build e2e généré (voir ci-dessous).
-- **Playwright** : `cd e2e && npm ci`. Chromium : en environnement orchestrateur,
+- **Playwright** : `cd e2e && npm install`. Chromium : en environnement orchestrateur,
   `PLAYWRIGHT_BROWSERS_PATH` fournit déjà le navigateur (ne pas re-télécharger). En
   CI, `npx playwright install --with-deps chromium`.
 
@@ -33,7 +33,7 @@ BUILD_PATH=build-e2e REACT_APP_API_URL=/api CI=false npm run build
 
 # 2) Tests E2E : Playwright démarre le backend (SQLite) qui sert le build
 cd ../../../e2e
-npm ci
+npm install
 npx playwright test            # rapport HTML : npx playwright show-report
 ```
 

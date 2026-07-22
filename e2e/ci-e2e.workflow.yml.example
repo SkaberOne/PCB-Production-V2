@@ -32,13 +32,13 @@ jobs:
           REACT_APP_API_URL: /api
           CI: 'false'
         run: |
-          npm ci
+          npm install
           npm run build
 
       - name: Install Playwright + Chromium
         working-directory: e2e
         run: |
-          npm ci
+          npm install
           npx playwright install --with-deps chromium
 
       - name: Run E2E
