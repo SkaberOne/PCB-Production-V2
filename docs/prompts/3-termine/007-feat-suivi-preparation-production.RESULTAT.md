@@ -2,7 +2,7 @@
 
 - **Statut** : ✅ terminé
 - **Branche** : feat/suivi-preparation-prod
-- **PR** : #NN (à compléter) → dev — état CI : en attente
+- **PR** : [#86](https://github.com/SkaberOne/PCB-Production-V2/pull/86) → dev — état CI : en attente (voir PR)
 - **Déployé staging** : oui (:8001, base ECB_Production_STAGING)
 
 ## Ce qui a été fait
