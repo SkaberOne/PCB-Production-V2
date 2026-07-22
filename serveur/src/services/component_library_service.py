@@ -140,6 +140,17 @@ class ComponentLibraryService:
 
         return None
 
+    @staticmethod
+    def _value_candidates(value_harmonized, value_raw):
+        """Priorité à la valeur **harmonisée** (curée) pour la résolution
+        composant / MPN (échange E01, option A validée). La valeur **brute** ne
+        sert de repli **que si l'harmonisée est absente** : une valeur renommée
+        vers un composant inconnu de la bibliothèque donne « sans MPN », **jamais
+        l'ancien MPN** re-matché via la brute (règle produit E01)."""
+        if value_harmonized is not None and str(value_harmonized).strip():
+            return [value_harmonized]
+        return [value_raw]
+
     @classmethod
     def match_bom_item(
         cls,
@@ -149,7 +160,7 @@ class ComponentLibraryService:
         """Match a persisted BOM item against the component library."""
         return cls.match_candidates(
             lookup,
-            value_candidates=[bom_item.value_raw, bom_item.value_harmonized],
+            value_candidates=cls._value_candidates(bom_item.value_harmonized, bom_item.value_raw),
             footprint_candidates=[bom_item.footprint_pnp, bom_item.footprint_eagle],
         )
 
@@ -162,7 +173,7 @@ class ComponentLibraryService:
         """Match a serialized/imported BOM item dict against the component library."""
         return cls.match_candidates(
             lookup,
-            value_candidates=[item.get("value_raw"), item.get("value_harmonized")],
+            value_candidates=cls._value_candidates(item.get("value_harmonized"), item.get("value_raw")),
             footprint_candidates=[item.get("footprint_pnp"), item.get("footprint_eagle")],
         )
 
