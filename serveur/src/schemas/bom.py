@@ -182,6 +182,22 @@ class BomImportResponse(BaseModel):
     warnings: List[str] = Field(default_factory=list)
 
 
+class CaoImportResponse(BaseModel):
+    """Réponse d'un import CAO par dossier (un revision par face)."""
+
+    success: bool
+    kind: str
+    supported: bool
+    board: Optional[str] = None
+    schematic: Optional[str] = None
+    message: str
+    reference: Optional[str] = None
+    revision: Optional[str] = None
+    faces: List[str] = Field(default_factory=list)
+    revisions: List[BomImportResponse] = Field(default_factory=list)
+    warnings: List[str] = Field(default_factory=list)
+
+
 class BomCategorySchema(OrmBaseModel):
     id: Optional[int] = None
     name: str
