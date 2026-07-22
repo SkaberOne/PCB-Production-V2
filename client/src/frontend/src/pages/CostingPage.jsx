@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
     Alert,
     Box,
@@ -8,22 +8,20 @@ import {
     Grid,
     MenuItem,
     Snackbar,
-    Tab,
-    Tabs,
     TextField,
+    ToggleButton,
+    ToggleButtonGroup,
     Typography,
 } from '@mui/material';
-import CalculateRoundedIcon from '@mui/icons-material/CalculateRounded';
 import SaveRoundedIcon from '@mui/icons-material/SaveRounded';
 import RefreshRoundedIcon from '@mui/icons-material/RefreshRounded';
 import apiClient, { extractApiError } from '../api/client';
 import PageHeader from '../components/common/PageHeader';
 import CostParametersForm from '../components/costing/CostParametersForm';
 import ProductionInputsForm from '../components/costing/ProductionInputsForm';
-import CardCostBreakdown from '../components/costing/CardCostBreakdown';
-import CardPriceHistory from '../components/costing/CardPriceHistory';
+import CardReferencePanel from '../components/costing/CardReferencePanel';
 import { colors } from '../theme';
-import { eur, eur0, pct, shortDate } from '../utils/costingFormat';
+import { eur, eur0, pct } from '../utils/costingFormat';
 
 const CARD_SX = { backgroundColor: colors.surfaceCard, border: `1px solid ${colors.border}` };
 const PARAM_KEYS = [
@@ -52,19 +50,18 @@ function MetricCard({ label, value, sub, accent }) {
 }
 
 /**
- * « Prix carte à la production » — costing tab. Production selector + two sub-tabs:
- * coût de la production (lot) and coût unitaire / carte (référence + historique).
+ * « Prix carte » — deux modes explicites (prompt 009) :
+ *  - Production : coût de revient d'une production précise (run — quantités, pertes, série) ;
+ *  - Carte en général : prix unitaire de référence d'une carte, hors production (CardReferencePanel).
  * Backed by /api/costing/*. See ADR 0005 / audit 2026-06-09.
  */
 function CostingPage() {
+    const [mode, setMode] = useState('production');
     const [productions, setProductions] = useState([]);
     const [productionId, setProductionId] = useState('');
     const [params, setParams] = useState(null);
     const [inputs, setInputs] = useState(null);
     const [result, setResult] = useState(null);
-    const [tab, setTab] = useState(0);
-    const [cardRefId, setCardRefId] = useState('');
-    const [history, setHistory] = useState(null);
     const [error, setError] = useState(null);
     const [busy, setBusy] = useState(false);
     const [toast, setToast] = useState('');
@@ -93,8 +90,6 @@ function CostingPage() {
             ]);
             setInputs(inp.data);
             setResult(comp.data);
-            const cards = comp.data?.cards || [];
-            setCardRefId((prev) => (cards.some((c) => c.bom_reference_id === prev) ? prev : (cards[0]?.bom_reference_id ?? '')));
         } catch (e) {
             const detail = extractApiError(e);
             setError(
@@ -109,13 +104,6 @@ function CostingPage() {
     }, []);
 
     useEffect(() => { loadProduction(productionId); }, [productionId, loadProduction]);
-
-    useEffect(() => {
-        if (tab !== 1 || !cardRefId) return;
-        apiClient.get(`/costing/cards/${cardRefId}/history`)
-            .then((res) => setHistory(res.data))
-            .catch(() => setHistory(null));
-    }, [tab, cardRefId, result]);
 
     const apply = async () => {
         if (!productionId) return;
@@ -143,10 +131,6 @@ function CostingPage() {
         try {
             await apiClient.post(`/costing/productions/${productionId}/snapshot`);
             setToast('Chiffrage enregistré comme nouveau prix de référence.');
-            if (cardRefId) {
-                const res = await apiClient.get(`/costing/cards/${cardRefId}/history`);
-                setHistory(res.data);
-            }
         } catch (e) {
             setError("Échec de l'enregistrement de la référence.");
         } finally {
@@ -155,159 +139,130 @@ function CostingPage() {
     };
 
     const cards = result?.cards || [];
-    const selectedCard = useMemo(
-        () => cards.find((c) => c.bom_reference_id === cardRefId) || null,
-        [cards, cardRefId],
-    );
-    const refPrice = history?.reference_price || null;
-    const ecart = (selectedCard && refPrice)
-        ? selectedCard.unit_cost_ht - refPrice.unit_cost_ht
-        : null;
 
     return (
         <Box>
             <PageHeader
-                title="Prix carte à la production"
-                description="Coût de revient (HT/TTC) d'une carte produite et prix de référence par carte."
+                title="Prix carte"
+                description="Deux modes : coût d'une production précise, ou prix unitaire de référence d'une carte."
             />
 
             {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
 
-            <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', mb: 2, flexWrap: 'wrap' }}>
-                <TextField
-                    select size="small" label="Production" value={productionId}
-                    onChange={(e) => setProductionId(e.target.value)} sx={{ minWidth: 260 }}
-                    disabled={!productions.length}
-                >
-                    {productions.map((p) => (
-                        <MenuItem key={p.id} value={p.id}>{p.name}</MenuItem>
-                    ))}
-                </TextField>
-                <Box sx={{ flex: 1 }} />
-                <Button startIcon={<RefreshRoundedIcon />} onClick={apply} disabled={busy || !inputs}>
-                    Appliquer / recalculer
-                </Button>
-                <Button
-                    variant="contained" startIcon={<SaveRoundedIcon />} onClick={snapshot}
-                    disabled={busy || !result}
-                >
-                    Enregistrer la référence
-                </Button>
-            </Box>
+            <ToggleButtonGroup
+                exclusive size="small" value={mode}
+                onChange={(_, v) => { if (v) setMode(v); }}
+                sx={{ mb: 2 }}
+                aria-label="Mode de calcul du prix"
+            >
+                <ToggleButton value="production" data-testid="mode-production">
+                    Production (run précis)
+                </ToggleButton>
+                <ToggleButton value="card" data-testid="mode-card">
+                    Carte en général (référence)
+                </ToggleButton>
+            </ToggleButtonGroup>
 
-            {!productions.length && !error && (
-                <Typography variant="body2" sx={{ color: colors.textSecondary }}>
-                    Aucune production. Créez-en une depuis l'onglet Productions.
-                </Typography>
-            )}
-
-            {params && inputs && (
-                <Grid container spacing={2} sx={{ mb: 2 }}>
-                    <Grid item xs={12} md={6}>
-                        <CostParametersForm
-                            values={params} disabled={busy}
-                            onChange={(k, v) => setParams((prev) => ({ ...prev, [k]: v }))}
-                        />
-                    </Grid>
-                    <Grid item xs={12} md={6}>
-                        <ProductionInputsForm
-                            values={inputs} disabled={busy}
-                            onChange={(k, v) => setInputs((prev) => ({ ...prev, [k]: v }))}
-                        />
-                    </Grid>
-                </Grid>
-            )}
-
-            <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ mb: 2, borderBottom: `1px solid ${colors.border}` }}>
-                <Tab icon={<CalculateRoundedIcon fontSize="small" />} iconPosition="start" label="Coût de la production" />
-                <Tab label="Coût unitaire / carte" />
-            </Tabs>
-
-            {tab === 0 && result && (
+            {mode === 'card' ? (
+                <CardReferencePanel />
+            ) : (
                 <Box>
-                    <Grid container spacing={2} sx={{ mb: 2 }}>
-                        <Grid item xs={6} sm={3}>
-                            <MetricCard label="Coût total production HT" value={eur0(result.total_ht)} accent />
-                        </Grid>
-                        <Grid item xs={6} sm={3}>
-                            <MetricCard label="Coût total TTC" value={eur0(result.total_ttc)} />
-                        </Grid>
-                        <Grid item xs={6} sm={3}>
-                            <MetricCard label="Cartes du lot" value={cards.length} />
-                        </Grid>
-                        <Grid item xs={6} sm={3}>
-                            <MetricCard
-                                label="Coût unitaire HT"
-                                value={cards.length === 1 ? eur(cards[0].unit_cost_ht) : '—'}
-                                sub={cards.length > 1 ? 'plusieurs cartes' : ''}
-                            />
-                        </Grid>
-                    </Grid>
-                    {cards.map((card) => {
-                        const mat = card.material?.subtotal || 0;
-                        const lab = card.labor?.subtotal || 0;
-                        const unit = card.unit_cost_ht || (mat + lab) || 1;
-                        return (
-                            <Card key={card.bom_reference_id} sx={{ ...CARD_SX, mb: 1.5 }}>
-                                <CardContent>
-                                    <Box sx={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 1 }}>
-                                        <Typography variant="subtitle1">{card.reference}</Typography>
-                                        <Typography variant="body2" sx={{ color: colors.textSecondary }}>
-                                            {card.quantity} cartes · {eur(card.unit_cost_ht)} /carte · {eur0(card.total_ht)} HT
-                                        </Typography>
-                                    </Box>
-                                    <Box sx={{ display: 'flex', height: 8, borderRadius: 1, overflow: 'hidden', mt: 1 }}>
-                                        <Box sx={{ width: `${(mat / unit) * 100}%`, backgroundColor: colors.green }} />
-                                        <Box sx={{ width: `${(lab / unit) * 100}%`, backgroundColor: colors.purple }} />
-                                    </Box>
-                                    <Typography variant="caption" sx={{ color: colors.textSecondary }}>
-                                        <Box component="span" sx={{ color: colors.green }}>Matière {pct(mat / unit)}</Box>
-                                        {' · '}
-                                        <Box component="span" sx={{ color: colors.purple }}>Main d'œuvre {pct(lab / unit)}</Box>
-                                    </Typography>
-                                </CardContent>
-                            </Card>
-                        );
-                    })}
-                </Box>
-            )}
+                    <Typography variant="body2" sx={{ color: colors.textSecondary, mb: 1.5 }}>
+                        Coût de revient (HT/TTC) d'une production précise (quantités, pertes, série).
+                    </Typography>
 
-            {tab === 1 && result && (
-                <Box>
-                    <TextField
-                        select size="small" label="Carte" value={cardRefId}
-                        onChange={(e) => setCardRefId(e.target.value)} sx={{ minWidth: 260, mb: 2 }}
-                    >
-                        {cards.map((c) => (
-                            <MenuItem key={c.bom_reference_id} value={c.bom_reference_id}>{c.reference}</MenuItem>
-                        ))}
-                    </TextField>
+                    <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', mb: 2, flexWrap: 'wrap' }}>
+                        <TextField
+                            select size="small" label="Production" value={productionId}
+                            onChange={(e) => setProductionId(e.target.value)} sx={{ minWidth: 260 }}
+                            disabled={!productions.length}
+                        >
+                            {productions.map((p) => (
+                                <MenuItem key={p.id} value={p.id}>{p.name}</MenuItem>
+                            ))}
+                        </TextField>
+                        <Box sx={{ flex: 1 }} />
+                        <Button startIcon={<RefreshRoundedIcon />} onClick={apply} disabled={busy || !inputs}>
+                            Appliquer / recalculer
+                        </Button>
+                        <Button
+                            variant="contained" startIcon={<SaveRoundedIcon />} onClick={snapshot}
+                            disabled={busy || !result}
+                        >
+                            Enregistrer la référence
+                        </Button>
+                    </Box>
 
-                    {selectedCard && (
-                        <>
+                    {!productions.length && !error && (
+                        <Typography variant="body2" sx={{ color: colors.textSecondary }}>
+                            Aucune production. Créez-en une depuis l'onglet Productions.
+                        </Typography>
+                    )}
+
+                    {params && inputs && (
+                        <Grid container spacing={2} sx={{ mb: 2 }}>
+                            <Grid item xs={12} md={6}>
+                                <CostParametersForm
+                                    values={params} disabled={busy}
+                                    onChange={(k, v) => setParams((prev) => ({ ...prev, [k]: v }))}
+                                />
+                            </Grid>
+                            <Grid item xs={12} md={6}>
+                                <ProductionInputsForm
+                                    values={inputs} disabled={busy}
+                                    onChange={(k, v) => setInputs((prev) => ({ ...prev, [k]: v }))}
+                                />
+                            </Grid>
+                        </Grid>
+                    )}
+
+                    {result && (
+                        <Box>
                             <Grid container spacing={2} sx={{ mb: 2 }}>
-                                <Grid item xs={12} sm={4}>
-                                    <MetricCard
-                                        label="Prix de référence (dernière prod.)"
-                                        value={refPrice ? eur(refPrice.unit_cost_ht) : '—'}
-                                        sub={refPrice ? `${refPrice.quantity} cartes · ${shortDate(refPrice.computed_at)}` : 'aucune référence'}
-                                    />
+                                <Grid item xs={6} sm={3}>
+                                    <MetricCard label="Coût total production HT" value={eur0(result.total_ht)} accent />
                                 </Grid>
-                                <Grid item xs={12} sm={4}>
-                                    <MetricCard label="Estimé à l'unité (cette prod.)" value={eur(selectedCard.unit_cost_ht)} sub={`${eur(selectedCard.unit_cost_ttc)} TTC`} accent />
+                                <Grid item xs={6} sm={3}>
+                                    <MetricCard label="Coût total TTC" value={eur0(result.total_ttc)} />
                                 </Grid>
-                                <Grid item xs={12} sm={4}>
+                                <Grid item xs={6} sm={3}>
+                                    <MetricCard label="Cartes du lot" value={cards.length} />
+                                </Grid>
+                                <Grid item xs={6} sm={3}>
                                     <MetricCard
-                                        label="Écart vs référence"
-                                        value={ecart === null ? '—' : `${ecart >= 0 ? '+' : '−'}${eur(Math.abs(ecart))}`}
+                                        label="Coût unitaire HT"
+                                        value={cards.length === 1 ? eur(cards[0].unit_cost_ht) : '—'}
+                                        sub={cards.length > 1 ? 'plusieurs cartes' : ''}
                                     />
                                 </Grid>
                             </Grid>
-                            <Box sx={{ mb: 2 }}>
-                                <CardCostBreakdown card={selectedCard} />
-                            </Box>
-                            <CardPriceHistory history={history?.history} />
-                        </>
+                            {cards.map((card) => {
+                                const mat = card.material?.subtotal || 0;
+                                const lab = card.labor?.subtotal || 0;
+                                const unit = card.unit_cost_ht || (mat + lab) || 1;
+                                return (
+                                    <Card key={card.bom_reference_id} sx={{ ...CARD_SX, mb: 1.5 }}>
+                                        <CardContent>
+                                            <Box sx={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 1 }}>
+                                                <Typography variant="subtitle1">{card.reference}</Typography>
+                                                <Typography variant="body2" sx={{ color: colors.textSecondary }}>
+                                                    {card.quantity} cartes · {eur(card.unit_cost_ht)} /carte · {eur0(card.total_ht)} HT
+                                                </Typography>
+                                            </Box>
+                                            <Box sx={{ display: 'flex', height: 8, borderRadius: 1, overflow: 'hidden', mt: 1 }}>
+                                                <Box sx={{ width: `${(mat / unit) * 100}%`, backgroundColor: colors.green }} />
+                                                <Box sx={{ width: `${(lab / unit) * 100}%`, backgroundColor: colors.purple }} />
+                                            </Box>
+                                            <Typography variant="caption" sx={{ color: colors.textSecondary }}>
+                                                <Box component="span" sx={{ color: colors.green }}>Matière {pct(mat / unit)}</Box>
+                                                {' · '}
+                                                <Box component="span" sx={{ color: colors.purple }}>Main d'œuvre {pct(lab / unit)}</Box>
+                                            </Typography>
+                                        </CardContent>
+                                    </Card>
+                                );
+                            })}
+                        </Box>
                     )}
                 </Box>
             )}
