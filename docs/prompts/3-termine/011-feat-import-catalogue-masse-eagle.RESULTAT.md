@@ -2,7 +2,7 @@
 
 - **Statut** : ✅ terminé
 - **Branche** : feat/import-catalogue-masse
-- **PR** : #NN (à compléter) → dev — état CI : en attente
+- **PR** : [#90](https://github.com/SkaberOne/PCB-Production-V2/pull/90) → dev — état CI : en attente (voir PR)
 - **Déployé staging** : oui (:8001)
 
 ## Ce qui a été fait
