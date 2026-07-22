@@ -117,3 +117,47 @@ class ProductionRun(Base):
 
     def __repr__(self):
         return f"<ProductionRun prod={self.production_id} boards={self.boards_produced}>"
+
+
+class ProductionComponentProgress(Base):
+    """Avancement de préparation physique d'un composant pour une production (007).
+
+    Annotation d'état par ``(production, composant)`` — comme ``ComponentMachineLoad``
+    elle **n'affecte pas** le solde de stock. Deux jalons booléens :
+
+    - ``is_prepared``  : composant mis dans la boîte de préparation (vue Commande et stock) ;
+    - ``is_installed`` : composant posé sur la PnP (pop-up Machine PnP).
+
+    Chaque jalon garde **qui + quand** (``*_by`` via header ``X-Workstation``, ADR 0015 ;
+    ``*_at`` en ``utcnow()``) pour permettre la reprise / le passage de relais.
+    """
+
+    __tablename__ = "PRODUCTION_COMPONENT_PROGRESS"
+    __table_args__ = (
+        UniqueConstraint(
+            "production_id", "component_id", name="uq_production_component_progress"
+        ),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    production_id = Column(
+        Integer, ForeignKey("PRODUCTIONS.id"), nullable=False, index=True
+    )
+    component_id = Column(
+        Integer, ForeignKey("COMPONENTS.id"), nullable=False, index=True
+    )
+    is_prepared = Column(Boolean, nullable=False, default=False, server_default="0")
+    prepared_by = Column(String(60), nullable=True)
+    prepared_at = Column(DateTime, nullable=True)
+    is_installed = Column(Boolean, nullable=False, default=False, server_default="0")
+    installed_by = Column(String(60), nullable=True)
+    installed_at = Column(DateTime, nullable=True)
+    updated_at = Column(DateTime, default=utcnow, onupdate=utcnow)
+
+    component = relationship("Component")
+
+    def __repr__(self):
+        return (
+            f"<ProductionComponentProgress prod={self.production_id} "
+            f"comp={self.component_id} prep={self.is_prepared} inst={self.is_installed}>"
+        )

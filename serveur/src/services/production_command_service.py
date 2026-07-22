@@ -17,6 +17,7 @@ from ..models.commands import Command, CommandItem, CommandLineDetail, CommandRe
 from ..models.production import Production
 from .command_service import CommandService
 from .stock_service import StockService
+from .production_progress_service import ProductionProgressService
 
 logger = logging.getLogger(__name__)
 
@@ -293,6 +294,26 @@ class ProductionCommandService:
                 line["component_mpn"] = detail.manual_mpn
                 if not (line.get("component_name") or "").strip() or line.get("component_name") == line.get("value"):
                     line["component_name"] = detail.manual_mpn
+
+        # Conditionnement (formes) + avancement préparé/installé par composant (007).
+        command = db.get(Command, command_id)
+        production_id = command.production_id if command else None
+        lines = summary.get("aggregated_components", [])
+        comp_ids = [line.get("component_library_id") for line in lines]
+        cond = ProductionProgressService.conditionnement_map(db, comp_ids)
+        prog = (
+            ProductionProgressService.get_progress_map(db, production_id)
+            if production_id
+            else {}
+        )
+        for line in lines:
+            cid = line.get("component_library_id")
+            line["conditionnement"] = (
+                cond.get(cid) if cid else None
+            ) or {"reel": 0, "bag": 0, "tube": 0}
+            line["progress"] = ProductionProgressService.progress_payload(
+                prog.get(cid) if cid else None
+            )
 
         summary["command_id"] = command_id
         return summary

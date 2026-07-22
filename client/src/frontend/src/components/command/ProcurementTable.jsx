@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
     Box,
     Button,
+    Checkbox,
     Chip,
     CircularProgress,
     Dialog,
@@ -39,6 +40,16 @@ import {
 
 const GREEN_BG = 'rgba(5, 150, 105, 0.16)';
 
+// Conditionnement (007) : formes physiques non nulles, façon « 🎞️ 2500 · sachet 300 ».
+const COND_LABELS = { reel: '🎞️', bag: 'sachet', tube: 'tube' };
+function formatConditionnement(cond) {
+    if (!cond) return '—';
+    const parts = ['reel', 'bag', 'tube']
+        .filter((f) => Number(cond[f]) > 0)
+        .map((f) => `${COND_LABELS[f]} ${Number(cond[f]).toLocaleString('fr-FR')}`);
+    return parts.length ? parts.join(' · ') : '—';
+}
+
 /**
  * Tableau unique de la page Commande : lignes BOM agrégées + offres fournisseurs
  * (prix/stock/tri) + saisie de la quantité reçue. Une ligne passe en vert quand
@@ -71,8 +82,33 @@ function buildQtyChoices({ autoQty, current, offer, qtyPerReel }) {
     return Array.from(set).sort((a, b) => a - b);
 }
 
-function ProcurementTable({ rows = [], commandId, refreshNonce = 0, onRefreshState, onLineSaved }) {
+function ProcurementTable({ rows = [], commandId, productionId, refreshNonce = 0, onRefreshState, onLineSaved }) {
     const [offersByComponent, setOffersByComponent] = useState({});
+    // Overlay optimiste de l'état « préparé » par composant (007). Prime sur row.progress.
+    const [preparedOverlay, setPreparedOverlay] = useState({});
+    const preparedFor = useCallback((row) => {
+        const cid = row.componentLibraryId;
+        if (cid != null && preparedOverlay[cid] !== undefined) return preparedOverlay[cid];
+        return row.progress || null;
+    }, [preparedOverlay]);
+    const togglePrepared = useCallback(async (row, checked) => {
+        const cid = row.componentLibraryId;
+        if (cid == null || !productionId) return;
+        setPreparedOverlay((m) => ({ ...m, [cid]: { is_prepared: checked, prepared_by: null, prepared_at: null } }));
+        try {
+            const res = await apiClient.put(
+                `/marketplace/productions/${productionId}/component-progress/${cid}`,
+                { prepared: checked },
+            );
+            setPreparedOverlay((m) => ({ ...m, [cid]: {
+                is_prepared: res.data.is_prepared,
+                prepared_by: res.data.prepared_by,
+                prepared_at: res.data.prepared_at,
+            } }));
+        } catch (err) {
+            setPreparedOverlay((m) => ({ ...m, [cid]: { is_prepared: !checked, prepared_by: null, prepared_at: null } }));
+        }
+    }, [productionId]);
     const [strategy, setStrategy] = useState('cheapest');
     const [prioritySupplier, setPrioritySupplier] = useState('MOUSER');
     const [received, setReceived] = useState({});
@@ -278,12 +314,14 @@ function ProcurementTable({ rows = [], commandId, refreshNonce = 0, onRefreshSta
                 <Table size="small" stickyHeader>
                     <TableHead>
                         <TableRow>
+                            <TableCell padding="checkbox">Prép.</TableCell>
                             <TableCell>Composant</TableCell>
                             <TableCell>MPN</TableCell>
                             <TableCell>Valeur</TableCell>
                             <TableCell>Empreinte</TableCell>
                             <TableCell align="right">Besoin</TableCell>
                             <TableCell align="right">Stock</TableCell>
+                            <TableCell>Cond.</TableCell>
                             <TableCell align="right">À commander</TableCell>
                             <TableCell align="right">Qté reçue</TableCell>
                             <TableCell>Fournisseur</TableCell>
@@ -329,6 +367,28 @@ function ProcurementTable({ rows = [], commandId, refreshNonce = 0, onRefreshSta
                                         ...(isCovered ? { backgroundColor: GREEN_BG, '&:hover': { backgroundColor: GREEN_BG } } : {}),
                                     }}
                                 >
+                                    <TableCell padding="checkbox" onClick={(e) => e.stopPropagation()}>
+                                        {(() => {
+                                            const prog = preparedFor(row);
+                                            const checked = !!prog?.is_prepared;
+                                            const tip = checked && prog?.prepared_by
+                                                ? `Préparé par ${prog.prepared_by}${prog.prepared_at ? ` le ${new Date(prog.prepared_at).toLocaleString('fr-FR')}` : ''}`
+                                                : 'Marquer préparé (mis dans la boîte)';
+                                            return (
+                                                <Tooltip title={tip}>
+                                                    <span>
+                                                        <Checkbox
+                                                            size="small"
+                                                            checked={checked}
+                                                            disabled={row.componentLibraryId == null || !productionId}
+                                                            onChange={(e) => togglePrepared(row, e.target.checked)}
+                                                            inputProps={{ 'aria-label': 'préparé' }}
+                                                        />
+                                                    </span>
+                                                </Tooltip>
+                                            );
+                                        })()}
+                                    </TableCell>
                                     <TableCell>
                                         <Stack direction="row" spacing={0.5} alignItems="center">
                                             <span>{row.componentName || row.value}</span>
@@ -345,6 +405,11 @@ function ProcurementTable({ rows = [], commandId, refreshNonce = 0, onRefreshSta
                                     <TableCell>{row.footprint}</TableCell>
                                     <TableCell align="right">{row.requiredQuantity}</TableCell>
                                     <TableCell align="right">{row.stockAvailableQty || 0}</TableCell>
+                                    <TableCell>
+                                        <Typography variant="caption" sx={{ color: colors.textSecondary, whiteSpace: 'nowrap' }}>
+                                            {formatConditionnement(row.conditionnement)}
+                                        </Typography>
+                                    </TableCell>
                                     <TableCell align="right" onClick={(e) => e.stopPropagation()}>
                                         <Select
                                             size="small"

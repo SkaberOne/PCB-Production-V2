@@ -215,6 +215,7 @@ function MachineImplantationPanel({ config, onEditComponent }) {
             <TableContainer sx={{ maxHeight: 360 }}>
                 <MachineAssignmentTable
                     assignments={visibleMachineAssignments}
+                    productionId={config.machineProductionPlan?.production_id ?? null}
                     selectedSlot={selectedMachineSlotPosition}
                     onSelectSlot={handleSelectMachineSlot}
                     onEditComponent={onEditComponent}

@@ -573,6 +573,8 @@ function CommandPage() {
                 // ré-enregistrer une ligne sans écraser la quantité choisie.
                 quantityToOrderOverride: line.quantity_to_order_override ?? null,
                 componentLibraryId: line.component_library_id,
+                conditionnement: line.conditionnement || null,
+                progress: line.progress || null,
                 lifecycleStatus: line.lifecycle_status,
                 mpn: line.component_mpn,
                 note: line.note || '',
@@ -867,6 +869,7 @@ function CommandPage() {
                             <CardContent>
                                 <ProcurementTable
                                     rows={procurementRows}
+                                    productionId={activeProduction?.id}
                                     commandId={commandSummary?.command_id || commandSummary?.id}
                                     refreshNonce={refreshNonce}
                                     onRefreshState={setRefreshState}

@@ -55,7 +55,9 @@ from src.models.commands import (  # noqa: F401
     CommandReceipt, CommandLineDetail,
 )
 from src.models.machines import PnpCart, PnpFeeder, PnpMachine  # noqa: F401
-from src.models.production import Production, ProductionBomRevision  # noqa: F401
+from src.models.production import (  # noqa: F401
+    Production, ProductionBomRevision, ProductionRun, ProductionComponentProgress,
+)
 from src.models.costing import (  # noqa: F401
     CostParameters, ProductionCostInput, ProductionCosting,
 )
