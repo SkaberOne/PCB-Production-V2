@@ -120,3 +120,10 @@ client/src/desktop/installers/*.exe
 *.log
 serveur/backend.err
 client/src/frontend/frontend.err
+
+# E2E Playwright (prompt 004)
+client/src/frontend/build-e2e/
+serveur/e2e_test.db
+e2e/node_modules/
+e2e/playwright-report/
+e2e/test-results/
