@@ -351,16 +351,16 @@ function BomViewerPage() {
         });
     }, [activeRevisionId, activeBomItemsById, updateBomWorkspaceItem, pushUndo]);
 
+    // 005 — édition live d'un footprint sur la seule ligne éditée (+ undo).
+    // Le choix de portée (ce composant / tous les mêmes valeur+footprint) est
+    // décidé à la validation dans BomReviewTab (dialog), qui appelle ensuite
+    // handleBulkFootprintChange pour « tous ». Plus de regroupement footprint_eagle.
     const handleFootprintChange = React.useCallback((item, nextFootprint) => {
-        if (!activeRevisionId || !activeBom?.items?.length) return;
-        const normalizedFp = String(item.footprint_eagle || '').trim().toUpperCase();
-        const matchingIds = activeBom.items
-            .filter((c) => normalizedFp
-                ? String(c.footprint_eagle || '').trim().toUpperCase() === normalizedFp
-                : c.id === item.id)
-            .map((c) => c.id);
-        updateBomWorkspaceItems(activeRevisionId, matchingIds, { footprint_pnp: nextFootprint });
-    }, [activeBom?.items, activeRevisionId, updateBomWorkspaceItems]);
+        if (!activeRevisionId) return;
+        const currentItem = activeBomItemsById[item.id];
+        if (currentItem) pushUndo({ revisionId: activeRevisionId, itemId: item.id, field: 'footprint_pnp', previousValue: currentItem.footprint_pnp });
+        updateBomWorkspaceItem(activeRevisionId, item.id, { footprint_pnp: nextFootprint });
+    }, [activeRevisionId, activeBomItemsById, updateBomWorkspaceItem, pushUndo]);
 
     // #8 — Notes column handler
     const handleNotesChange = React.useCallback((itemId, nextNotes) => {
@@ -392,6 +392,23 @@ function BomViewerPage() {
             if (current) pushUndo({ revisionId: activeRevisionId, itemId: id, field: 'value_harmonized', previousValue: current.value_harmonized });
         });
         updateBomWorkspaceItems(activeRevisionId, matchingIds, { value_harmonized: newValue });
+    }, [activeRevisionId, activeBom?.items, activeBomItemsById, updateBomWorkspaceItems, pushUndo]);
+
+    // 005 — Changement de footprint « à tous » : applique newFootprint aux lignes
+    // de même (valeur harmonisée + ancien footprint). La ligne éditée est déjà à jour.
+    const handleBulkFootprintChange = React.useCallback((valueHarmonized, oldFootprint, newFootprint) => {
+        if (!activeRevisionId || !activeBom?.items?.length) return;
+        const value = valueHarmonized || '';
+        const previousFootprint = oldFootprint || '';
+        const matchingIds = activeBom.items
+            .filter((c) => (c.value_harmonized || '') === value && (c.footprint_pnp || '') === previousFootprint)
+            .map((c) => c.id);
+        if (!matchingIds.length) return;
+        matchingIds.forEach((id) => {
+            const current = activeBomItemsById[id];
+            if (current) pushUndo({ revisionId: activeRevisionId, itemId: id, field: 'footprint_pnp', previousValue: current.footprint_pnp });
+        });
+        updateBomWorkspaceItems(activeRevisionId, matchingIds, { footprint_pnp: newFootprint });
     }, [activeRevisionId, activeBom?.items, activeBomItemsById, updateBomWorkspaceItems, pushUndo]);
 
     // ── Persist revision ──────────────────────────────────────────────────────
@@ -749,6 +766,7 @@ function BomViewerPage() {
                             onValueChange={handleValueChange}
                             onBulkValueChange={handleBulkValueChange}
                             onFootprintChange={handleFootprintChange}
+                            onBulkFootprintChange={handleBulkFootprintChange}
                             onComponentTypeChange={handleComponentTypeChange}
                             onDnpChange={handleDnpChange}
                             onNotesChange={handleNotesChange}
