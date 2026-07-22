@@ -1,0 +1,20 @@
+# Normalisation des fins de ligne (fix bruit CRLF recurrent)
+* text=auto eol=lf
+
+# Scripts Windows : CRLF requis
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.ps1 text eol=crlf
+
+# Binaires : aucune conversion
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.pdf binary
+*.xlsx binary
+*.zip binary
+
+# Fixtures figees (pas de conversion EOL)
+serveur/src/tests/fixtures/** -text
