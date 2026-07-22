@@ -38,7 +38,7 @@ function eur(v) {
  * composition d'assemblage, et les révisions/BOM de la carte (ouverture dans la
  * Revue BOM éditable, suppression). L'onglet « BOM enregistrées » a été fusionné ici.
  */
-function CardCatalogPage() {
+function CardCatalogPage({ embedded = false }) {
     const [rows, setRows] = React.useState(null);
     const [files, setFiles] = React.useState([]);
     const [categories, setCategories] = React.useState([]);
@@ -121,11 +121,17 @@ function CardCatalogPage() {
 
     return (
         <Box>
-            <PageHeader
-                title="Catalogue des cartes"
-                description="Fiche unifiée : référence, code KELENN, nom, type, catégorie, révisions/BOM, prix et composition (assemblages)."
-                actions={headerActions}
-            />
+            {embedded ? (
+                <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 1.5 }}>
+                    {headerActions}
+                </Box>
+            ) : (
+                <PageHeader
+                    title="Catalogue des cartes"
+                    description="Fiche unifiée : référence, code KELENN, nom, type, catégorie, révisions/BOM, prix et composition (assemblages)."
+                    actions={headerActions}
+                />
+            )}
             {error ? <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>{error}</Alert> : null}
 
             <Stack direction="row" spacing={1.5} sx={{ mb: 2 }} flexWrap="wrap" useFlexGap>

@@ -26,7 +26,6 @@ import CostingPage from './pages/CostingPage';
 // L'onglet « BOM enregistrées » (BomFilesPage) a été fusionné dans « Cartes » (prompt 001).
 import MachinePnpPage from './pages/MachinePnpPage';
 import BaseDeDonneesPage from './pages/BaseDeDonneesPage';
-import CardCatalogPage from './pages/CardCatalogPage';
 import SettingsPage from './pages/SettingsPage';
 import './App.css';
 
@@ -84,15 +83,6 @@ const pages = [
         title: 'Prix carte à la production',
         description: 'Coût de revient HT/TTC d\'une carte produite et prix de référence par carte.',
         icon: PriceChangeRoundedIcon,
-        group: 'library',
-        step: null
-    },
-    {
-        path: '/cartes',
-        label: 'Cartes',
-        title: 'Catalogue des cartes',
-        description: 'Fiche unifiée par carte : référence, code KELENN, nom, type, révisions, prix et assemblages.',
-        icon: DeveloperBoardRoundedIcon,
         group: 'library',
         step: null
     },
@@ -156,13 +146,14 @@ function App() {
                 <Route path="/dashboard" element={<ErrorBoundary context="Dashboard"><DashboardPage /></ErrorBoundary>} />
                 <Route path="/import-bom" element={<ErrorBoundary context="Import BOM"><ImportBomPage /></ErrorBoundary>} />
                 {/* « BOM enregistrées » fusionné dans « Cartes » (prompt 001) : redirection des anciens liens. */}
-                <Route path="/fichier-bom" element={<Navigate to="/cartes" replace />} />
+                <Route path="/fichier-bom" element={<Navigate to="/base-donnees?tab=cartes" replace />} />
                 <Route path="/bom" element={<ErrorBoundary context="BOM Viewer"><BomViewerPage /></ErrorBoundary>} />
                 <Route path="/visualisation-bom" element={<Navigate to="/bom" replace />} />
                 <Route path="/commande-composant" element={<ErrorBoundary context="Commande"><CommandPage /></ErrorBoundary>} />
                 <Route path="/machine-pnp" element={<ErrorBoundary context="Machine PnP"><MachinePnpPage /></ErrorBoundary>} />
                 <Route path="/prix-carte" element={<ErrorBoundary context="Prix carte"><CostingPage /></ErrorBoundary>} />
-                <Route path="/cartes" element={<ErrorBoundary context="Catalogue Cartes"><CardCatalogPage /></ErrorBoundary>} />
+                {/* « Cartes » est désormais un onglet de « Base de données » (prompt 008). */}
+                <Route path="/cartes" element={<Navigate to="/base-donnees?tab=cartes" replace />} />
                 <Route path="/base-donnees" element={<ErrorBoundary context="Base de donnees"><BaseDeDonneesPage /></ErrorBoundary>} />
                 {featureFlags.libraryStock ? (
                     <Route path="/stock" element={<ErrorBoundary context="Stock"><StockPage /></ErrorBoundary>} />

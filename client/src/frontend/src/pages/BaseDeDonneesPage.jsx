@@ -1,13 +1,22 @@
 import React from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Stack, Tab, Tabs } from '@mui/material';
 import PageHeader from '../components/common/PageHeader';
+import CardCatalogPage from './CardCatalogPage';
 import MpnEnrichmentPanel from '../components/library/MpnEnrichmentPanel';
 import ReglesTypePanel from '../components/library/ReglesTypePanel';
 import ComposantsPanel from '../components/library/ComposantsPanel';
 import EmpreintesPanel from '../components/library/EmpreintesPanel';
 
 function BaseDeDonneesPage() {
-    const [activeTab, setActiveTab] = React.useState(0);
+    const [searchParams] = useSearchParams();
+    const [activeTab, setActiveTab] = React.useState(
+        () => (searchParams.get('tab') === 'cartes' ? 4 : 0),
+    );
+    // Ouverture directe de l'onglet Cartes via /base-donnees?tab=cartes (redirection /cartes).
+    React.useEffect(() => {
+        if (searchParams.get('tab') === 'cartes') setActiveTab(4);
+    }, [searchParams]);
     return (
         <Stack spacing={4}>
             <PageHeader
@@ -28,6 +37,7 @@ function BaseDeDonneesPage() {
                 <Tab label="Composants" id="bdd-tab-1" aria-controls="bdd-panel-1" />
                 <Tab label="Règles de type" id="bdd-tab-2" aria-controls="bdd-panel-2" />
                 <Tab label="Enrichissement MPN" id="bdd-tab-3" aria-controls="bdd-panel-3" />
+                <Tab label="Cartes" id="bdd-tab-4" aria-controls="bdd-panel-4" />
             </Tabs>
 
             {activeTab === 0 ? (
@@ -44,6 +54,10 @@ function BaseDeDonneesPage() {
 
             {activeTab === 3 ? (
                 <MpnEnrichmentPanel />
+            ) : null}
+
+            {activeTab === 4 ? (
+                <CardCatalogPage embedded />
             ) : null}
         </Stack>
     );
