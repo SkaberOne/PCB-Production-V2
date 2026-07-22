@@ -2,7 +2,7 @@
 
 - **Statut** : ✅ terminé
 - **Branche** : feat/prix-carte-modes
-- **PR** : #NN (à compléter) → dev — état CI : en attente
+- **PR** : [#88](https://github.com/SkaberOne/PCB-Production-V2/pull/88) → dev — état CI : en attente (voir PR)
 - **Déployé staging** : oui (:8001)
 
 ## Ce qui a été fait
