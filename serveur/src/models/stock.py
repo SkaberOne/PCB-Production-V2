@@ -179,6 +179,9 @@ class StockSettings(Base):
     id = Column(Integer, primary_key=True, index=True)
     # Global production loss coefficient in percent (default 0.0 = neutral).
     global_loss_pct = Column(Float, nullable=False, default=0.0, server_default="0")
+    # Racine des projets de conception (import catalogue 011) — réglage éditable,
+    # jamais codé en dur ; nullable tant que non configuré.
+    projects_root_path = Column(String(500), nullable=True)
     updated_at = Column(DateTime, default=utcnow, onupdate=utcnow)
 
     def __repr__(self):

@@ -5,6 +5,7 @@ import MpnEnrichmentPanel from '../components/library/MpnEnrichmentPanel';
 import ReglesTypePanel from '../components/library/ReglesTypePanel';
 import ComposantsPanel from '../components/library/ComposantsPanel';
 import EmpreintesPanel from '../components/library/EmpreintesPanel';
+import CatalogueImportPanel from '../components/import/CatalogueImportPanel';
 
 function BaseDeDonneesPage() {
     const [activeTab, setActiveTab] = React.useState(0);
@@ -28,6 +29,7 @@ function BaseDeDonneesPage() {
                 <Tab label="Composants" id="bdd-tab-1" aria-controls="bdd-panel-1" />
                 <Tab label="Règles de type" id="bdd-tab-2" aria-controls="bdd-panel-2" />
                 <Tab label="Enrichissement MPN" id="bdd-tab-3" aria-controls="bdd-panel-3" />
+                <Tab label="Import catalogue" id="bdd-tab-4" aria-controls="bdd-panel-4" />
             </Tabs>
 
             {activeTab === 0 ? (
@@ -44,6 +46,10 @@ function BaseDeDonneesPage() {
 
             {activeTab === 3 ? (
                 <MpnEnrichmentPanel />
+            ) : null}
+
+            {activeTab === 4 ? (
+                <CatalogueImportPanel />
             ) : null}
         </Stack>
     );

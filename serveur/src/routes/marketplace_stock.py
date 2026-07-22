@@ -20,6 +20,7 @@ from ..schemas.stock import (
     ComponentParamsRequest,
     ComponentStockOut,
     GlobalSettingsRequest,
+    ProjectsRootRequest,
     MovementCreateRequest,
     MovementOut,
     ReceptionCreateRequest,
@@ -106,6 +107,14 @@ def get_settings(db: Session = Depends(get_db)):
 @router.put("/stock/settings", response_model=SettingsOut)
 def update_settings(request: GlobalSettingsRequest, db: Session = Depends(get_db)):
     out = StockService.set_global_loss_pct(db, request.global_loss_pct)
+    event_bus.publish("stock", {"kind": "settings"})
+    return out
+
+
+@router.put("/stock/projects-root", response_model=SettingsOut)
+def update_projects_root(request: ProjectsRootRequest, db: Session = Depends(get_db)):
+    """Configure le chemin racine des projets pour l'import catalogue (011)."""
+    out = StockService.set_projects_root_path(db, request.projects_root_path)
     event_bus.publish("stock", {"kind": "settings"})
     return out
 
