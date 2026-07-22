@@ -21,6 +21,7 @@ import {
 } from '@mui/material';
 import apiClient from '../api/client';
 import PageHeader from '../components/common/PageHeader';
+import ProductionSuiviBar from '../components/dashboard/ProductionSuiviBar';
 import { colors } from '../theme';
 
 const BELOW_MIN_BG = 'rgba(239, 68, 68, 0.12)';
@@ -131,13 +132,14 @@ function BoardStockPage() {
                             <TableCell align="right">Testées</TableCell>
                             <TableCell align="right">Validées</TableCell>
                             <TableCell align="right">À débugger</TableCell>
+                            <TableCell align="right">Suivi</TableCell>
                         </TableRow>
                     </TableHead>
                     <TableBody>
                         {rows === null ? (
-                            <TableRow><TableCell colSpan={9} sx={{ py: 3, textAlign: 'center', color: colors.textSecondary }}>Chargement…</TableCell></TableRow>
+                            <TableRow><TableCell colSpan={10} sx={{ py: 3, textAlign: 'center', color: colors.textSecondary }}>Chargement…</TableCell></TableRow>
                         ) : rows.length === 0 ? (
-                            <TableRow><TableCell colSpan={9} sx={{ py: 3, textAlign: 'center', color: colors.textSecondary }}>Aucune référence de carte.</TableCell></TableRow>
+                            <TableRow><TableCell colSpan={10} sx={{ py: 3, textAlign: 'center', color: colors.textSecondary }}>Aucune référence de carte.</TableCell></TableRow>
                         ) : rows.map((row) => (
                             <TableRow
                                 key={`${row.bom_reference_id}::${row.revision || ''}`}
@@ -164,6 +166,17 @@ function BoardStockPage() {
                                 <TableCell align="right" sx={{ color: '#3b82f6' }}>{row.cards_tested}</TableCell>
                                 <TableCell align="right" sx={{ color: '#22c55e' }}>{row.cards_validated}</TableCell>
                                 <TableCell align="right" sx={{ color: '#f59e0b' }}>{row.cards_to_debug}</TableCell>
+                                <TableCell align="right">
+                                    <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
+                                        <ProductionSuiviBar
+                                            produced={row.qty_in_stock}
+                                            tested={row.cards_tested}
+                                            validated={row.cards_validated}
+                                            toDebug={row.cards_to_debug}
+                                            testId={`suivi-bar-${row.bom_reference_id}`}
+                                        />
+                                    </Box>
+                                </TableCell>
                             </TableRow>
                         ))}
                     </TableBody>
