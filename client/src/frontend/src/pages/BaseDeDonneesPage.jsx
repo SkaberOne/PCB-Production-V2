@@ -7,6 +7,7 @@ import MpnEnrichmentPanel from '../components/library/MpnEnrichmentPanel';
 import ReglesTypePanel from '../components/library/ReglesTypePanel';
 import ComposantsPanel from '../components/library/ComposantsPanel';
 import EmpreintesPanel from '../components/library/EmpreintesPanel';
+import CatalogueImportPanel from '../components/import/CatalogueImportPanel';
 
 function BaseDeDonneesPage() {
     const [searchParams] = useSearchParams();
@@ -38,6 +39,7 @@ function BaseDeDonneesPage() {
                 <Tab label="Règles de type" id="bdd-tab-2" aria-controls="bdd-panel-2" />
                 <Tab label="Enrichissement MPN" id="bdd-tab-3" aria-controls="bdd-panel-3" />
                 <Tab label="Cartes" id="bdd-tab-4" aria-controls="bdd-panel-4" />
+                <Tab label="Import catalogue" id="bdd-tab-5" aria-controls="bdd-panel-5" />
             </Tabs>
 
             {activeTab === 0 ? (
@@ -58,6 +60,10 @@ function BaseDeDonneesPage() {
 
             {activeTab === 4 ? (
                 <CardCatalogPage embedded />
+            ) : null}
+
+            {activeTab === 5 ? (
+                <CatalogueImportPanel />
             ) : null}
         </Stack>
     );

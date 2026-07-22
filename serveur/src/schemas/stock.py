@@ -170,7 +170,13 @@ class SettingsOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     global_loss_pct: float
+    projects_root_path: Optional[str] = None
     updated_at: Optional[datetime] = None
+
+
+class ProjectsRootRequest(BaseModel):
+    """Chemin racine des projets pour l'import catalogue (011). Vide = efface."""
+    projects_root_path: Optional[str] = None
 
 
 class StockListOut(BaseModel):

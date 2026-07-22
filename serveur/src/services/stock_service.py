@@ -54,6 +54,23 @@ class StockService:
         return row
 
     @classmethod
+    def get_projects_root_path(cls, db: Session) -> Optional[str]:
+        """Racine des projets de conception (réglage 011), ou ``None`` si non configurée."""
+        row = cls.get_settings(db)
+        value = (row.projects_root_path or "").strip()
+        return value or None
+
+    @classmethod
+    def set_projects_root_path(cls, db: Session, path: Optional[str]) -> StockSettings:
+        """Met à jour le chemin racine des projets (vide = efface)."""
+        row = cls.get_settings(db)
+        cleaned = (path or "").strip()
+        row.projects_root_path = cleaned[:500] or None
+        db.commit()
+        db.refresh(row)
+        return row
+
+    @classmethod
     def set_global_loss_pct(cls, db: Session, value: float) -> StockSettings:
         row = cls.get_settings(db)
         row.global_loss_pct = max(float(value or 0.0), 0.0)

@@ -335,3 +335,15 @@ class BomDetailResponse(BaseModel):
 class BomRevisionDetailResponse(BaseModel):
     revision: BomRevisionSchema
     items: List[BomItemSchema]
+
+
+class CatalogueImportResponse(BaseModel):
+    """Rapport d'import en masse du catalogue (prompt 011)."""
+
+    root_path: str
+    dry_run: bool
+    cards_scanned: int
+    revisions_imported: int
+    components_created: int
+    skipped_dirs: List[str] = Field(default_factory=list)
+    rows: List[dict] = Field(default_factory=list)

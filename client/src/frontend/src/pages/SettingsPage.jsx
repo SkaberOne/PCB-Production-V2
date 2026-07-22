@@ -20,6 +20,7 @@ import PageHeader from '../components/common/PageHeader';
 import DatabaseSettings from '../components/common/DatabaseSettings';
 import SupplierApiSettings from '../components/common/SupplierApiSettings';
 import WorkstationSetting from '../components/common/WorkstationSetting';
+import ProjectsRootSetting from '../components/common/ProjectsRootSetting';
 
 const cardSx = { backgroundColor: '#18181b', border: '1px solid #1f2937' };
 
@@ -81,8 +82,9 @@ function SettingsPage() {
             </SettingsSection>
 
             <SettingsSection icon={FolderRoundedIcon} title="Chemins import / export">
+                <ProjectsRootSetting />
                 <Typography variant="body2" sx={{ color: '#a1a1aa' }}>
-                    Les répertoires utilisés par les flux locaux (import BOM, exports) sont définis côté serveur
+                    Les autres répertoires des flux locaux (import BOM, exports) sont définis côté serveur
                     dans le fichier de configuration <Box component="code" sx={{ color: '#e4e4e7' }}>serveur/.env</Box>.
                 </Typography>
             </SettingsSection>
