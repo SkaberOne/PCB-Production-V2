@@ -18,6 +18,7 @@ from ..schemas.marketplace import (
 from ..schemas.stock import ProduceRequest, RunOut, RunUpdateRequest
 from ..services.production_stock_service import ProductionStockService
 from ..services.production_workspace_service import ProductionWorkspaceService
+from ..services.production_progress_service import ProductionProgressService
 from ..services import event_bus
 from .marketplace_stock import workstation_header
 
@@ -240,6 +241,14 @@ def cancel_production_run(
     return run
 
 
+class ComponentProgressRequest(BaseModel):
+    """Toggle « préparé » / « installé » d'un composant pour une production (007).
+    Champs optionnels : seul le jalon fourni est modifié (set-to)."""
+
+    prepared: Optional[bool] = None
+    installed: Optional[bool] = None
+
+
 class FollowupRequest(BaseModel):
     """Suivi manuel d'une production terminée (compteurs cartes + note libre).
     Tous les champs optionnels : seuls ceux fournis sont mis à jour."""
@@ -360,3 +369,33 @@ def update_production_erp_context(
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error updating ERP context: {str(e)}")
+
+
+@router.put("/{production_id}/component-progress/{component_id}")
+def set_component_progress(
+    production_id: int,
+    component_id: int,
+    request: ComponentProgressRequest,
+    db: Session = Depends(get_db),
+    created_by: Optional[str] = Depends(workstation_header),
+):
+    """Coche/décoche « préparé » et/ou « installé » d'un composant (qui + quand).
+
+    Annotation d'avancement — **aucun impact sur le solde de stock**. Set-to :
+    seul le jalon présent dans le corps est modifié."""
+    try:
+        row = ProductionProgressService.set_progress(
+            db,
+            production_id,
+            component_id,
+            prepared=request.prepared,
+            installed=request.installed,
+            created_by=created_by,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    return {
+        "production_id": production_id,
+        "component_id": component_id,
+        **ProductionProgressService.progress_payload(row),
+    }

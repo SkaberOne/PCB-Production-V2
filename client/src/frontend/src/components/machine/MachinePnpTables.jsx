@@ -1,11 +1,13 @@
 import React from 'react';
 import DeleteOutlineRoundedIcon from '@mui/icons-material/DeleteOutlineRounded';
+import apiClient from '../../api/client';
 import EditRoundedIcon from '@mui/icons-material/EditRounded';
 import MoreVertRoundedIcon from '@mui/icons-material/MoreVertRounded';
 import PushPinRoundedIcon from '@mui/icons-material/PushPinRounded';
 import TuneRoundedIcon from '@mui/icons-material/TuneRounded';
 import {
     Box,
+    Checkbox,
     Chip,
     IconButton,
     LinearProgress,
@@ -437,6 +439,16 @@ export const CartTable = React.memo(function CartTable({
     );
 });
 
+// Conditionnement (007) : formes physiques non nulles (« 🎞️ 2500 · sachet 300 »).
+const COND_LABELS_PNP = { reel: '🎞️', bag: 'sachet', tube: 'tube' };
+function formatConditionnementPnp(cond) {
+    if (!cond) return '—';
+    const parts = ['reel', 'bag', 'tube']
+        .filter((f) => Number(cond[f]) > 0)
+        .map((f) => `${COND_LABELS_PNP[f]} ${Number(cond[f]).toLocaleString('fr-FR')}`);
+    return parts.length ? parts.join(' · ') : '—';
+}
+
 const MachineAssignmentTableRow = React.memo(function MachineAssignmentTableRow({
     assignment,
     isSelected,
@@ -444,6 +456,9 @@ const MachineAssignmentTableRow = React.memo(function MachineAssignmentTableRow(
     onEditComponent,
     selectedMachineBomPlannedBoardQuantity,
     selectedMachineBomRevision,
+    installedInfo,
+    canToggleInstalled,
+    onToggleInstalled,
 }) {
     const assignmentPalette = getMachineAssignmentPalette(assignment);
     const quantityDisplay = getMachineAssignmentDisplayQuantities(
@@ -480,6 +495,27 @@ const MachineAssignmentTableRow = React.memo(function MachineAssignmentTableRow(
                 },
             }}
         >
+            <TableCell padding="checkbox" onClick={(e) => e.stopPropagation()}>
+                {(() => {
+                    const checked = !!installedInfo?.is_installed;
+                    const tip = checked && installedInfo?.installed_by
+                        ? `Installé par ${installedInfo.installed_by}${installedInfo.installed_at ? ` le ${new Date(installedInfo.installed_at).toLocaleString('fr-FR')}` : ''}`
+                        : 'Marquer installé (posé sur la PnP)';
+                    return (
+                        <Tooltip title={tip}>
+                            <span>
+                                <Checkbox
+                                    size="small"
+                                    checked={checked}
+                                    disabled={!canToggleInstalled || assignment.component_id == null}
+                                    onChange={(e) => onToggleInstalled(assignment, e.target.checked)}
+                                    inputProps={{ 'aria-label': 'installé' }}
+                                />
+                            </span>
+                        </Tooltip>
+                    );
+                })()}
+            </TableCell>
             <TableCell sx={compactCellSx}>
                 <Stack direction="row" spacing={0.4} alignItems="center">
                     {assignment.is_pinned ? (
@@ -530,6 +566,11 @@ const MachineAssignmentTableRow = React.memo(function MachineAssignmentTableRow(
                     </Typography>
                 </Stack>
             </TableCell>
+            <TableCell sx={compactCellSx}>
+                <Typography variant="caption" sx={{ color: '#a1a1aa', whiteSpace: 'nowrap' }}>
+                    {formatConditionnementPnp(assignment.conditionnement)}
+                </Typography>
+            </TableCell>
         </TableRow>
     );
 });
@@ -554,9 +595,35 @@ export const MachineAssignmentTable = React.memo(function MachineAssignmentTable
     onEditComponent,
     selectedMachineBomPlannedBoardQuantity,
     selectedMachineBomRevision,
+    productionId,
 }) {
     const [sortBy, setSortBy] = React.useState('slot');
     const [sortDir, setSortDir] = React.useState('asc');
+    // Overlay optimiste de l'état « installé » par composant (007).
+    const [installedOverlay, setInstalledOverlay] = React.useState({});
+    const installedFor = React.useCallback((assignment) => {
+        const cid = assignment.component_id;
+        if (cid != null && installedOverlay[cid] !== undefined) return installedOverlay[cid];
+        return assignment.progress || null;
+    }, [installedOverlay]);
+    const toggleInstalled = React.useCallback(async (assignment, checked) => {
+        const cid = assignment.component_id;
+        if (cid == null || !productionId) return;
+        setInstalledOverlay((m) => ({ ...m, [cid]: { is_installed: checked, installed_by: null, installed_at: null } }));
+        try {
+            const res = await apiClient.put(
+                `/marketplace/productions/${productionId}/component-progress/${cid}`,
+                { installed: checked },
+            );
+            setInstalledOverlay((m) => ({ ...m, [cid]: {
+                is_installed: res.data.is_installed,
+                installed_by: res.data.installed_by,
+                installed_at: res.data.installed_at,
+            } }));
+        } catch (err) {
+            setInstalledOverlay((m) => ({ ...m, [cid]: { is_installed: !checked, installed_by: null, installed_at: null } }));
+        }
+    }, [productionId]);
 
     const handleSort = (key) => {
         if (key === sortBy) {
@@ -589,6 +656,7 @@ export const MachineAssignmentTable = React.memo(function MachineAssignmentTable
         <Table size="small" stickyHeader>
             <TableHead>
                 <TableRow>
+                    <TableCell padding="checkbox">Inst.</TableCell>
                     {ASSIGNMENT_SORT_COLUMNS.map((col) => (
                         <TableCell
                             key={col.key}
@@ -603,6 +671,7 @@ export const MachineAssignmentTable = React.memo(function MachineAssignmentTable
                             </TableSortLabel>
                         </TableCell>
                     ))}
+                    <TableCell>Cond.</TableCell>
                 </TableRow>
             </TableHead>
             <TableBody>
@@ -615,6 +684,9 @@ export const MachineAssignmentTable = React.memo(function MachineAssignmentTable
                         onEditComponent={onEditComponent}
                         selectedMachineBomPlannedBoardQuantity={selectedMachineBomPlannedBoardQuantity}
                         selectedMachineBomRevision={selectedMachineBomRevision}
+                        installedInfo={installedFor(assignment)}
+                        canToggleInstalled={!!productionId}
+                        onToggleInstalled={toggleInstalled}
                     />
                 ))}
             </TableBody>

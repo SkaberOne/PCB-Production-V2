@@ -20,6 +20,7 @@ from ..schemas.marketplace import (
 from ..schemas.stock import MachineLoadOut, ProduceRequest, RunOut, SetLoadRequest
 from ..services.assignment_service import AssignmentService
 from ..services.production_stock_service import ProductionStockService
+from ..services.production_progress_service import ProductionProgressService
 from ..services.stock_service import StockService
 
 router = APIRouter(prefix="/machines")
@@ -221,12 +222,14 @@ def get_machine_production_feeder_plan(
     (TOP/BOT) seule : implantation + composants à la main propres à la face.
     """
     try:
-        return AssignmentService.get_machine_production_feeder_plan(
+        plan = AssignmentService.get_machine_production_feeder_plan(
             db=db,
             machine_id=machine_id,
             production_id=production_id,
             bom_revision_id=bom_revision_id,
         )
+        # Conditionnement (formes) + avancement « installé » par composant (007).
+        return ProductionProgressService.enrich_component_id_tree(db, production_id, plan)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
