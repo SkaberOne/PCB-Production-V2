@@ -2,7 +2,7 @@
 
 - **Statut** : ✅ terminé
 - **Branche** : feat/stock-cartes-barre
-- **PR** : #NN (à compléter) → dev — état CI : en attente
+- **PR** : [#89](https://github.com/SkaberOne/PCB-Production-V2/pull/89) → dev — état CI : en attente (voir PR)
 - **Déployé staging** : oui (:8001)
 
 ## Ce qui a été fait
