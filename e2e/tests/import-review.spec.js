@@ -10,7 +10,7 @@ const FIXTURE = path.join(__dirname, '..', 'fixtures', 'E2ETEST_TOP.txt');
 test.describe('Import BOM', () => {
   test('uploader un fichier BOM le parse et l\'importe', async ({ page }) => {
     await page.goto('/#/import-bom');
-    await page.locator('input[type="file"]').first().setInputFiles(FIXTURE);
+    await page.locator('#file-input').setInputFiles(FIXTURE);
     await page.getByRole('button', { name: /^Importer$/i }).click();
 
     // L'import a réussi : la résolution des composants absents s'ouvre et liste
