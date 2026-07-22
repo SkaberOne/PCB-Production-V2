@@ -2,7 +2,7 @@
 
 - **Statut** : ✅ terminé
 - **Branche** : feat/cartes-dans-bdd
-- **PR** : #NN (à compléter) → dev — état CI : en attente
+- **PR** : [#87](https://github.com/SkaberOne/PCB-Production-V2/pull/87) → dev — état CI : en attente (voir PR)
 - **Déployé staging** : oui (:8001)
 
 ## Ce qui a été fait
