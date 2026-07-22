@@ -5,8 +5,12 @@ Mis à jour par l'orchestrateur à chaque exécution (le plus récent en haut).
 
 | ID | Feature | Type | Statut | Branche | Résultat | Date |
 |----|---------|------|--------|---------|----------|------|
-| 011 | Import en masse du catalogue depuis le partage réseau (Eagle ; KiCad listé) | feat | ✅ terminé | feat/import-catalogue-masse | [PR #90](https://github.com/SkaberOne/PCB-Production-V2/pull/90) → dev (chemin réglable + dry-run/import idempotent ; réutilise chaîne CAO 006) | 2026-07-22 |
 | 012 | Import CAO — glisser-déposer dossier carte + extraction arbo (multi-révisions) | feat | ✅ terminé | feat/import-cao-drop-dossier | [PR #85](https://github.com/SkaberOne/PCB-Production-V2/pull/85) → dev (drop + KT<réf>/Rev.X ; réutilise /bom/import-cao du 006) | 2026-07-22 |
+| 011 | Import en masse du catalogue depuis le partage réseau (Eagle ; KiCad listé) | feat | ✅ terminé | feat/import-catalogue-masse | [PR #90](https://github.com/SkaberOne/PCB-Production-V2/pull/90) → dev (chemin réglable + dry-run/import idempotent ; réutilise chaîne CAO 006) | 2026-07-22 |
+| 010 | Stock cartes — barre visuelle testées/validées/à débugger par carte | feat | ✅ terminé | feat/stock-cartes-barre | [PR #89](https://github.com/SkaberOne/PCB-Production-V2/pull/89) → dev (réutilise ProductionSuiviBar du dashboard ; aucun changement backend) | 2026-07-22 |
+| 009 | « Prix carte » — deux modes (production run vs carte de référence) | feat | ✅ terminé | feat/prix-carte-modes | [PR #88](https://github.com/SkaberOne/PCB-Production-V2/pull/88) → dev (sélecteur de mode ; réutilise costing production + is_reference) | 2026-07-22 |
+| 008 | « Cartes » intégré comme onglet de « Base de données » (+ redirection /cartes) | feat | ✅ terminé | feat/cartes-dans-bdd | [PR #87](https://github.com/SkaberOne/PCB-Production-V2/pull/87) → dev (réutilise CardCatalogPage en onglet ; menu allégé) | 2026-07-22 |
+| 007 | Conditionnement affiché + suivi « préparé / installé » par composant | feat | ✅ terminé | feat/suivi-preparation-prod | [PR #86](https://github.com/SkaberOne/PCB-Production-V2/pull/86) → dev (modèle ProductionComponentProgress ; cases Préparé/Installé + conditionnement, sans impact stock) | 2026-07-22 |
 | 006 | Import CAO Eagle — endpoint /import-cao + UI dossier (incrément 2) | feat | ✅ terminé | feat/import-cao-ui | [PR #82](https://github.com/SkaberOne/PCB-Production-V2/pull/82) → dev | 2026-07-22 |
 | 005 | Changement de footprint avec choix de portée (parité 002, MPN suit) | feat | ✅ terminé | feat/footprint-portee | [PR #83](https://github.com/SkaberOne/PCB-Production-V2/pull/83) → dev | 2026-07-22 |
 | 004 | Tests E2E Playwright — infra + parcours critiques (smoke/nav, import) | chore/test | ⚠ terminé avec réserve | chore/e2e-playwright | [PR #84](https://github.com/SkaberOne/PCB-Production-V2/pull/84) → dev (3 E2E verts ; gate CI = échange E03, option a) | 2026-07-22 |
@@ -18,8 +22,8 @@ Mis à jour par l'orchestrateur à chaque exécution (le plus récent en haut).
 
 ## Légende des statuts
 
-- **à-faire** — prompt validé dans \`1-a-faire/\`, pas encore exécuté
-- **en-cours** — en cours d'exécution par l'orchestrateur (\`2-en-cours/\`)
-- **✅ terminé** — codé, testé, déployé staging, PR ouverte (\`3-termine/\`)
+- **à-faire** — prompt validé dans `1-a-faire/`, pas encore exécuté
+- **en-cours** — en cours d'exécution par l'orchestrateur (`2-en-cours/`)
+- **✅ terminé** — codé, testé, déployé staging, PR ouverte (`3-termine/`)
 - **⚠ terminé avec réserves / partiel** — livré mais un point/incrément reste (voir RESULTAT.md)
 - **❌ échec** — bloqué, non déployé (voir RESULTAT.md pour la cause)
