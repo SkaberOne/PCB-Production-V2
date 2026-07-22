@@ -5,6 +5,7 @@ Mis à jour par l'orchestrateur à chaque exécution (le plus récent en haut).
 
 | ID | Feature | Type | Statut | Branche | Résultat | Date |
 |----|---------|------|--------|---------|----------|------|
+| 009 | « Prix carte » — deux modes (production run vs carte de référence) | feat | ✅ terminé | feat/prix-carte-modes | PR → dev (sélecteur de mode ; réutilise costing production + is_reference) | 2026-07-22 |
 | 012 | Import CAO — glisser-déposer dossier carte + extraction arbo (multi-révisions) | feat | ✅ terminé | feat/import-cao-drop-dossier | [PR #85](https://github.com/SkaberOne/PCB-Production-V2/pull/85) → dev (drop + KT<réf>/Rev.X ; réutilise /bom/import-cao du 006) | 2026-07-22 |
 | 006 | Import CAO Eagle — endpoint /import-cao + UI dossier (incrément 2) | feat | ✅ terminé | feat/import-cao-ui | [PR #82](https://github.com/SkaberOne/PCB-Production-V2/pull/82) → dev | 2026-07-22 |
 | 005 | Changement de footprint avec choix de portée (parité 002, MPN suit) | feat | ✅ terminé | feat/footprint-portee | [PR #83](https://github.com/SkaberOne/PCB-Production-V2/pull/83) → dev | 2026-07-22 |
