@@ -378,6 +378,22 @@ function BomViewerPage() {
         });
     }, [activeRevisionId, updateBomWorkspaceItems]);
 
+    // 002 — Renommage de valeur « à tous » : applique newValue à toutes les lignes
+    // dont value_harmonized === oldValue (la ligne éditée est déjà à newValue).
+    const handleBulkValueChange = React.useCallback((oldValue, newValue) => {
+        if (!activeRevisionId || !activeBom?.items?.length) return;
+        const previousValue = oldValue || '';
+        const matchingIds = activeBom.items
+            .filter((c) => (c.value_harmonized || '') === previousValue)
+            .map((c) => c.id);
+        if (!matchingIds.length) return;
+        matchingIds.forEach((id) => {
+            const current = activeBomItemsById[id];
+            if (current) pushUndo({ revisionId: activeRevisionId, itemId: id, field: 'value_harmonized', previousValue: current.value_harmonized });
+        });
+        updateBomWorkspaceItems(activeRevisionId, matchingIds, { value_harmonized: newValue });
+    }, [activeRevisionId, activeBom?.items, activeBomItemsById, updateBomWorkspaceItems, pushUndo]);
+
     // ── Persist revision ──────────────────────────────────────────────────────
     const persistRevision = React.useCallback(async (entry, options = {}) => {
         if (!entry?.bom_revision_id) return null;
@@ -731,6 +747,7 @@ function BomViewerPage() {
                             activeRevisionId={activeRevisionId}
                             undoStackLength={undoStack.length}
                             onValueChange={handleValueChange}
+                            onBulkValueChange={handleBulkValueChange}
                             onFootprintChange={handleFootprintChange}
                             onComponentTypeChange={handleComponentTypeChange}
                             onDnpChange={handleDnpChange}

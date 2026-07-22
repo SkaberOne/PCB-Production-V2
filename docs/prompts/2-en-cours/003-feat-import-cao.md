@@ -1,3 +1,5 @@
+> **EN ATTENTE — echange [[E02]]** (docs/prompts/echanges/ouverts/E02-orch-p003-parser-fixtures.md) : import CAO Eagle en pause tant que parser_eagle.py + fixtures OTR ne sont pas fournis. Repris a reception.
+
 # [003] feat(import): import direct de fichiers CAO (Eagle/KiCad) par dossier → BOM + centroïde
 
 | Champ | Valeur |
