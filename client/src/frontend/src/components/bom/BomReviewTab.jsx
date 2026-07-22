@@ -37,6 +37,7 @@ import {
 } from '../../utils/compactTable';
 import { componentTypeOptions } from '../../utils/componentTypes';
 import ValueScopeDialog from './ValueScopeDialog';
+import FootprintScopeDialog from './FootprintScopeDialog';
 
 // ─── Dark-themed dialog paper ────────────────────────────────────────────────
 const DIALOG_PAPER_SX = {
@@ -116,6 +117,8 @@ const BomReviewTableRow = React.memo(function BomReviewTableRow({
     onValueFocus,
     onValueCommit,
     onFootprintChange,
+    onFootprintFocus,
+    onFootprintCommit,
     onComponentTypeChange,
     onDnpChange,
     onNotesChange,
@@ -161,6 +164,9 @@ const BomReviewTableRow = React.memo(function BomReviewTableRow({
                     aria-label={`Empreinte PnP ${item.reference || item.reference_item || ''}`.trim()}
                     value={item.footprint_pnp || ''}
                     onChange={(e) => onFootprintChange(item, e.target.value)}
+                    onFocus={() => onFootprintFocus(item)}
+                    onBlur={(e) => onFootprintCommit(item.id, e.target.value)}
+                    onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); e.target.blur(); } }}
                     placeholder={item.footprint_eagle || ''}
                     sx={compactInputSx}
                 />
@@ -224,6 +230,7 @@ function BomReviewTab({
     onValueChange,
     onBulkValueChange,
     onFootprintChange,
+    onBulkFootprintChange,
     onComponentTypeChange,
     onDnpChange,
     onNotesChange,
@@ -253,6 +260,10 @@ function BomReviewTab({
     // valeur au focus (ancienne) pour décider de la portée à la validation.
     const valueFocusRef = React.useRef(null);
     const [valueScope, setValueScope] = React.useState(null);
+    // ── Changement de footprint avec portée (prompt 005) ─────────────────────
+    // (valeur harmonisée + ancien footprint) au focus pour décider de la portée.
+    const footprintFocusRef = React.useRef(null);
+    const [footprintScope, setFootprintScope] = React.useState(null);
 
     const deferredSearch = React.useDeferredValue(search);
 
@@ -467,6 +478,51 @@ function BomReviewTab({
             return null;
         });
     }, [onValueChange]);
+
+    // ── Portée du changement de footprint (prompt 005) ───────────────────────
+    const handleFootprintFocus = React.useCallback((item) => {
+        footprintFocusRef.current = {
+            itemId: item.id,
+            value: item.value_harmonized || '',
+            footprint: item.footprint_pnp || '',
+        };
+    }, []);
+
+    const handleFootprintCommit = React.useCallback((itemId, newFootprintRaw) => {
+        const start = footprintFocusRef.current;
+        footprintFocusRef.current = null;
+        if (!start || start.itemId !== itemId) return;
+        const oldFootprint = start.footprint || '';
+        const newFootprint = newFootprintRaw || '';
+        if (newFootprint === oldFootprint) return; // pas de changement réel
+        const value = start.value || '';
+        // Frères = même valeur harmonisée ET même ancien footprint (la ligne
+        // éditée est déjà au nouveau footprint via l'édition live).
+        const count = items.filter((i) => i.id !== itemId
+            && (i.value_harmonized || '') === value
+            && (i.footprint_pnp || '') === oldFootprint).length;
+        if (count > 0) {
+            setFootprintScope({ itemId, value, oldFootprint, newFootprint, count });
+        }
+    }, [items]);
+
+    const handleFootprintScopeThis = React.useCallback(() => setFootprintScope(null), []);
+
+    const handleFootprintScopeAll = React.useCallback(() => {
+        setFootprintScope((current) => {
+            if (current && onBulkFootprintChange) {
+                onBulkFootprintChange(current.value, current.oldFootprint, current.newFootprint);
+            }
+            return null;
+        });
+    }, [onBulkFootprintChange]);
+
+    const handleFootprintScopeCancel = React.useCallback(() => {
+        setFootprintScope((current) => {
+            if (current) onFootprintChange({ id: current.itemId }, current.oldFootprint);
+            return null;
+        });
+    }, [onFootprintChange]);
 
     const allPageSelected = paginatedItems.length > 0
         && paginatedItems.every((i) => selectedItemIds.has(i.id));
@@ -692,6 +748,8 @@ function BomReviewTab({
                                     onValueFocus={handleValueFocus}
                                     onValueCommit={handleValueCommit}
                                     onFootprintChange={onFootprintChange}
+                                    onFootprintFocus={handleFootprintFocus}
+                                    onFootprintCommit={handleFootprintCommit}
                                     onComponentTypeChange={onComponentTypeChange}
                                     onDnpChange={onDnpChange}
                                     onNotesChange={onNotesChange}
@@ -754,6 +812,14 @@ function BomReviewTab({
                 onThis={handleScopeThis}
                 onAll={handleScopeAll}
                 onCancel={handleScopeCancel}
+            />
+
+            {/* ── Portée du changement de footprint (prompt 005) ─────────── */}
+            <FootprintScopeDialog
+                scope={footprintScope}
+                onThis={handleFootprintScopeThis}
+                onAll={handleFootprintScopeAll}
+                onCancel={handleFootprintScopeCancel}
             />
         </Stack>
     );
