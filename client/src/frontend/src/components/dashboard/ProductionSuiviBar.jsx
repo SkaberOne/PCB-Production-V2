@@ -6,7 +6,7 @@ import { Box, Tooltip } from '@mui/material';
  * part **validée** (vert), **à débugger** (orange), **testée en attente** (bleu =
  * testées − validées − à débugger), le reste **non testée** (fond gris).
  */
-function ProductionSuiviBar({ produced, tested, validated, toDebug, width = 130 }) {
+function ProductionSuiviBar({ produced, tested, validated, toDebug, width = 130, testId }) {
     const p = Math.max(Number(produced) || 0, 0);
     const t = Math.max(Number(tested) || 0, 0);
     const v = Math.max(Number(validated) || 0, 0);
@@ -16,7 +16,7 @@ function ProductionSuiviBar({ produced, tested, validated, toDebug, width = 130 
     const pct = (n) => (base > 0 ? `${(n / base) * 100}%` : '0%');
     return (
         <Tooltip arrow title={`Validées ${v} · À débugger ${d} · Testées ${t} / produites ${p}`}>
-            <Box sx={{ display: 'flex', width, height: 9, borderRadius: 5, overflow: 'hidden', bgcolor: '#3f3f46' }}>
+            <Box data-testid={testId} sx={{ display: 'flex', width, height: 9, borderRadius: 5, overflow: 'hidden', bgcolor: '#3f3f46' }}>
                 <Box sx={{ width: pct(v), bgcolor: '#22c55e' }} />
                 <Box sx={{ width: pct(d), bgcolor: '#f59e0b' }} />
                 <Box sx={{ width: pct(pending), bgcolor: '#3b82f6' }} />
