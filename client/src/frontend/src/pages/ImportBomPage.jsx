@@ -39,6 +39,7 @@ import apiClient from '../api/client';
 import { useNavigate } from 'react-router-dom';
 import BomImport from '../components/BomImport';
 import BomLibraryCard from '../components/import/BomLibraryCard';
+import CaoFolderImport from '../components/import/CaoFolderImport';
 import GuideBanner from '../components/common/GuideBanner';
 import PageHeader from '../components/common/PageHeader';
 import { useBomSession } from '../context/BomSessionContext';
@@ -634,6 +635,8 @@ function ImportBomPage() {
             </Dialog>
 
             <BomLibraryCard />
+
+            <CaoFolderImport />
 
             <BomImport />
         </Stack>
