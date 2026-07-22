@@ -54,6 +54,7 @@ Pour un prompt donné :
    les **scénarios staging** listés au §5 du prompt **en pilotant Chrome sur l'appli qui tourne**
    (Claude-in-Chrome). **Pour toute feature comportant du front : capture une image par scénario**
    (ou un court GIF via `gif_creator`) et enregistre-les dans `docs/prompts/preuves/<NNN>/`.
+   > **Anti-doublon serveur** : avant de (re)lancer staging, ferme TOUJOURS l'instance :8001 deja en cours (jamais une 2e fenetre par-dessus). Le lanceur `DEMARRER_SERVEUR_WEB_STAGING.bat` le fait desormais (kill du process :8001 avant de demarrer) ; ne le contourne pas. Ne JAMAIS toucher la PROD (:8000).
    ⚠ Un `npm test` vert **ne suffit pas** à valider le front (ce sont des tests de composants en jsdom,
    pas l'application réelle).
 6. **CI GitHub** : ouvre la PR `type/slug → dev`, vérifie la CI verte (Chrome sur GitHub).

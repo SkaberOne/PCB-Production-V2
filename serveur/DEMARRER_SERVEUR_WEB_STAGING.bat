@@ -14,6 +14,11 @@ if not exist "..\client\src\frontend\build-web-staging\index.html" (
     exit /b 1
 )
 
+:: --- Anti-doublon : fermer toute instance staging (:8001) deja lancee avant de relancer ---
+:: (ne touche QUE le port 8001 ; la PROD sur :8000 n'est jamais visee)
+echo Fermeture de toute instance staging (:8001) deja en cours...
+powershell -NoProfile -Command "Get-CimInstance Win32_Process | Where-Object { $_.Name -eq 'python.exe' -and $_.CommandLine -match 'launch\.py' -and $_.CommandLine -match 'port 8001' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }" >nul 2>&1
+
 :: Dossier du build STAGING servi par le backend
 set "WEB_STATIC_DIR=%~dp0..\client\src\frontend\build-web-staging"
 
@@ -36,4 +41,6 @@ echo ================================================================
 echo.
 
 "..\.venv\Scripts\python.exe" launch.py --host 0.0.0.0 --port 8001
-pause
+
+:: Serveur arrete (ou remplace par une nouvelle instance) : la fenetre se ferme
+:: automatiquement, plus d'accumulation de fenetres bloquees sur "pause".
