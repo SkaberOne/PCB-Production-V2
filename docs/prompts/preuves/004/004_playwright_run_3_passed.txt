@@ -1,0 +1,8 @@
+
+Running 3 tests using 1 worker
+
+  ✓  1 [chromium] › tests/import-review.spec.js:11:3 › Import BOM › uploader un fichier BOM le parse et l'importe (2.8s)
+  ✓  2 [chromium] › tests/smoke.spec.js:6:3 › Smoke — démarrage et navigation › le tableau de bord se charge (1.3s)
+  ✓  3 [chromium] › tests/smoke.spec.js:12:3 › Smoke — démarrage et navigation › navigation latérale Import BOM puis Revue BOM (2.7s)
+
+  3 passed (11.8s)

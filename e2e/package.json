@@ -1,0 +1,14 @@
+{
+  "name": "pcb-flow-e2e",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Tests E2E Playwright — parcours critiques de PCB Flow Production Suite (prompt 004).",
+  "scripts": {
+    "test:e2e": "playwright test",
+    "test:e2e:headed": "playwright test --headed",
+    "report": "playwright show-report"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.45.0"
+  }
+}
