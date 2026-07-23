@@ -18,6 +18,9 @@ from ..schemas.bom import (
     BomImportResponse,
     BomReferenceCategoryUpdateRequest,
     BomReferenceSchema,
+    BulkDeleteReferencesRequest,
+    BulkDeleteReferencesResponse,
+    DeleteReferenceResponse,
     BomStoredFileListResponse,
     BomStoredFileMutationResponse,
     BomStoredFileUpdateRequest,
@@ -38,6 +41,11 @@ from .bom_support import (
 import logging
 
 logger = logging.getLogger(__name__)
+from ..services.bom_reference_service import (
+    ReferenceLinkedError,
+    delete_reference,
+    delete_references_bulk,
+)
 
 router = APIRouter(tags=["bom"])
 
@@ -214,6 +222,37 @@ def update_bom_reference_category(
     db.commit()
     db.refresh(bom_ref)
     return BomReferenceSchema.model_validate(bom_ref)
+
+
+@router.delete("/references/{bom_reference_id}", response_model=DeleteReferenceResponse)
+def delete_bom_reference(bom_reference_id: int, db: Session = Depends(get_db)):
+    """Supprime une carte entiere (BomReference + revisions + items + snapshots).
+
+    Refus 409 si la carte est liee (production, stock cartes qty>0, commande,
+    sous-carte d'assemblage, modele machine). 404 si introuvable.
+    """
+    try:
+        result = delete_reference(db, bom_reference_id)
+    except ReferenceLinkedError as exc:
+        db.rollback()
+        raise HTTPException(
+            status_code=409,
+            detail=f"Carte {exc.reference} non supprimable : liee a {', '.join(exc.reasons)}.",
+        )
+    except ValueError as exc:
+        db.rollback()
+        raise HTTPException(status_code=404, detail=str(exc))
+    return DeleteReferenceResponse(**result)
+
+
+@router.delete("/references", response_model=BulkDeleteReferencesResponse)
+def delete_bom_references_bulk(
+    payload: BulkDeleteReferencesRequest,
+    db: Session = Depends(get_db),
+):
+    """Suppression multiple : chaque carte liee est ignoree (rapport), les autres supprimees."""
+    report = delete_references_bulk(db, payload.ids)
+    return BulkDeleteReferencesResponse(**report)
 
 
 @router.patch("/files/{bom_revision_id}", response_model=BomStoredFileMutationResponse)

@@ -233,6 +233,32 @@ class BomReferenceCategoryUpdateRequest(BaseModel):
     category: Optional[str] = Field(default=None, max_length=100)
 
 
+class BulkDeleteReferencesRequest(BaseModel):
+    ids: List[int] = Field(..., min_length=1)
+
+
+class DeletedReferenceEntry(BaseModel):
+    id: int
+    reference: Optional[str] = None
+
+
+class SkippedReferenceEntry(BaseModel):
+    id: int
+    reference: Optional[str] = None
+    reasons: List[str] = Field(default_factory=list)
+
+
+class DeleteReferenceResponse(BaseModel):
+    deleted: bool
+    id: int
+    reference: Optional[str] = None
+
+
+class BulkDeleteReferencesResponse(BaseModel):
+    deleted: List[DeletedReferenceEntry] = Field(default_factory=list)
+    skipped: List[SkippedReferenceEntry] = Field(default_factory=list)
+
+
 class BomStoredFileListResponse(BaseModel):
     items: List[BomStoredFileSchema] = Field(default_factory=list)
 
