@@ -15,6 +15,42 @@ class OverviewResponse(BaseModel):
     commands_by_status: Dict[str, int]
 
 
+class _CatalogueOverview(BaseModel):
+    references: int
+    revisions: int
+
+
+class _StockOverview(BaseModel):
+    cartes_en_stock: int
+    references_distinctes: int
+    valeur: float
+    a_prix: bool
+
+
+class _ProductionsOverview(BaseModel):
+    total: int
+    active: int
+    draft: int
+
+
+class _CommandesOverview(BaseModel):
+    total: int
+    open: int
+    ready: int
+
+
+class DashboardOverviewResponse(BaseModel):
+    """Vue d'ensemble globale du dashboard (prompt 024)."""
+
+    catalogue: _CatalogueOverview
+    stock: _StockOverview
+    stock_bas: int
+    productions_en_cours: _ProductionsOverview
+    commandes_clients_a_preparer: _CommandesOverview
+    cartes_a_debugger: int
+    machines: int
+
+
 router = APIRouter(prefix="/reports", tags=["reports"])
 
 
@@ -22,6 +58,12 @@ router = APIRouter(prefix="/reports", tags=["reports"])
 def get_overview(db: Session = Depends(get_db)):
     """Get dashboard overview metrics."""
     return ReportService.get_overview(db=db)
+
+
+@router.get("/dashboard-overview", response_model=DashboardOverviewResponse)
+def get_dashboard_overview(db: Session = Depends(get_db)):
+    """Vue d'ensemble globale (catalogue, stock, alertes, productions, commandes, machines)."""
+    return ReportService.get_dashboard_overview(db=db)
 
 
 @router.get("/productions-summary")

@@ -12,6 +12,8 @@ from ..models.bom import BomItem, BomReference, BomRevision, Component
 from ..models.commands import Command, CommandItem, PlanAssignment, ProductionPlan
 from ..models.machines import PnpFeeder, PnpMachine
 from ..models.production import Production, ProductionBomRevision, ProductionRun
+from ..models.board_stock import BoardStock, ClientOrder, MachineModel
+from .board_stock_service import BoardStockService
 from . import presence_service
 from .command_service import CommandService
 
@@ -56,6 +58,67 @@ class ReportService:
                 "feeders": total_feeders,
             },
             "commands_by_status": status_counts,
+        }
+
+    @staticmethod
+    def get_dashboard_overview(db: Session) -> Dict:
+        """Vue d'ensemble globale (prompt 024) — agrégats COUNT/SUM en une réponse.
+
+        Indépendant de la session : catalogue, stock cartes (qté/valeur/alertes/
+        à débugger), productions en cours, commandes clients à préparer, machines.
+        """
+        references = db.query(func.count(BomReference.id)).scalar() or 0
+        revisions = db.query(func.count(BomRevision.id)).scalar() or 0
+
+        # Stock : réutilise le calcul de prix effectif de BoardStockService
+        # (override OU prix Costing de référence) — cohérent avec l'écran Stock cartes.
+        stock_rows = BoardStockService.list_board_stock(db)
+        cartes_en_stock = sum(r["qty_in_stock"] or 0 for r in stock_rows)
+        references_distinctes = len({r["bom_reference_id"] for r in stock_rows if (r["qty_in_stock"] or 0) > 0})
+        valeur = round(sum(r["stock_value"] or 0 for r in stock_rows), 2)
+        a_prix = any(r.get("unit_price_effective") is not None and (r["qty_in_stock"] or 0) > 0 for r in stock_rows)
+        stock_bas = sum(1 for r in stock_rows if r["below_min"])
+        cartes_a_debugger = sum(r["cards_to_debug"] or 0 for r in stock_rows)
+
+        # Productions en cours = DRAFT + ACTIVE (les COMPLETED/ARCHIVED sont exclues).
+        prod_counts = dict(
+            db.query(Production.status, func.count(Production.id)).group_by(Production.status).all()
+        )
+        def _pc(status):
+            return prod_counts.get(status, 0) or 0
+        prod_active = _pc(Production.StatusEnum.ACTIVE)
+        prod_draft = _pc(Production.StatusEnum.DRAFT)
+
+        # Commandes clients à préparer = OPEN + READY (non livrées, non annulées).
+        order_counts = dict(
+            db.query(ClientOrder.status, func.count(ClientOrder.id)).group_by(ClientOrder.status).all()
+        )
+        cmd_open = order_counts.get("OPEN", 0) or 0
+        cmd_ready = order_counts.get("READY", 0) or 0
+
+        machines = db.query(func.count(MachineModel.id)).scalar() or 0
+
+        return {
+            "catalogue": {"references": references, "revisions": revisions},
+            "stock": {
+                "cartes_en_stock": int(cartes_en_stock),
+                "references_distinctes": references_distinctes,
+                "valeur": valeur,
+                "a_prix": bool(a_prix),
+            },
+            "stock_bas": stock_bas,
+            "productions_en_cours": {
+                "total": prod_active + prod_draft,
+                "active": prod_active,
+                "draft": prod_draft,
+            },
+            "commandes_clients_a_preparer": {
+                "total": cmd_open + cmd_ready,
+                "open": cmd_open,
+                "ready": cmd_ready,
+            },
+            "cartes_a_debugger": int(cartes_a_debugger),
+            "machines": machines,
         }
 
     @staticmethod
