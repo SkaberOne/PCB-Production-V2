@@ -1,46 +1,28 @@
 import React from 'react';
 import {
-    Alert,
-    Box,
-    Button,
-    Chip,
-    Dialog,
-    DialogActions,
-    DialogContent,
-    DialogTitle,
-    Grid,
-    Stack,
-    Table,
-    TableBody,
-    TableCell,
-    TableContainer,
-    TableHead,
-    TableRow,
-    TextField,
-    Typography,
+    Alert, Box, Button, Chip, Dialog, DialogActions, DialogContent, DialogTitle, Grid,
+    InputAdornment, Stack, Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
+    TextField, Typography,
 } from '@mui/material';
+import SearchRoundedIcon from '@mui/icons-material/SearchRounded';
 import apiClient from '../api/client';
 import PageHeader from '../components/common/PageHeader';
+import CardStockRow from '../components/stock/CardStockRow';
 import { normalizeRevisionCode, formatRevisionLabel } from '../utils/revision';
-import ProductionSuiviBar from '../components/dashboard/ProductionSuiviBar';
+import { matchesQuery } from '../utils/textSearch';
 import { colors } from '../theme';
-
-const BELOW_MIN_BG = 'rgba(239, 68, 68, 0.12)';
 
 function eur(v) {
     if (v == null || Number.isNaN(Number(v))) return '—';
-    try {
-        return new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(v);
-    } catch (e) {
-        return `${Number(v).toFixed(2)} €`;
-    }
+    try { return new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(v); }
+    catch (e) { return `${Number(v).toFixed(2)} €`; }
 }
 
 /**
- * Stock des cartes produites (ADR 0017). Une ligne par référence de carte :
- * quantité en stock, minimum, prix par carte (Costing + override), valeur du
- * stock, et état QA (testées / validées / à débugger). Cliquer une ligne ouvre
- * l'édition.
+ * Stock des cartes produites (ADR 0017). Prompt 022 : vue **groupée par carte**
+ * (une ligne par référence, résumé agrégé stock/valeur + barre SUIVI), déroulant
+ * `Collapse` avec le détail par révision (édition au clic), et barre de recherche
+ * réf + nom (insensible casse/accents). Le regroupement s'applique au filtré.
  */
 function BoardStockPage() {
     const [rows, setRows] = React.useState(null);
@@ -48,6 +30,8 @@ function BoardStockPage() {
     const [editing, setEditing] = React.useState(null);
     const [form, setForm] = React.useState(null);
     const [saving, setSaving] = React.useState(false);
+    const [search, setSearch] = React.useState('');
+    const [openCards, setOpenCards] = React.useState(() => new Set());
 
     const load = React.useCallback(async () => {
         setError(null);
@@ -59,8 +43,47 @@ function BoardStockPage() {
             setRows([]);
         }
     }, []);
-
     React.useEffect(() => { load(); }, [load]);
+
+    // Agrégation par carte (référence) : total stock/valeur, révisions, QA agrégé.
+    const cards = React.useMemo(() => {
+        if (rows === null) return null;
+        const byRef = new Map();
+        rows.forEach((r) => {
+            let c = byRef.get(r.bom_reference_id);
+            if (!c) {
+                c = {
+                    bom_reference_id: r.bom_reference_id, reference: r.reference, name: r.name || '',
+                    revisions: [], totalStock: 0, totalValue: 0,
+                    totalTested: 0, totalValidated: 0, totalToDebug: 0, anyBelowMin: false,
+                };
+                byRef.set(r.bom_reference_id, c);
+            }
+            c.revisions.push(r);
+            c.totalStock += r.qty_in_stock || 0;
+            c.totalValue += r.stock_value || 0;
+            c.totalTested += r.cards_tested || 0;
+            c.totalValidated += r.cards_validated || 0;
+            c.totalToDebug += r.cards_to_debug || 0;
+            if (r.below_min) c.anyBelowMin = true;
+        });
+        // Cartes avec du stock en tête, puis par référence.
+        return Array.from(byRef.values()).sort((a, b) => {
+            if ((b.totalStock > 0) !== (a.totalStock > 0)) return b.totalStock > 0 ? 1 : -1;
+            return String(a.reference).localeCompare(String(b.reference));
+        });
+    }, [rows]);
+
+    const filteredCards = React.useMemo(() => {
+        if (cards === null) return null;
+        return cards.filter((c) => matchesQuery(search, [c.reference, c.name]));
+    }, [cards, search]);
+
+    const toggleCard = (id) => setOpenCards((prev) => {
+        const next = new Set(prev);
+        if (next.has(id)) next.delete(id); else next.add(id);
+        return next;
+    });
 
     const openEditor = (row) => {
         setForm({
@@ -75,7 +98,6 @@ function BoardStockPage() {
         });
         setEditing(row);
     };
-
     const setField = (k) => (e) => setForm((prev) => ({ ...prev, [k]: e.target.value }));
 
     const save = async () => {
@@ -110,12 +132,22 @@ function BoardStockPage() {
         <Box>
             <PageHeader
                 title="Stock des cartes produites"
-                subtitle="Stock de cartes finies par référence : quantité, minimum, prix et état QA."
+                subtitle="Stock de cartes finies groupé par carte : total, révisions dépliables, prix et état QA."
             />
 
             {error ? <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>{error}</Alert> : null}
 
-            <Stack direction="row" spacing={1.5} sx={{ mb: 2 }} flexWrap="wrap" useFlexGap>
+            <Stack direction="row" spacing={1.5} sx={{ mb: 2 }} alignItems="center" flexWrap="wrap" useFlexGap>
+                <TextField
+                    size="small"
+                    placeholder="Rechercher (référence ou nom)…"
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    inputProps={{ 'aria-label': 'Rechercher une carte' }}
+                    sx={{ minWidth: 280, flex: 1 }}
+                    InputProps={{ startAdornment: (<InputAdornment position="start"><SearchRoundedIcon fontSize="small" /></InputAdornment>) }}
+                />
+                <Chip label={`${(filteredCards || []).length} carte(s)`} variant="outlined" />
                 <Chip label={`Valeur totale du stock : ${eur(totalValue)}`} sx={{ backgroundColor: 'rgba(5,150,105,0.14)', color: '#6ee7b7' }} />
                 <Chip label={`${belowMinCount} référence(s) sous le minimum`} color={belowMinCount ? 'error' : 'default'} variant={belowMinCount ? 'filled' : 'outlined'} />
             </Stack>
@@ -124,61 +156,29 @@ function BoardStockPage() {
                 <Table size="small" stickyHeader>
                     <TableHead>
                         <TableRow>
+                            <TableCell padding="checkbox" />
                             <TableCell>Référence carte</TableCell>
-                            <TableCell>Révision</TableCell>
+                            <TableCell>Nom</TableCell>
+                            <TableCell align="right">Révisions</TableCell>
                             <TableCell align="right">En stock</TableCell>
-                            <TableCell align="right">Min.</TableCell>
-                            <TableCell align="right">Prix / carte</TableCell>
                             <TableCell align="right">Valeur stock</TableCell>
-                            <TableCell align="right">Testées</TableCell>
-                            <TableCell align="right">Validées</TableCell>
-                            <TableCell align="right">À débugger</TableCell>
                             <TableCell align="right">Suivi</TableCell>
                         </TableRow>
                     </TableHead>
                     <TableBody>
-                        {rows === null ? (
-                            <TableRow><TableCell colSpan={10} sx={{ py: 3, textAlign: 'center', color: colors.textSecondary }}>Chargement…</TableCell></TableRow>
-                        ) : rows.length === 0 ? (
-                            <TableRow><TableCell colSpan={10} sx={{ py: 3, textAlign: 'center', color: colors.textSecondary }}>Aucune référence de carte.</TableCell></TableRow>
-                        ) : rows.map((row) => (
-                            <TableRow
-                                key={`${row.bom_reference_id}::${row.revision || ''}`}
-                                hover
-                                onClick={() => openEditor(row)}
-                                sx={{ cursor: 'pointer', ...(row.below_min ? { backgroundColor: BELOW_MIN_BG, '&:hover': { backgroundColor: BELOW_MIN_BG } } : {}) }}
-                            >
-                                <TableCell>
-                                    {row.reference}
-                                    {row.below_min ? <Chip size="small" label="sous min." color="error" sx={{ ml: 0.75 }} /> : null}
-                                </TableCell>
-                                <TableCell>
-                                    {normalizeRevisionCode(row.revision) ? <Chip size="small" label={formatRevisionLabel(row.revision)} variant="outlined" /> : <span style={{ color: colors.textSecondary }}>Sans révision</span>}
-                                </TableCell>
-                                <TableCell align="right" sx={{ fontWeight: 600 }}>{row.qty_in_stock}</TableCell>
-                                <TableCell align="right" sx={{ color: colors.textSecondary }}>{row.min_stock}</TableCell>
-                                <TableCell align="right">
-                                    {eur(row.unit_price_effective)}
-                                    {row.unit_price_override != null
-                                        ? <Chip size="small" label="manuel" variant="outlined" sx={{ ml: 0.5 }} />
-                                        : (row.reference_unit_cost_ht != null ? <Chip size="small" label="auto" variant="outlined" sx={{ ml: 0.5, color: colors.textSecondary }} /> : null)}
-                                </TableCell>
-                                <TableCell align="right" sx={{ fontWeight: 600 }}>{eur(row.stock_value)}</TableCell>
-                                <TableCell align="right" sx={{ color: '#3b82f6' }}>{row.cards_tested}</TableCell>
-                                <TableCell align="right" sx={{ color: '#22c55e' }}>{row.cards_validated}</TableCell>
-                                <TableCell align="right" sx={{ color: '#f59e0b' }}>{row.cards_to_debug}</TableCell>
-                                <TableCell align="right">
-                                    <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
-                                        <ProductionSuiviBar
-                                            produced={row.qty_in_stock}
-                                            tested={row.cards_tested}
-                                            validated={row.cards_validated}
-                                            toDebug={row.cards_to_debug}
-                                            testId={`suivi-bar-${row.bom_reference_id}`}
-                                        />
-                                    </Box>
-                                </TableCell>
-                            </TableRow>
+                        {filteredCards === null ? (
+                            <TableRow><TableCell colSpan={7} sx={{ py: 3, textAlign: 'center', color: colors.textSecondary }}>Chargement…</TableCell></TableRow>
+                        ) : filteredCards.length === 0 ? (
+                            <TableRow><TableCell colSpan={7} sx={{ py: 3, textAlign: 'center', color: colors.textSecondary }}>Aucune référence de carte.</TableCell></TableRow>
+                        ) : filteredCards.map((card) => (
+                            <CardStockRow
+                                key={card.bom_reference_id}
+                                card={card}
+                                open={openCards.has(card.bom_reference_id)}
+                                onToggle={() => toggleCard(card.bom_reference_id)}
+                                onEditRevision={openEditor}
+                                formatPrice={eur}
+                            />
                         ))}
                     </TableBody>
                 </Table>

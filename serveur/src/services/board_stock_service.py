@@ -98,6 +98,7 @@ class BoardStockService:
                 out.append({
                     "bom_reference_id": ref.id,
                     "reference": ref.reference,
+                    "name": ref.name,
                     "revision": rev,
                     "category": ref.category,
                     "qty_in_stock": qty,
