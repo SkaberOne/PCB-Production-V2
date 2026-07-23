@@ -1,0 +1,10 @@
+GET /api/reports/dashboard-overview  (staging :8001, données réelles — vérifié via l'API)
+{
+  "catalogue": { "references": 86, "revisions": 251 },
+  "stock": { "cartes_en_stock": 22, "references_distinctes": 3, "valeur": 7008.42, "a_prix": true },
+  "stock_bas": 0,
+  "productions_en_cours": { "total": 3, "active": 1, "draft": 2 },
+  "commandes_clients_a_preparer": { "total": 2, "open": 1, "ready": 1 },
+  "cartes_a_debugger": 1,
+  "machines": 0
+}
