@@ -1,0 +1,31 @@
+Vérifications staging :8001 (branche fix/front-robustesse-ux) — 016
+===================================================================
+
+Captures :
+- 016-confirmation-suppression.jpg : « Supprimer le client » ouvre un ConfirmDialog
+  « Supprimer le client « Client Demo » et ses 2 commande(s) ? Cette action est
+  irréversible. » rendu AU-DESSUS du modal de détail (item 1). Le sous-titre
+  « Clients, leurs commandes et machines… » s'affiche désormais sous le titre
+  (item 4 : PageHeader accepte `subtitle` comme alias de `description`).
+- 016-prix-carte.jpg : page Prix carte à largeur standard — contrôles (Appliquer /
+  Enregistrer) et rangée KPI entièrement visibles.
+
+Item 2 (erreurs visibles) : l'alerte d'erreur passe d'un <Alert> en tête de page
+(sous le backdrop des modals) à un <Snackbar> (zIndex 1400 > Dialog 1300) → visible
+au-dessus des dialogs ; ajout d'un Snackbar de succès (création / suppression
+client, enregistrement / suppression machine). Le même principe de z-index est
+visible sur la capture confirmation (dialog imbriqué au-dessus du modal).
+
+Item 6 (débordement Prix carte) : à largeur réduite (~1180 px), l'ancienne version
+coupait le panneau « Données production », le bouton « Appliquer » et la dernière
+carte KPI. Correctif : les deux panneaux de configuration passent en pleine largeur
+sous `lg` (empilés au lieu de 2 colonnes trop larges) et les cartes KPI passent à
+2 par ligne sous `md`. Plus de débordement horizontal.
+
+Item 7 (/command état vide) : déjà couvert — CommandPage rend un EmptyState
+« Sélectionnez une production » + bouton de navigation quand aucune production
+active (titre cohérent « Préparation commande composants »). Vérifié dans le code
+et par le test existant DashboardPage/CommandPage.
+
+Tests : npm test 47 suites / 170 tests OK (dont PageHeader.test.jsx et
+ConfirmDialog.test.jsx ajoutés).

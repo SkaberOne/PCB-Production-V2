@@ -1,7 +1,9 @@
 import React from 'react';
 import { Box, Stack, Typography } from '@mui/material';
 
-function PageHeader({ eyebrow, title, description, actions = null }) {
+function PageHeader({ eyebrow, title, description, subtitle, actions = null }) {
+    // Alias : certaines pages passent `subtitle` (historique) au lieu de `description`.
+    const resolvedDescription = description != null ? description : subtitle;
     return (
         <Stack
             direction={{ xs: 'column', md: 'row' }}
@@ -28,7 +30,7 @@ function PageHeader({ eyebrow, title, description, actions = null }) {
                 <Typography
                     component="h2"
                     sx={{
-                        mb: description ? 0.5 : 0,
+                        mb: resolvedDescription ? 0.5 : 0,
                         color: '#f4f4f5',
                         fontWeight: 700,
                         fontSize: '1.05rem',
@@ -37,7 +39,7 @@ function PageHeader({ eyebrow, title, description, actions = null }) {
                 >
                     {title}
                 </Typography>
-                {description ? (
+                {resolvedDescription ? (
                     <Typography
                         variant="body2"
                         sx={{
@@ -47,7 +49,7 @@ function PageHeader({ eyebrow, title, description, actions = null }) {
                             lineHeight: 1.45
                         }}
                     >
-                        {description}
+                        {resolvedDescription}
                     </Typography>
                 ) : null}
             </Box>
