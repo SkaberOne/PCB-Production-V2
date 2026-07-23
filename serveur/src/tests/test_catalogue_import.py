@@ -17,6 +17,13 @@ from src.services.catalogue_import_service import parse_card_folder, scan_catalo
 
 from src.models.bom import BomReference
 from .conftest import client, TestingSessionLocal
+from src.services.stock_service import StockService
+
+
+def _configure_root(path):
+    """Fixe la racine projets configurée (l'endpoint confine root_path dessous)."""
+    with TestingSessionLocal() as s:
+        StockService.set_projects_root_path(s, str(path))
 
 EAGLE_FIX = os.path.join(os.path.dirname(__file__), "fixtures", "eagle_otr")
 
@@ -107,6 +114,7 @@ def test_import_catalogue_dry_run_reports_without_writing(tmp_path):
     _make_conception(root, "KT190562 - NanoSH MK2", "A", _eagle_files())
     _make_conception(root, "KT200001 - KiCad Board", "A",
                      [("board.kicad_pcb", None), ("board.kicad_sch", None)])
+    _configure_root(root)
 
     resp = client.post("/api/bom/import-catalogue",
                        params={"dry_run": True, "root_path": root})
@@ -127,6 +135,7 @@ def test_import_catalogue_dry_run_reports_without_writing(tmp_path):
 def test_import_catalogue_real_then_idempotent(tmp_path):
     root = str(tmp_path)
     _make_conception(root, "KT190562 - NanoSH MK2", "A", _eagle_files())
+    _configure_root(root)
 
     first = client.post("/api/bom/import-catalogue",
                         params={"dry_run": False, "root_path": root})

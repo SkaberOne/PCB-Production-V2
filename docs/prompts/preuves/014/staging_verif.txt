@@ -1,0 +1,18 @@
+Vérification staging :8001 (backend branche fix/securite-backend) — 014
+=======================================================================
+014 est backend uniquement (aucun changement front) → preuves = logs/API.
+
+Démarrage staging (DEMARRER_SERVEUR_WEB_STAGING.bat, kill auto :8001) :
+  GET /api/health                       -> 200  {"status":"ok","version":"1.0.0","service":"PCB Flow Production Suite API"}
+    => l'app démarre avec toutes les modifs (CORS allow_credentials=False,
+       garde fail-fast API_KEY, handlers d'erreurs génériques).
+
+Connexion base (SQL Server ECB_Production_STAGING via DATABASE_URL override) :
+  GET /api/marketplace/carts     (X-API-Key: pcbflow-staging) -> 200 (902 o)
+  GET /api/marketplace/machines  (X-API-Key: pcbflow-staging) -> 200 (945 o)
+    => connexion DB OK ; le point (6) TLS (SQL_ENCRYPT configurable, défaut yes)
+       n'affecte PAS staging/prod qui utilisent un DATABASE_URL override
+       (Encrypt=no dans le .bat / .env) — aucune régression de connexion.
+
+Imports CAO/PDF non régressés : couverts par la suite pytest complète
+(test_cao_import_*, test_bom_import, test_catalogue_import) — 582 passed.

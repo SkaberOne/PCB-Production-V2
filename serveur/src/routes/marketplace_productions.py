@@ -1,5 +1,6 @@
 """Marketplace production workspace routes."""
 
+import logging
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -21,6 +22,8 @@ from ..services.production_workspace_service import ProductionWorkspaceService
 from ..services.production_progress_service import ProductionProgressService
 from ..services import event_bus
 from .marketplace_stock import workstation_header
+
+logger = logging.getLogger(__name__)
 
 
 def _build_duplicate_name(db: Session, source_name: str) -> str:
@@ -53,8 +56,11 @@ def create_production(
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error creating production: {str(e)}")
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Error creating production")
+        raise HTTPException(status_code=500, detail="Erreur interne du serveur.")
 
 
 @router.delete("/{production_id}")
@@ -68,8 +74,11 @@ def delete_production(
         return {"status": "deleted", "id": production_id}
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error deleting production: {str(e)}")
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Error deleting production")
+        raise HTTPException(status_code=500, detail="Erreur interne du serveur.")
 
 
 @router.post("/{production_id}/duplicate")
@@ -88,8 +97,11 @@ def duplicate_production(
         )
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error duplicating production: {str(e)}")
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Error duplicating production")
+        raise HTTPException(status_code=500, detail="Erreur interne du serveur.")
 
 
 @router.get("")
@@ -104,8 +116,11 @@ def list_productions(
         }
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error listing productions: {str(e)}")
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Error listing productions")
+        raise HTTPException(status_code=500, detail="Erreur interne du serveur.")
 
 
 @router.get("/{production_id}")
@@ -118,8 +133,11 @@ def get_production_detail(
         return ProductionWorkspaceService.get_production_detail(db=db, production_id=production_id)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error getting production: {str(e)}")
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Error getting production")
+        raise HTTPException(status_code=500, detail="Erreur interne du serveur.")
 
 
 @router.patch("/{production_id}")
@@ -159,8 +177,11 @@ def update_production(
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error updating production: {str(e)}")
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Error updating production")
+        raise HTTPException(status_code=500, detail="Erreur interne du serveur.")
 
 
 @router.post("/{production_id}/produce", response_model=RunOut)
@@ -300,8 +321,11 @@ def attach_bom_revisions_to_production(
         return result
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error attaching BOMs to production: {str(e)}")
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Error attaching BOMs to production")
+        raise HTTPException(status_code=500, detail="Erreur interne du serveur.")
 
 
 @router.post("/{production_id}/bom-revisions/detach")
@@ -321,8 +345,11 @@ def detach_bom_revisions_from_production(
         return result
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error detaching BOMs from production: {str(e)}")
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Error detaching BOMs from production")
+        raise HTTPException(status_code=500, detail="Erreur interne du serveur.")
 
 
 @router.patch("/{production_id}/bom-quantities")
@@ -348,8 +375,11 @@ def update_production_bom_quantities(
         return result
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error updating production BOM quantities: {str(e)}")
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Error updating production BOM quantities")
+        raise HTTPException(status_code=500, detail="Erreur interne du serveur.")
 
 
 @router.patch("/{production_id}/erp-context")
@@ -367,8 +397,11 @@ def update_production_erp_context(
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error updating ERP context: {str(e)}")
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Error updating ERP context")
+        raise HTTPException(status_code=500, detail="Erreur interne du serveur.")
 
 
 @router.put("/{production_id}/component-progress/{component_id}")

@@ -35,6 +35,9 @@ from .bom_support import (
     _try_save_revision_snapshot,
     bom_file_service,
 )
+import logging
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["bom"])
 
@@ -338,10 +341,13 @@ def delete_saved_bom_file(
                 db.delete(bom_reference)
 
         db.commit()
-    except Exception as exc:
+    except HTTPException:
         db.rollback()
-        raise HTTPException(status_code=500, detail=f"Failed to delete BOM from database: {str(exc)}")
-
+        raise
+    except Exception:
+        db.rollback()
+        logger.exception("Failed to delete BOM from database")
+        raise HTTPException(status_code=500, detail="Erreur interne du serveur.")
     _try_delete_revision_snapshot(reference_name, revision_name, side_name, action="delete")
 
     return BomStoredFileMutationResponse(

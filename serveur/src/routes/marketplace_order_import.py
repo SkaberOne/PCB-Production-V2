@@ -9,8 +9,13 @@ from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
+import logging
+
 from ..database import get_db
 from ..services.pdf_order_import_service import PdfOrderImportService
+from ..utils.uploads import read_upload_capped
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["order-import"])
 
@@ -36,13 +41,16 @@ class ImportCommit(BaseModel):
 @router.post("/client-orders/import-pdf")
 async def import_pdf_preview(file: UploadFile = File(...), db: Session = Depends(get_db)):
     """Upload d'un PDF de commande → aperçu (client + cartes reconnues + codes inconnus)."""
-    data = await file.read()
+    data = await read_upload_capped(file)
     if not data:
         raise HTTPException(status_code=400, detail="Fichier vide.")
     try:
         return PdfOrderImportService.preview(db, data)
-    except Exception as exc:  # parsing / PDF illisible
-        raise HTTPException(status_code=422, detail=f"Lecture du PDF impossible : {exc}")
+    except HTTPException:
+        raise
+    except Exception:  # parsing / PDF illisible
+        logger.exception("Lecture du PDF impossible")
+        raise HTTPException(status_code=422, detail="Lecture du PDF impossible.")
 
 
 @router.post("/client-orders/import-pdf/commit")

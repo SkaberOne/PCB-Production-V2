@@ -1,5 +1,6 @@
 """Marketplace feeder, cart, and fixed-feeder routes."""
 
+import logging
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -14,6 +15,8 @@ from ..schemas.marketplace import (
     UpdateFixedFeederComponentRequest,
 )
 from ..services.assignment_service import AssignmentService
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -37,8 +40,11 @@ def create_cart(
         return {"message": "Cart created", "cart_id": cart.id}
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error creating cart: {str(e)}")
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Error creating cart")
+        raise HTTPException(status_code=500, detail="Erreur interne du serveur.")
 
 
 @router.get("/carts/{cart_id}")
@@ -72,8 +78,11 @@ def list_carts(
             "limit": limit,
             "offset": offset,
         }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error listing carts: {str(e)}")
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Error listing carts")
+        raise HTTPException(status_code=500, detail="Erreur interne du serveur.")
 
 
 @router.post("/fixed-feeders/calculate")
@@ -92,8 +101,11 @@ def calculate_fixed_feeders(
         }
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error calculating fixed feeders: {str(e)}")
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Error calculating fixed feeders")
+        raise HTTPException(status_code=500, detail="Erreur interne du serveur.")
 
 
 @router.get("/fixed-feeders/components")
@@ -122,8 +134,11 @@ def list_fixed_feeder_components(
         }
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error listing fixed feeders: {str(e)}")
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Error listing fixed feeders")
+        raise HTTPException(status_code=500, detail="Erreur interne du serveur.")
 
 
 @router.patch("/fixed-feeders/components/{component_id}")
@@ -151,8 +166,11 @@ def update_fixed_feeder_component(
         }
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error updating fixed feeder: {str(e)}")
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Error updating fixed feeder")
+        raise HTTPException(status_code=500, detail="Erreur interne du serveur.")
 
 
 @router.put("/carts/{cart_id}", response_model=dict)
@@ -176,8 +194,11 @@ def update_cart(
         return {"message": "Cart updated"}
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error updating cart: {str(e)}")
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Error updating cart")
+        raise HTTPException(status_code=500, detail="Erreur interne du serveur.")
 
 
 @router.delete("/carts/{cart_id}")
@@ -193,8 +214,11 @@ def delete_cart(
         return {"message": "Cart deleted"}
     except HTTPException:
         raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error deleting cart: {str(e)}")
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Error deleting cart")
+        raise HTTPException(status_code=500, detail="Erreur interne du serveur.")
 
 
 @router.post("/feeder-types", response_model=dict)
@@ -214,8 +238,11 @@ def create_feeder_type(
         return {"message": "Feeder type created", "feeder_id": feeder.id}
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error creating feeder: {str(e)}")
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Error creating feeder")
+        raise HTTPException(status_code=500, detail="Erreur interne du serveur.")
 
 
 @router.get("/feeder-types/{feeder_id}")
@@ -263,8 +290,11 @@ def list_feeder_types(
             "limit": limit,
             "offset": offset,
         }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error listing feeders: {str(e)}")
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Error listing feeders")
+        raise HTTPException(status_code=500, detail="Erreur interne du serveur.")
 
 
 @router.put("/feeder-types/{feeder_id}", response_model=dict)
@@ -285,8 +315,11 @@ def update_feeder_type(
         return {"message": "Feeder type updated"}
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error updating feeder: {str(e)}")
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Error updating feeder")
+        raise HTTPException(status_code=500, detail="Erreur interne du serveur.")
 
 
 @router.post("/machines/{machine_id}/feeder-types/{feeder_id}")
@@ -307,8 +340,11 @@ def assign_feeder_to_machine(
         return {"message": "Feeder already assigned to machine"}
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error assigning feeder: {str(e)}")
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Error assigning feeder")
+        raise HTTPException(status_code=500, detail="Erreur interne du serveur.")
 
 
 @router.delete("/machines/{machine_id}/feeder-types/{feeder_id}")
@@ -329,8 +365,11 @@ def remove_feeder_from_machine(
         return {"message": "Feeder not assigned to this machine"}
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error removing feeder: {str(e)}")
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Error removing feeder")
+        raise HTTPException(status_code=500, detail="Erreur interne du serveur.")
 
 
 @router.delete("/feeder-types/{feeder_id}")
@@ -346,5 +385,8 @@ def delete_feeder_type(
         return {"message": "Feeder type deleted"}
     except HTTPException:
         raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error deleting feeder: {str(e)}")
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Error deleting feeder")
+        raise HTTPException(status_code=500, detail="Erreur interne du serveur.")

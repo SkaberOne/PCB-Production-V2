@@ -18,6 +18,9 @@ from ..schemas.marketplace import (
 )
 from ..services.command_service import CommandService
 from ..services.erp_defaults_service import ErpDefaultsService
+import logging
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -37,10 +40,11 @@ def create_command(
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
-    except Exception as exc:
-        raise HTTPException(status_code=500, detail=f"Error creating command: {exc}")
-
-
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Error creating command")
+        raise HTTPException(status_code=500, detail="Erreur interne du serveur.")
 @router.post("/generate")
 def generate_command(
     request: GenerateCommandRequest,
@@ -64,10 +68,11 @@ def generate_command(
         return CommandService.get_command_summary(db=db, command_id=command.id)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
-    except Exception as exc:
-        raise HTTPException(status_code=500, detail=f"Error generating command: {exc}")
-
-
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Error generating command")
+        raise HTTPException(status_code=500, detail="Erreur interne du serveur.")
 @router.get("/{command_id}", response_model=CommandResponse)
 def get_command(
     command_id: int,
@@ -116,10 +121,11 @@ def list_commands(
         }
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
-    except Exception as exc:
-        raise HTTPException(status_code=500, detail=f"Error listing commands: {exc}")
-
-
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Error listing commands")
+        raise HTTPException(status_code=500, detail="Erreur interne du serveur.")
 @router.get("/{command_id}/summary")
 def get_command_summary(
     command_id: int,
@@ -130,10 +136,11 @@ def get_command_summary(
         return CommandService.get_command_summary(db=db, command_id=command_id)
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc))
-    except Exception as exc:
-        raise HTTPException(status_code=500, detail=f"Error getting summary: {exc}")
-
-
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Error getting summary")
+        raise HTTPException(status_code=500, detail="Erreur interne du serveur.")
 @router.post("/{command_id}/erp-export")
 def export_command_erp(
     command_id: int,
@@ -169,10 +176,11 @@ def export_command_erp(
         )
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc))
-    except Exception as exc:
-        raise HTTPException(status_code=500, detail=f"Error exporting ERP workbook: {exc}")
-
-
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Error exporting ERP workbook")
+        raise HTTPException(status_code=500, detail="Erreur interne du serveur.")
 @router.put("/{command_id}", response_model=CommandResponse)
 def update_command(
     command_id: int,
@@ -195,10 +203,11 @@ def update_command(
         detail = str(exc)
         status_code = 404 if detail.endswith("not found") else 400
         raise HTTPException(status_code=status_code, detail=detail)
-    except Exception as exc:
-        raise HTTPException(status_code=500, detail=f"Error updating command: {exc}")
-
-
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Error updating command")
+        raise HTTPException(status_code=500, detail="Erreur interne du serveur.")
 @router.post("/{command_id}/items")
 def add_command_item(
     command_id: int,
@@ -216,10 +225,11 @@ def add_command_item(
         return {"message": "Item added successfully", "item_id": item.id}
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
-    except Exception as exc:
-        raise HTTPException(status_code=500, detail=f"Error adding item: {exc}")
-
-
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Error adding item")
+        raise HTTPException(status_code=500, detail="Erreur interne du serveur.")
 @router.put("/{command_id}/items/{bom_revision_id}")
 def update_command_item_quantity(
     command_id: int,
@@ -238,10 +248,11 @@ def update_command_item_quantity(
         return {"message": "Quantity updated", "new_quantity": item.quantity_to_produce}
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
-    except Exception as exc:
-        raise HTTPException(status_code=500, detail=f"Error updating quantity: {exc}")
-
-
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Error updating quantity")
+        raise HTTPException(status_code=500, detail="Erreur interne du serveur.")
 @router.delete("/{command_id}/items/{bom_revision_id}")
 def remove_command_item(
     command_id: int,
@@ -260,10 +271,9 @@ def remove_command_item(
         return {"message": "Item removed successfully"}
     except HTTPException:
         raise
-    except Exception as exc:
-        raise HTTPException(status_code=500, detail=f"Error removing item: {exc}")
-
-
+    except Exception:
+        logger.exception("Error removing item")
+        raise HTTPException(status_code=500, detail="Erreur interne du serveur.")
 @router.post("/{command_id}/duplicate")
 def duplicate_command(
     command_id: int,
@@ -280,10 +290,11 @@ def duplicate_command(
         return {"message": "Command duplicated", "new_command_id": new_command.id}
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
-    except Exception as exc:
-        raise HTTPException(status_code=500, detail=f"Error duplicating command: {exc}")
-
-
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Error duplicating command")
+        raise HTTPException(status_code=500, detail="Erreur interne du serveur.")
 @router.delete("/{command_id}")
 def delete_command(
     command_id: int,
@@ -297,5 +308,6 @@ def delete_command(
         return {"message": "Command deleted successfully"}
     except HTTPException:
         raise
-    except Exception as exc:
-        raise HTTPException(status_code=500, detail=f"Error deleting command: {exc}")
+    except Exception:
+        logger.exception("Error deleting command")
+        raise HTTPException(status_code=500, detail="Erreur interne du serveur.")

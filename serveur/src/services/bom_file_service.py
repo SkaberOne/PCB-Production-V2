@@ -20,9 +20,28 @@ class BomFileService:
 
     @classmethod
     def sanitize_segment(cls, value: Optional[str]) -> str:
-        """Normalize a path segment while preserving readability."""
+        """Normalize a path segment while preserving readability.
+
+        Neutralise aussi les segments de traversée (``''``, ``'.'``, ``'..'``)
+        qui permettraient de remonter hors de ``storage_root`` (path traversal).
+        """
         cleaned = cls.INVALID_PATH_CHARS.sub("_", (value or "").strip())
-        return cleaned or "UNDEFINED"
+        if cleaned in ("", ".", ".."):
+            return "UNDEFINED"
+        return cleaned
+
+    def _assert_within_root(self, path: "Path") -> "Path":
+        """Vérifie que ``path`` reste descendant de ``storage_root`` (anti-traversée).
+
+        Défense en profondeur : même si ``sanitize_segment`` neutralise déjà ``..``,
+        on refuse toute écriture/suppression/déplacement dont le chemin résolu
+        sortirait de la racine de stockage.
+        """
+        root = self.storage_root.resolve()
+        resolved = path.resolve()
+        if resolved != root and root not in resolved.parents:
+            raise ValueError("Chemin hors du dépôt BOM (traversée refusée).")
+        return path
 
     def get_reference_dir(self, reference: str) -> Path:
         return self.storage_root / self.sanitize_segment(reference)
@@ -95,6 +114,7 @@ class BomFileService:
     def save_revision_snapshot(self, reference: str, revision: str, side: str, items: Iterable) -> Path:
         """Write the harmonized BOM snapshot to disk and return its path."""
         target_path = self.get_file_path(reference, revision, side)
+        self._assert_within_root(target_path)
         target_path.parent.mkdir(parents=True, exist_ok=True)
         target_path.write_text(
             self.build_harmonized_content(items, default_side=side),
@@ -105,6 +125,7 @@ class BomFileService:
     def delete_revision_snapshot(self, reference: str, revision: str, side: str) -> None:
         """Delete the stored text snapshot for a revision if it exists."""
         target_path = self.get_file_path(reference, revision, side)
+        self._assert_within_root(target_path)
         if target_path.exists():
             try:
                 target_path.unlink()
@@ -121,6 +142,8 @@ class BomFileService:
         """Rename a full reference folder when the PCB reference changes."""
         old_dir = self.get_reference_dir(old_reference)
         new_dir = self.get_reference_dir(new_reference)
+        self._assert_within_root(old_dir)
+        self._assert_within_root(new_dir)
 
         if old_dir == new_dir or not old_dir.exists():
             return
@@ -132,6 +155,8 @@ class BomFileService:
         """Rename a revision subfolder while preserving the reference folder."""
         old_dir = self.get_revision_dir(reference, old_revision)
         new_dir = self.get_revision_dir(reference, new_revision)
+        self._assert_within_root(old_dir)
+        self._assert_within_root(new_dir)
 
         if old_dir == new_dir or not old_dir.exists():
             return

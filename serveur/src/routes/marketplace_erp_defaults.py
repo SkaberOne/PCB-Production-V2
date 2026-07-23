@@ -10,6 +10,9 @@ from sqlalchemy.orm import Session
 from ..database import get_db
 from ..schemas.marketplace import UpdateErpDefaultsRequest
 from ..services.erp_defaults_service import ErpDefaultsService
+import logging
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/erp-defaults", tags=["erp-defaults"])
 
@@ -28,5 +31,8 @@ def update_erp_defaults(
     """Update the ERP export defaults from the admin screen."""
     try:
         return ErpDefaultsService.update(db, request.model_dump())
-    except Exception as exc:  # pragma: no cover - defensive
-        raise HTTPException(status_code=500, detail=f"Error updating ERP defaults: {exc}")
+    except HTTPException:
+        raise
+    except Exception:  # pragma: no cover - defensive
+        logger.exception("Error updating ERP defaults")
+        raise HTTPException(status_code=500, detail="Erreur interne du serveur.")
