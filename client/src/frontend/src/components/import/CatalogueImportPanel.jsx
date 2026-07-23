@@ -99,9 +99,20 @@ function CatalogueImportPanel() {
                         <Chip label={`${report.components_created} composant(s) créé(s)`} variant="outlined" />
                         <Chip label={report.dry_run ? 'Aperçu (rien écrit)' : 'Import réel'} color={report.dry_run ? 'default' : 'success'} />
                     </Stack>
-                    {report.skipped_dirs?.length ? (
-                        <Alert severity="info" sx={{ mb: 2 }}>
-                            Dossiers hors convention ignorés : {report.skipped_dirs.join(', ')}
+                    {(report.skipped?.length || report.skipped_dirs?.length) ? (
+                        <Alert severity="warning" sx={{ mb: 2 }} data-testid="catalogue-skipped">
+                            <Typography variant="body2" sx={{ fontWeight: 600, mb: 0.5 }}>
+                                {(report.skipped?.length ?? report.skipped_dirs.length)} dossier(s) ignoré(s) (non importé(s)) :
+                            </Typography>
+                            {report.skipped?.length
+                                ? report.skipped.map((d) => (
+                                    <Typography key={d.name} variant="body2">
+                                        {d.name} — {d.label || d.reason}
+                                    </Typography>
+                                ))
+                                : (
+                                    <Typography variant="body2">{report.skipped_dirs.join(', ')}</Typography>
+                                )}
                         </Alert>
                     ) : null}
                     <TableContainer sx={{ maxHeight: 460 }}>

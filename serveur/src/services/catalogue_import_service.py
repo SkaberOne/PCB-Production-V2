@@ -20,16 +20,32 @@ from typing import Dict, List, Optional
 
 from .cao.detect import detect_cao
 
-_CARD_RE = re.compile(r"^(KT\d+[A-Za-z]?)\s*-\s*(.+)$")
+# Séparateur réf/nom tolérant (prompt 021) : tiret, underscore, tiret long, ou
+# un/plusieurs espaces, avec espaces optionnels autour. La référence reste KT<num>[lettre].
+_CARD_RE = re.compile(r"^(KT\d+[A-Za-z]?)(?:\s*[-_\u2013\u2014]+\s*|\s+)(.+)$")
+# Référence seule (aucun nom après) : importée avec un nom vide, jamais ignorée.
+_CARD_REF_ONLY_RE = re.compile(r"^(KT\d+[A-Za-z]?)$")
+# Ressemble à une carte KT (pour distinguer « format non reconnu » de « pas une carte »).
+_LOOKS_KT_RE = re.compile(r"^KT\d", re.IGNORECASE)
 _REV_RE = re.compile(r"^Rev\.?\s*([A-Za-z0-9]+)$", re.IGNORECASE)
 
 
 def parse_card_folder(name: str):
-    """« KT190562 - NanoSH MK2 » → (``KT190562``, ``NanoSH MK2``) ; ``None`` sinon."""
-    match = _CARD_RE.match(str(name or "").strip())
-    if not match:
-        return None
-    return match.group(1), match.group(2).strip()
+    """Extrait (référence, nom) d'un dossier carte, séparateur tolérant (prompt 021).
+
+    « KT190562 - NanoSH MK2 » → (``KT190562``, ``NanoSH MK2``) ;
+    « KT190300 MPX 1.0 » (espace) → (``KT190300``, ``MPX 1.0``) ;
+    « KT200026 » (référence seule) → (``KT200026``, ``""``) ;
+    ``None`` si le dossier ne commence pas par une référence ``KT<num>``.
+    """
+    raw = str(name or "").strip()
+    match = _CARD_RE.match(raw)
+    if match:
+        return match.group(1), match.group(2).strip()
+    ref_only = _CARD_REF_ONLY_RE.match(raw)
+    if ref_only:
+        return ref_only.group(1), ""
+    return None
 
 
 def _conception_dir(rev_dir: str) -> str:
@@ -74,12 +90,36 @@ class ScannedCard:
     revisions: List[ScannedRevision] = field(default_factory=list)
 
 
+# Raisons de mise à l'écart d'un dossier (prompt 021), pour un rapport lisible.
+SKIP_LABELS = {
+    "not_a_card": "Pas une carte (dossier hors convention KT)",
+    "unrecognized_format": "Format de nom non reconnu (référence KT attendue)",
+    "no_revision": "Aucune révision Rev.X / fichier CAO exploitable",
+}
+
+
+@dataclass
+class SkippedDir:
+    name: str
+    reason: str                   # code : not_a_card / unrecognized_format / no_revision
+    label: str = ""
+
+    def __post_init__(self):
+        if not self.label:
+            self.label = SKIP_LABELS.get(self.reason, self.reason)
+
+
 @dataclass
 class CatalogueScan:
     root_path: Optional[str]
     exists: bool
     cards: List[ScannedCard] = field(default_factory=list)
-    skipped_dirs: List[str] = field(default_factory=list)  # dossiers hors convention
+    skipped: List[SkippedDir] = field(default_factory=list)  # dossiers écartés + raison
+
+    @property
+    def skipped_dirs(self) -> List[str]:
+        """Noms seuls des dossiers écartés (compat rétro)."""
+        return [d.name for d in self.skipped]
 
 
 def scan_catalogue(root_path: Optional[str]) -> CatalogueScan:
@@ -92,7 +132,7 @@ def scan_catalogue(root_path: Optional[str]) -> CatalogueScan:
         return CatalogueScan(root_path=root_path, exists=False)
 
     cards: List[ScannedCard] = []
-    skipped: List[str] = []
+    skipped: List[SkippedDir] = []
 
     for card_name in sorted(os.listdir(root_path)):
         card_dir = os.path.join(root_path, card_name)
@@ -100,7 +140,10 @@ def scan_catalogue(root_path: Optional[str]) -> CatalogueScan:
             continue
         parsed = parse_card_folder(card_name)
         if not parsed:
-            skipped.append(card_name)
+            # Distingue « format non reconnu » (ressemble à une carte KT) de
+            # « pas une carte » (Archives, history, dossiers hors convention).
+            reason = "unrecognized_format" if _LOOKS_KT_RE.match(card_name.strip()) else "not_a_card"
+            skipped.append(SkippedDir(name=card_name, reason=reason))
             continue
         reference, name = parsed
 
@@ -125,6 +168,6 @@ def scan_catalogue(root_path: Optional[str]) -> CatalogueScan:
         if revisions:
             cards.append(ScannedCard(reference=reference, name=name, revisions=revisions))
         else:
-            skipped.append(card_name)
+            skipped.append(SkippedDir(name=card_name, reason="no_revision"))
 
-    return CatalogueScan(root_path=root_path, exists=True, cards=cards, skipped_dirs=skipped)
+    return CatalogueScan(root_path=root_path, exists=True, cards=cards, skipped=skipped)

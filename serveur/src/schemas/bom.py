@@ -363,6 +363,14 @@ class BomRevisionDetailResponse(BaseModel):
     items: List[BomItemSchema]
 
 
+class CatalogueSkippedDir(BaseModel):
+    """Dossier écarté du scan catalogue + raison lisible (prompt 021)."""
+
+    name: str
+    reason: str
+    label: str
+
+
 class CatalogueImportResponse(BaseModel):
     """Rapport d'import en masse du catalogue (prompt 011)."""
 
@@ -372,4 +380,5 @@ class CatalogueImportResponse(BaseModel):
     revisions_imported: int
     components_created: int
     skipped_dirs: List[str] = Field(default_factory=list)
+    skipped: List[CatalogueSkippedDir] = Field(default_factory=list)
     rows: List[dict] = Field(default_factory=list)
