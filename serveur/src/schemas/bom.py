@@ -242,10 +242,23 @@ class DeletedReferenceEntry(BaseModel):
     reference: Optional[str] = None
 
 
+class ReferenceLinkEntry(BaseModel):
+    """Un bloqueur nommé empêchant la suppression d'une carte (prompt 023)."""
+
+    nature: str
+    label: str
+    id: Optional[int] = None
+    nom: Optional[str] = None
+    reference: Optional[str] = None
+    statut: Optional[str] = None
+    quantite: Optional[int] = None
+
+
 class SkippedReferenceEntry(BaseModel):
     id: int
     reference: Optional[str] = None
     reasons: List[str] = Field(default_factory=list)
+    links: List[ReferenceLinkEntry] = Field(default_factory=list)
 
 
 class DeleteReferenceResponse(BaseModel):
