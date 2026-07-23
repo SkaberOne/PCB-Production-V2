@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session, joinedload
 
 from ..database import utcnow
 from ..models.bom import BomItem, BomRevision, Component
-from ..models.commands import ProductionPlan
+from ..models.commands import PlanAssignment, ProductionPlan
 from ..models.machines import PnpCart, PnpMachine, PnpManualPlacement, PnpSlotPin
 from ..models.production import Production, ProductionBomRevision
 from .assignment_helpers import (
@@ -1058,7 +1058,7 @@ class AssignmentPlanningMixin:
         machine_id: int,
         plan_id: int,
     ) -> Dict:
-        machine = db.query(PnpCart).filter(PnpCart.id == machine_id).first()
+        machine = db.query(PnpMachine).filter(PnpMachine.id == machine_id).first()
         if not machine:
             raise ValueError(f"Machine {machine_id} not found")
 
@@ -1066,16 +1066,22 @@ class AssignmentPlanningMixin:
         if not plan:
             raise ValueError(f"Production plan {plan_id} not found")
 
-        assignments = db.query(ProductionPlan).filter(ProductionPlan.id == plan_id).all()
-        num_assignments = len(assignments)
-        has_capacity = num_assignments <= machine.num_positions
+        num_assignments = (
+            db.query(PlanAssignment)
+            .filter(PlanAssignment.production_plan_id == plan_id)
+            .count()
+        )
+        positions = machine.num_positions or 0
+        has_capacity = num_assignments <= positions
 
         return {
             "machine_id": machine_id,
             "plan_id": plan_id,
-            "machine_positions": machine.num_positions,
+            "machine_positions": positions,
             "assigned_positions": num_assignments,
-            "available_positions": machine.num_positions - num_assignments,
+            "available_positions": positions - num_assignments,
             "has_capacity": has_capacity,
-            "capacity_utilization": round((num_assignments / machine.num_positions) * 100, 2),
+            "capacity_utilization": (
+                round((num_assignments / positions) * 100, 2) if positions else 0.0
+            ),
         }
