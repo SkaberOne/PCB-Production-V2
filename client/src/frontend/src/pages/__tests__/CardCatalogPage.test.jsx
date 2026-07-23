@@ -234,3 +234,55 @@ describe('CardCatalogPage — prompt 020 (recherche + suppression)', () => {
         expect(await screen.findByText(/non supprimable/)).toBeInTheDocument();
     });
 });
+
+// ── Prompt 023 : refus 409 détaillé (bloqueurs nommés) ────────────────────────
+
+describe('CardCatalogPage — refus suppression détaillé (023)', () => {
+    let restoreConsoleError;
+    beforeEach(() => {
+        jest.clearAllMocks();
+        restoreConsoleError = suppressActDeprecatedWarning();
+        mockGet020();
+        axios.put.mockResolvedValue({ data: {} });
+        axios.patch.mockResolvedValue({ data: {} });
+        axios.post.mockResolvedValue({ data: {} });
+        axios.delete.mockResolvedValue({ data: {} });
+    });
+    afterEach(() => { restoreConsoleError?.(); });
+
+    it('suppression unitaire refusée : message nomme les commandes (interne + client)', async () => {
+        axios.delete.mockRejectedValue({ response: { status: 409, data: {
+            detail: 'Carte AMPLI_GEN6 non supprimable — retenue par : commande interne #1 "Cmd" (DRAFT), commande client CMD-0003 (DELIVERED).',
+            reference: 'AMPLI_GEN6',
+            links: [
+                { nature: 'commande interne', id: 1, label: 'commande interne #1 "Cmd" (DRAFT)' },
+                { nature: 'commande client', reference: 'CMD-0003', label: 'commande client CMD-0003 (DELIVERED)' },
+            ],
+        } } });
+        renderPage();
+        fireEvent.click(await screen.findByText('AMPLI_GEN6'));
+        fireEvent.click(await screen.findByRole('button', { name: 'Supprimer la carte' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Supprimer' }));
+        const msg = await screen.findByText(/non supprimable/);
+        expect(msg).toHaveTextContent('commande interne #1');
+        expect(msg).toHaveTextContent('commande client CMD-0003');
+    });
+
+    it('rapport bulk : chaque bloqueur nommé (interne vs client) via links', async () => {
+        axios.delete.mockResolvedValue({ data: { deleted: [], skipped: [
+            { id: 3, reference: 'CARTE_LIEE', reasons: ['commande interne #1 "Cmd" (DRAFT)', 'commande client CMD-0003 (DELIVERED)'],
+              links: [
+                { nature: 'commande interne', id: 1, label: 'commande interne #1 "Cmd" (DRAFT)' },
+                { nature: 'commande client', reference: 'CMD-0003', label: 'commande client CMD-0003 (DELIVERED)' },
+              ] },
+        ] } });
+        renderPage();
+        await screen.findByText('AMPLI_GEN6');
+        fireEvent.click(screen.getByLabelText('Sélectionner CARTE_LIEE'));
+        fireEvent.click(screen.getByRole('button', { name: /Supprimer la sélection \(1\)/ }));
+        fireEvent.click(screen.getByRole('button', { name: 'Supprimer' }));
+        expect(await screen.findByText('Rapport de suppression')).toBeInTheDocument();
+        expect(screen.getByText(/commande interne #1/)).toBeInTheDocument();
+        expect(screen.getByText(/commande client CMD-0003/)).toBeInTheDocument();
+    });
+});

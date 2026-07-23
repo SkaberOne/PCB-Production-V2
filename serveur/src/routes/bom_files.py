@@ -4,6 +4,7 @@ from datetime import datetime
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi.responses import JSONResponse
 from sqlalchemy import func, or_
 from sqlalchemy.orm import Session, joinedload
 
@@ -235,9 +236,11 @@ def delete_bom_reference(bom_reference_id: int, db: Session = Depends(get_db)):
         result = delete_reference(db, bom_reference_id)
     except ReferenceLinkedError as exc:
         db.rollback()
-        raise HTTPException(
+        # detail : phrase FR nommant chaque bloqueur (compat 020) ; links : structure riche (023).
+        detail = f"Carte {exc.reference} non supprimable — retenue par : {', '.join(exc.reasons)}."
+        return JSONResponse(
             status_code=409,
-            detail=f"Carte {exc.reference} non supprimable : liee a {', '.join(exc.reasons)}.",
+            content={"detail": detail, "reference": exc.reference, "links": exc.links},
         )
     except ValueError as exc:
         db.rollback()
