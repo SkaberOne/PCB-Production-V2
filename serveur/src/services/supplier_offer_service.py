@@ -36,6 +36,16 @@ _NON_ALNUM_RE = re.compile(r"[^a-z0-9]")
 _VALUE_VOLTAGE_RE = re.compile(r"\d+\s*(u|n|p|µ|m)?f", re.IGNORECASE)
 
 
+def _offer_in_stock(offer: Dict, min_qty: int = 1) -> bool:
+    """Prédicat « en stock » partagé : quantité disponible >= min_qty.
+
+    Centralise la règle réutilisée par ``select_best`` et ``_rank_candidates``
+    (dédup 017). Les clés de tri restent propres à chaque appelant (lead time,
+    départage prix-nul) car elles diffèrent légitimement.
+    """
+    return (offer.get("stock_qty") or 0) >= min_qty
+
+
 def _normalize_mpn(value: Optional[str]) -> str:
     """Upper-case, whitespace-stripped form used for exact MPN comparison."""
     return _WHITESPACE_RE.sub("", (value or "").strip()).upper()
@@ -243,7 +253,7 @@ class SupplierOfferService:
             return price if price is not None else float("inf")
 
         def in_stock(offer: Dict) -> bool:
-            return (offer.get("stock_qty") or 0) >= quantity
+            return _offer_in_stock(offer, quantity)
 
         if strategy == "priority" and priority_supplier:
             preferred = [
@@ -364,7 +374,7 @@ class SupplierOfferService:
         return sorted(
             candidates,
             key=lambda c: (
-                not ((c.get("stock_qty") or 0) > 0),
+                not _offer_in_stock(c),
                 c.get("unit_price") is None,
                 c.get("unit_price") if c.get("unit_price") is not None else float("inf"),
             ),

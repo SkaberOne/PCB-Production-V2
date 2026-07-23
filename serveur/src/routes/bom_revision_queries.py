@@ -14,7 +14,7 @@ from ..schemas.bom import (
     BomRevisionDetailResponse,
     BomRevisionSchema,
 )
-from .bom import get_db
+from ..database import get_db
 from .bom_support import _enum_value
 
 router = APIRouter(tags=["bom"])

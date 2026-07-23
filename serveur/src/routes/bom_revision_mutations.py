@@ -17,7 +17,7 @@ from ..schemas.bom import (
 )
 from ..services.harmony_rules import harmonize_resistor_value
 from ..utils.file_parser import infer_component_type
-from .bom import get_db
+from ..database import get_db
 from .bom_support import (
     _apply_machine_footprint_catalog_defaults,
     _build_mapping_warnings,

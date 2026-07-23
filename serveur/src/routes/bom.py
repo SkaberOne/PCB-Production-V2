@@ -2,11 +2,9 @@
 
 from fastapi import APIRouter
 
-from ..database import get_db  # re-exported pour les routes bom_*
 from .bom_support import bom_file_service, bom_service, component_library_service
 
-# Re-export explicite pour les imports `from .bom import get_db`
-__all__ = ["router", "get_db"]
+__all__ = ["router"]
 
 router = APIRouter(
     prefix="/bom",

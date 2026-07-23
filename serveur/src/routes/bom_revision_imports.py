@@ -13,7 +13,7 @@ from ..models.bom import BomReference, BomRevision
 from ..schemas.bom import BomImportResponse, CaoImportResponse
 from ..services.cao.cao_import_service import prepare_cao_import
 from ..utils.uploads import read_upload_capped
-from .bom import get_db
+from ..database import get_db
 from .bom_support import (
     _collapse_duplicate_revisions,
     _ensure_bom_category,

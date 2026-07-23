@@ -37,7 +37,7 @@ from ..schemas.bom import (
     MachineFootprintCatalogImportResponse,
     MachineFootprintCatalogSchema,
 )
-from .bom import get_db
+from ..database import get_db
 from .bom_support import (
     _apply_machine_footprint_catalog_defaults,
     _clean_optional_text,

@@ -5,11 +5,12 @@ calcule ``à commander = besoin − stock`` et exclut les composants couverts.
 """
 
 from src.services.command_service import CommandService
+from src.services.command_export_service import CommandExportService
 
 
 def _rows(lines, overrides=None):
     summary = {"aggregated_components": lines}
-    return CommandService._build_erp_export_rows(summary, defaults={}, line_overrides=overrides or {})
+    return CommandExportService._build_erp_export_rows(summary, defaults={}, line_overrides=overrides or {})
 
 
 def test_export_skips_components_covered_by_stock():
@@ -44,7 +45,7 @@ def test_export_line_offer_override_wins_over_global():
     lines = [{"key": "A", "quantity": 100, "stock_available": 0, "component_library_id": 1}]
     global_offers = {1: {"supplier": "MOUSER", "supplier_part": "M-123", "product_url": "http://m"}}
     line_override = {"A": {"supplier": "RS", "supplier_part": "RS-999", "product_url": "http://rs"}}
-    rows = CommandService._build_erp_export_rows(
+    rows = CommandExportService._build_erp_export_rows(
         {"aggregated_components": lines},
         defaults={},
         offers_by_component=global_offers,

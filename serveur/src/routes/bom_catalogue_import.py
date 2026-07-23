@@ -21,7 +21,7 @@ from ..schemas.bom import CatalogueImportResponse
 from ..services.catalogue_import_service import scan_catalogue
 from ..services.cao.cao_import_service import prepare_cao_import
 from ..services.stock_service import StockService
-from .bom import get_db
+from ..database import get_db
 from .bom_revision_imports import _persist_import_result
 from .bom_support import (
     _apply_machine_footprint_catalog_defaults,
