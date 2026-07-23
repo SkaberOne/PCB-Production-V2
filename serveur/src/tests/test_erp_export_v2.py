@@ -3,6 +3,7 @@
 from src.tests.conftest import client
 
 from src.services.command_service import CommandService
+from src.services.command_export_service import CommandExportService
 
 
 DEFAULTS = {
@@ -17,7 +18,7 @@ DEFAULTS = {
 
 
 def test_erp_headers_are_the_twelve_form_fields():
-    assert CommandService.ERP_HEADERS == [
+    assert CommandExportService.ERP_HEADERS == [
         "Référence fournisseur",
         "Fournisseur",
         "Description",
@@ -58,7 +59,7 @@ def test_build_rows_maps_offer_and_defaults():
             "product_url": "https://mouser.com/p/1",
         }
     }
-    rows = CommandService._build_erp_export_rows(summary, DEFAULTS, offers_by_component)
+    rows = CommandExportService._build_erp_export_rows(summary, DEFAULTS, offers_by_component)
     assert len(rows) == 1
     row = rows[0]
     assert row["Référence fournisseur"] == "81-GRM188"
@@ -80,7 +81,7 @@ def test_build_rows_without_offer_uses_default_supplier():
                                           "footprint": "R0402", "component_reference": "R0402_10K",
                                           "quantity": 5}]}
     defaults = dict(DEFAULTS, default_supplier="Mouser")
-    rows = CommandService._build_erp_export_rows(summary, defaults, {})
+    rows = CommandExportService._build_erp_export_rows(summary, defaults, {})
     assert rows[0]["Fournisseur"] == "Mouser"
     assert rows[0]["Référence KT"] == ""  # champ société, jamais pré-rempli
 

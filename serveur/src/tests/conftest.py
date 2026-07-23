@@ -82,7 +82,7 @@ _src_database.SessionLocal = TestingSessionLocal
 
 from src.app import app  # noqa: E402  (import après monkey-patch)
 from src.database import get_db as db_get_db  # noqa: E402
-from src.routes.bom import bom_file_service, get_db as bom_get_db  # noqa: E402
+from src.routes.bom import bom_file_service  # noqa: E402
 
 
 def override_get_db():
@@ -93,7 +93,6 @@ def override_get_db():
         db.close()
 
 
-app.dependency_overrides[bom_get_db] = override_get_db
 app.dependency_overrides[db_get_db] = override_get_db
 
 client = TestClient(app)

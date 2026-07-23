@@ -22,7 +22,7 @@ from ..schemas.bom import (
     BomStoredFileMutationResponse,
     BomStoredFileUpdateRequest,
 )
-from .bom import get_db
+from ..database import get_db
 from .bom_support import (
     _build_revision_session_payload,
     _build_stored_file_entry,

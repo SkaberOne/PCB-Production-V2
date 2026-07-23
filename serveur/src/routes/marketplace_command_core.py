@@ -17,6 +17,7 @@ from ..schemas.marketplace import (
     UpdateCommandRequest,
 )
 from ..services.command_service import CommandService
+from ..services.command_export_service import CommandExportService
 from ..services.erp_defaults_service import ErpDefaultsService
 import logging
 
@@ -156,7 +157,7 @@ def export_command_erp(
             if value is not None:
                 defaults[field] = value
 
-        workbook_stream, filename = CommandService.export_command_erp_workbook(
+        workbook_stream, filename = CommandExportService.export_command_erp_workbook(
             db=db,
             command_id=command_id,
             defaults=defaults,
