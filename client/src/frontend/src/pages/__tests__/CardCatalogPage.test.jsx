@@ -105,8 +105,10 @@ describe('CardCatalogPage — fusion Cartes + édition (prompt 001)', () => {
         fireEvent.click(await screen.findByText('AMPLI_GEN6'));
         expect(await screen.findByLabelText('Nom de la carte')).toBeInTheDocument();
         expect(screen.getByText('Révisions & BOM')).toBeInTheDocument();
-        // Le bouton « Ouvrir » (BomLibraryDetail) mène à la Revue BOM éditable.
-        expect(screen.getByRole('button', { name: /Ouvrir/i })).toBeInTheDocument();
+        // La révision est repliée (prompt 019) : déplier « Rev. A » révèle les
+        // faces et le bouton « Ouvrir » (mène à la Revue BOM éditable).
+        fireEvent.click(screen.getByText('Rev. A'));
+        expect(await screen.findByRole('button', { name: /Ouvrir/i })).toBeInTheDocument();
     });
 
     it('édite le nom et enregistre (PUT /marketplace/cards/{id})', async () => {

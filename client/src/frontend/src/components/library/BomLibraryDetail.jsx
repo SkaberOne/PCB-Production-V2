@@ -24,6 +24,7 @@ import {
     Typography,
 } from '@mui/material';
 import { formatStoredBomDate } from '../../utils/bomFileExplorer';
+import RevisionGroupRow from './RevisionGroupRow';
 
 const cardSx = {
     backgroundColor: '#18181b',
@@ -61,6 +62,14 @@ function BomLibraryDetail({
     onReload,
 }) {
     const navigate = useNavigate();
+
+    const [openRevs, setOpenRevs] = React.useState(() => new Set());
+    const toggleRev = (key) => setOpenRevs((prev) => {
+        const next = new Set(prev);
+        if (next.has(key)) next.delete(key); else next.add(key);
+        return next;
+    });
+
 
     if (!referenceNode) {
         return (
@@ -154,83 +163,23 @@ function BomLibraryDetail({
                     <Table size="small">
                         <TableHead>
                             <TableRow>
+                                <TableCell sx={{ ...headCellSx, width: 44 }} />
                                 <TableCell sx={headCellSx}>Révision</TableCell>
-                                <TableCell sx={headCellSx}>Face</TableCell>
-                                <TableCell sx={headCellSx}>Statut</TableCell>
-                                <TableCell sx={headCellSx}>Importée le</TableCell>
-                                <TableCell sx={{ ...headCellSx, textAlign: 'right' }}>Actions</TableCell>
+                                <TableCell sx={headCellSx}>Faces</TableCell>
+                                <TableCell sx={headCellSx}>Dernier import</TableCell>
                             </TableRow>
                         </TableHead>
                         <TableBody>
-                            {(referenceNode.revisions || []).flatMap((revGroup, gIdx) =>
-                                (revGroup.items || []).map((item, iIdx) => (
-                                    <TableRow
-                                        key={item.bom_revision_id + '-' + item.side + '-' + gIdx + '-' + iIdx}
-                                        sx={{
-                                            backgroundColor: (gIdx + iIdx) % 2 ? 'rgba(255,255,255,0.015)' : 'transparent',
-                                            '&:hover': { backgroundColor: 'rgba(255,255,255,0.04)' },
-                                        }}
-                                    >
-                                        <TableCell sx={{ ...cellSx, color: '#f4f4f5', fontWeight: 600 }}>
-                                            {item.revision || revGroup.revision}
-                                        </TableCell>
-                                        <TableCell sx={cellSx}>
-                                            <Chip
-                                                size="small"
-                                                label={item.side || '—'}
-                                                sx={{
-                                                    backgroundColor: item.side === 'TOP'
-                                                        ? 'rgba(245, 158, 11, 0.12)'
-                                                        : 'rgba(59, 130, 246, 0.12)',
-                                                    color: item.side === 'TOP' ? '#fbbf24' : '#60a5fa',
-                                                    fontWeight: 500,
-                                                    minWidth: 56,
-                                                }}
-                                            />
-                                        </TableCell>
-                                        <TableCell sx={cellSx}>
-                                            <Chip
-                                                size="small"
-                                                label={item.status || 'DRAFT'}
-                                                sx={{
-                                                    backgroundColor: item.status === 'VALIDATED'
-                                                        ? 'rgba(16, 185, 129, 0.12)'
-                                                        : '#27272a',
-                                                    color: item.status === 'VALIDATED' ? '#10b981' : '#a1a1aa',
-                                                    fontWeight: 500,
-                                                }}
-                                            />
-                                        </TableCell>
-                                        <TableCell sx={{ ...cellSx, color: '#a1a1aa' }}>
-                                            {formatStoredBomDate(item.created_at)}
-                                        </TableCell>
-                                        <TableCell sx={{ ...cellSx, textAlign: 'right' }}>
-                                            <Stack direction="row" spacing={0.5} justifyContent="flex-end">
-                                                <Tooltip title="Ouvrir dans la Revue BOM">
-                                                    <Button
-                                                        size="small"
-                                                        variant="outlined"
-                                                        startIcon={<OpenInNewRoundedIcon sx={{ fontSize: 16 }} />}
-                                                        onClick={() => handleOpenRevision(item)}
-                                                        sx={{ minWidth: 92, fontSize: '0.75rem' }}
-                                                    >
-                                                        Ouvrir
-                                                    </Button>
-                                                </Tooltip>
-                                                <Tooltip title="Supprimer cette révision">
-                                                    <IconButton
-                                                        size="small"
-                                                        onClick={() => onDeleteRevision?.(item)}
-                                                        sx={{ color: '#a1a1aa', '&:hover': { color: '#ef4444' } }}
-                                                    >
-                                                        <DeleteOutlineRoundedIcon sx={{ fontSize: 18 }} />
-                                                    </IconButton>
-                                                </Tooltip>
-                                            </Stack>
-                                        </TableCell>
-                                    </TableRow>
-                                ))
-                            )}
+                            {(referenceNode.revisions || []).map((revGroup, gIdx) => (
+                                <RevisionGroupRow
+                                    key={revGroup.revision != null ? String(revGroup.revision) + '-' + gIdx : gIdx}
+                                    revGroup={revGroup}
+                                    open={openRevs.has(gIdx)}
+                                    onToggle={() => toggleRev(gIdx)}
+                                    onOpenRevision={handleOpenRevision}
+                                    onDeleteRevision={onDeleteRevision}
+                                />
+                            ))}
                         </TableBody>
                     </Table>
                 </TableContainer>
