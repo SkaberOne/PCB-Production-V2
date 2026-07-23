@@ -59,6 +59,7 @@ def _register_missing_components(db: Session, revision_id: int) -> int:
     created = 0
     items = db.query(BomItem).filter(BomItem.bom_revision_id == revision_id).all()
     lookup = _get_component_lookup(db)
+    _existing_refs = {r for (r,) in db.query(Component.reference).all()}
     seen = set()
     for item in items:
         if bool(item.dnp):
@@ -75,7 +76,7 @@ def _register_missing_components(db: Session, revision_id: int) -> int:
         if generated_reference in seen:
             continue
         seen.add(generated_reference)
-        if db.query(Component).filter(Component.reference == generated_reference).first():
+        if generated_reference in _existing_refs:
             continue
         component = Component(reference=generated_reference)
         component.value = value
@@ -91,6 +92,7 @@ def _register_missing_components(db: Session, revision_id: int) -> int:
         component.notes = "Créé par import catalogue (MPN à renseigner)"
         _apply_machine_footprint_catalog_defaults(db, component, overwrite=False)
         db.add(component)
+        _existing_refs.add(generated_reference)
         created += 1
     if created:
         db.commit()

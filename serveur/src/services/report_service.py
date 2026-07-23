@@ -6,7 +6,7 @@ Provides aggregated metrics and summaries for dashboard and reporting pages.
 from typing import Dict, List, Optional
 
 from sqlalchemy import func, case, or_
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from ..models.bom import BomItem, BomReference, BomRevision, Component
 from ..models.commands import Command, CommandItem, PlanAssignment, ProductionPlan
@@ -118,27 +118,67 @@ class ReportService:
                     [Production.StatusEnum.DRAFT, Production.StatusEnum.ACTIVE]
                 )
             )
-        productions = query.order_by(Production.updated_at.desc()).all()
+        productions = (
+            query.options(
+                joinedload(Production.machine),
+                joinedload(Production.bom_links),
+            )
+            .order_by(Production.updated_at.desc())
+            .all()
+        )
+        prod_ids = [p.id for p in productions]
+
+        # Σ cartes produites par production en UNE requête (au lieu d'une par prod).
+        produced_by_prod = dict(
+            db.query(
+                ProductionRun.production_id,
+                func.coalesce(func.sum(ProductionRun.boards_produced), 0),
+            )
+            .filter(
+                ProductionRun.production_id.in_(prod_ids),
+                ProductionRun.is_cancelled == False,  # noqa: E712 (SQL Server: IS 0 invalide)
+            )
+            .group_by(ProductionRun.production_id)
+            .all()
+        ) if prod_ids else {}
+
+        # Dernière commande par production en UNE requête (tri desc → première vue = dernière).
+        last_command_by_prod: Dict[int, Command] = {}
+        if prod_ids:
+            for cmd in (
+                db.query(Command)
+                .filter(Command.production_id.in_(prod_ids))
+                .order_by(Command.id.desc())
+                .all()
+            ):
+                last_command_by_prod.setdefault(cmd.production_id, cmd)
+
+        # Contexte partagé pour can_i_produce : données indépendantes de la production
+        # préchargées une seule fois (sinon full-scans répétés par production).
+        from .stock_service import StockService
+        from .component_library_service import ComponentLibraryService
+        from ..models.stock import ComponentStock
+
+        _all_components = db.query(Component).all()
+        cip_ctx = {
+            "settings": StockService.get_settings(db),
+            "components": {c.id: c for c in _all_components},
+            "lookup": ComponentLibraryService.build_lookup(_all_components),
+            "stocks": {s.component_id: s for s in db.query(ComponentStock).all()},
+            "engaged": StockService.engaged_by_component(db),
+        }
 
         summaries: List[Dict] = []
         for prod in productions:
             links = prod.bom_links or []
             boards_target = sum(int(link.quantity_to_produce or 0) for link in links)
 
-            boards_produced = (
-                db.query(func.coalesce(func.sum(ProductionRun.boards_produced), 0))
-                .filter(
-                    ProductionRun.production_id == prod.id,
-                    ProductionRun.is_cancelled == False,  # noqa: E712 (SQL Server: IS 0 invalide)
-                )
-                .scalar()
-                or 0
-            )
+            boards_produced = int(produced_by_prod.get(prod.id, 0) or 0)
 
             # « Puis-je produire ? » — résumé seulement (pas les lignes détaillées).
             stock = None
             try:
-                res = ProductionStockService.can_i_produce(db, prod.id, None)
+                res = ProductionStockService.can_i_produce(db, prod.id, None, ctx=cip_ctx)
                 getter = res.get if isinstance(res, dict) else lambda k, d=None: getattr(res, k, d)
                 stock = {
                     "can_produce": bool(getter("can_produce", False)),
@@ -148,12 +188,7 @@ class ReportService:
             except ValueError:
                 stock = None  # production sans révision liée, etc.
 
-            last_command = (
-                db.query(Command)
-                .filter(Command.production_id == prod.id)
-                .order_by(Command.id.desc())
-                .first()
-            )
+            last_command = last_command_by_prod.get(prod.id)
 
             summaries.append(
                 {

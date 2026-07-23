@@ -830,9 +830,14 @@ class AssignmentPlanningMixin:
             )
             .all()
         )
+        _pin_component_ids = [pin.component_id for pin in existing_pins]
+        _pin_components = {
+            c.id: c
+            for c in db.query(Component).filter(Component.id.in_(_pin_component_ids)).all()
+        } if _pin_component_ids else {}
         occupied_by: Dict[int, int] = {}
         for pin in existing_pins:
-            other = db.query(Component).filter(Component.id == pin.component_id).first()
+            other = _pin_components.get(pin.component_id)
             other_usage = component_slot_usage(other) if other else 1
             for offset in range(other_usage):
                 occupied_by[int(pin.slot_position) + offset] = int(pin.component_id)
