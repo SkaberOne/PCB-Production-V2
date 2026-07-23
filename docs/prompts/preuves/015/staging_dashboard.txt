@@ -1,0 +1,41 @@
+﻿Verif staging :8001 (branche perf/nplus1-backend) - 015
+=======================================================
+015 = backend perf ; effet visible sur le Tableau de bord (memes valeurs, moins de requetes).
+
+GET /api/reports/productions-summary : 3 productions en 216 ms.
+Valeurs coherentes (cible/produit/revisions/can_produce/machine) :
+
+
+id              : 12
+name            : prod02 Carrier Board D3000 Rev-F DATE:07/2026
+status          : ACTIVE
+boards_target   : 63
+boards_produced : 0
+revisions_count : 5
+can_produce     : False
+shortage        : 85
+machine         : 
+
+id              : 13
+name            : prod03 banc de test DATE:07/2026
+status          : DRAFT
+boards_target   : 2
+boards_produced : 0
+revisions_count : 2
+can_produce     : False
+shortage        : 21
+machine         : 
+
+id              : 8
+name            : prod01 Bistable DATE:07/2026
+status          : DRAFT
+boards_target   : 30
+boards_produced : 0
+revisions_count : 1
+can_produce     : False
+shortage        : 3
+machine         : PNP-02
+
+
+
+
