@@ -317,13 +317,18 @@ class SupplierOfferService:
         """
         applied: List[Dict] = []
         skipped: List[Dict] = []
+        _ids = [it.get("component_id") for it in items if it.get("component_id")]
+        _components_by_id = {
+            c.id: c
+            for c in db.query(Component).filter(Component.id.in_(_ids)).all()
+        } if _ids else {}
         for item in items:
             component_id = item.get("component_id")
             mpn = (item.get("mpn") or "").strip()
             if not component_id or not mpn:
                 skipped.append({"component_id": component_id, "reason": "missing_data"})
                 continue
-            component = db.query(Component).filter(Component.id == component_id).first()
+            component = _components_by_id.get(component_id)
             if component is None:
                 skipped.append({"component_id": component_id, "reason": "not_found"})
                 continue

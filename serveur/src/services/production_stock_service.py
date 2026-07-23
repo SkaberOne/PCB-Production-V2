@@ -59,7 +59,7 @@ class ProductionStockService:
 
     @classmethod
     def aggregate_needs_per_board(
-        cls, db: Session, production_id: int
+        cls, db: Session, production_id: int, component_lookup: Optional[Dict] = None
     ) -> Tuple[Dict[int, int], Production]:
         """Per-board component needs of a production (TOP+BOT, non-DNP, matched).
 
@@ -70,7 +70,11 @@ class ProductionStockService:
         if production is None:
             raise ValueError(f"Production {production_id} introuvable")
 
-        lookup = ComponentLibraryService.build_lookup(db.query(Component).all())
+        lookup = (
+            component_lookup
+            if component_lookup is not None
+            else ComponentLibraryService.build_lookup(db.query(Component).all())
+        )
         needs: Dict[int, int] = {}
         norm = ComponentLibraryService.normalize_lookup_token
 
@@ -183,7 +187,8 @@ class ProductionStockService:
     # --------------------------------------------------- reservations / need
     @classmethod
     def _reserved_by_others(
-        cls, db: Session, target_production_id: int, settings, target_status=None
+        cls, db: Session, target_production_id: int, settings, target_status=None,
+        component_lookup: Optional[Dict] = None,
     ) -> Dict[int, int]:
         """{component_id: reserved qty} = Σ remaining need of other non-closed prods.
 
@@ -214,7 +219,9 @@ class ProductionStockService:
             # Un brouillon ne bloque pas une production plus prioritaire (active).
             if _reservation_priority(production.status) < target_priority:
                 continue
-            needs, _ = cls.aggregate_needs_per_board(db, production.id)
+            needs, _ = cls.aggregate_needs_per_board(
+                db, production.id, component_lookup=component_lookup
+            )
             boards = cls.board_count(production)
             run_ids = [
                 r.id
@@ -233,27 +240,53 @@ class ProductionStockService:
 
     @classmethod
     def can_i_produce(
-        cls, db: Session, production_id: int, boards: Optional[int] = None
+        cls, db: Session, production_id: int, boards: Optional[int] = None,
+        *, ctx: Optional[Dict] = None,
     ) -> Dict:
-        """Need vs available (stock − reserved by others) per component + shortages."""
-        needs, production = cls.aggregate_needs_per_board(db, production_id)
-        settings = StockService.get_settings(db)
+        """Need vs available (stock − reserved by others) per component + shortages.
+
+        ``ctx`` (optionnel) porte les données indépendantes de la production,
+        préchargées une seule fois par l'appelant (dashboard) : ``settings``,
+        ``components`` (id→Component), ``lookup``, ``stocks`` (id→ComponentStock),
+        ``engaged``. Évite de re-scanner ces tables à chaque production.
+        """
+        if ctx is not None:
+            settings = ctx["settings"]
+            components = ctx["components"]
+            lookup = ctx["lookup"]
+            stocks = ctx["stocks"]
+            engaged = ctx["engaged"]
+        else:
+            settings = StockService.get_settings(db)
+            all_components = db.query(Component).all()
+            components = {c.id: c for c in all_components}
+            lookup = ComponentLibraryService.build_lookup(all_components)
+            stocks = {s.component_id: s for s in db.query(ComponentStock).all()}
+            engaged = StockService.engaged_by_component(db)
+
+        needs, production = cls.aggregate_needs_per_board(
+            db, production_id, component_lookup=lookup
+        )
         board_count = int(boards) if boards is not None else cls.board_count(production)
         reserved = cls._reserved_by_others(
-            db, production_id, settings, target_status=production.status
+            db, production_id, settings, target_status=production.status,
+            component_lookup=lookup,
         )
-        engaged = StockService.engaged_by_component(db)
-
-        stocks = {
-            s.component_id: s
-            for s in db.query(ComponentStock).all()
-        }
-        components = {c.id: c for c in db.query(Component).all()}
+        # aggregate peut créer des composants absents du préchargement.
+        missing_ids = [cid for cid in needs if cid not in components]
+        if missing_ids:
+            for c in db.query(Component).filter(Component.id.in_(missing_ids)).all():
+                components[c.id] = c
 
         lines: List[Dict] = []
         shortage_count = 0
         for component_id, per_board in needs.items():
-            loss = cls._effective_loss_pct(db, component_id, settings)
+            srow = stocks.get(component_id)
+            loss = (
+                float(srow.loss_pct)
+                if srow is not None and srow.loss_pct is not None
+                else float(settings.global_loss_pct or 0.0)
+            )
             besoin = cls._out_qty(per_board, board_count, loss)
             solde = stocks[component_id].qty_pieces if component_id in stocks else 0
             reserve = reserved.get(component_id, 0)

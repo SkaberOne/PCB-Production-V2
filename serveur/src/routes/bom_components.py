@@ -9,6 +9,7 @@ from io import BytesIO
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, Response, UploadFile
+from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from sqlalchemy import asc, desc, func, or_
@@ -895,7 +896,10 @@ def list_machine_footprints(
 async def import_machine_footprints(file: UploadFile = File(...), db: Session = Depends(get_db)):
     """Import or update the machine-footprint catalog from a semicolon-delimited text file."""
     try:
-        result = machine_footprint_catalog_service.import_delimited_text(await read_upload_capped(file), db)
+        data = await read_upload_capped(file)
+        result = await run_in_threadpool(
+            machine_footprint_catalog_service.import_delimited_text, data, db
+        )
         return MachineFootprintCatalogImportResponse(
             success=not result.errors,
             message=f"Imported {result.item_count} machine footprint rows",
@@ -922,11 +926,14 @@ async def import_component_library(file: UploadFile = File(...), db: Session = D
     tmp_path: Optional[str] = None
 
     try:
+        data = await read_upload_capped(file)
         with tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx") as tmp_file:
-            tmp_file.write(await read_upload_capped(file))
+            tmp_file.write(data)
             tmp_path = tmp_file.name
 
-        result = component_library_service.import_workbook(tmp_path, db)
+        result = await run_in_threadpool(
+            component_library_service.import_workbook, tmp_path, db
+        )
         return ComponentLibraryImportResponse(
             success=not result.errors,
             message=f"Imported {result.item_count} component library rows",

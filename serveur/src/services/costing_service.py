@@ -301,8 +301,13 @@ class CostingService:
         lookup = ComponentLibraryService.build_lookup(db.query(Component).all())
 
         cards = []
-        for rid in cls._card_ids_of_production(production):
-            ref = db.query(BomReference).filter(BomReference.id == rid).first()
+        _card_ids = list(cls._card_ids_of_production(production))
+        _refs_by_id = {
+            r.id: r
+            for r in db.query(BomReference).filter(BomReference.id.in_(_card_ids)).all()
+        } if _card_ids else {}
+        for rid in _card_ids:
+            ref = _refs_by_id.get(rid)
             card = cls.compute_card(db, production, rid, params, cinput, lookup)
             card["reference"] = ref.reference if ref else f"#{rid}"
             cards.append(card)
@@ -390,17 +395,18 @@ class CostingService:
     def list_cards(cls, db: Session) -> List[Dict]:
         """Cards selectable in the UI: every BOM reference + its latest reference price."""
         refs = db.query(BomReference).order_by(BomReference.reference).all()
+        # Dernier prix de référence par carte en UNE requête (tri desc → 1re vue = dernière).
+        latest_by_ref: Dict[int, ProductionCosting] = {}
+        for _pc in (
+            db.query(ProductionCosting)
+            .filter(ProductionCosting.is_reference == True)  # noqa: E712 (SQL Server: IS 1 invalide)
+            .order_by(ProductionCosting.computed_at.desc(), ProductionCosting.id.desc())
+            .all()
+        ):
+            latest_by_ref.setdefault(_pc.bom_reference_id, _pc)
         out = []
         for ref in refs:
-            latest = (
-                db.query(ProductionCosting)
-                .filter(
-                    ProductionCosting.bom_reference_id == ref.id,
-                    ProductionCosting.is_reference == True,  # noqa: E712 (SQL Server: IS 1 invalide)
-                )
-                .order_by(ProductionCosting.computed_at.desc())
-                .first()
-            )
+            latest = latest_by_ref.get(ref.id)
             out.append(
                 {
                     "bom_reference_id": ref.id,

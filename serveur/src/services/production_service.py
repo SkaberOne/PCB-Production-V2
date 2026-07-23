@@ -514,14 +514,18 @@ class ProductionService:
         assignments = db.query(PlanAssignment).filter(
             PlanAssignment.production_plan_id == plan_id
         ).all()
-        
+
+        _component_ids = [a.component_id for a in assignments]
+        _components_by_id = {
+            c.id: c
+            for c in db.query(Component).filter(Component.id.in_(_component_ids)).all()
+        } if _component_ids else {}
+
         assignment_details = []
         total_items = 0
         
         for assignment in assignments:
-            component = db.query(Component).filter(
-                Component.id == assignment.component_id
-            ).first()
+            component = _components_by_id.get(assignment.component_id)
             
             total_items += assignment.quantity
             
