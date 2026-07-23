@@ -106,6 +106,7 @@ function CostingPage() {
     useEffect(() => { loadProduction(productionId); }, [productionId, loadProduction]);
 
     const apply = async () => {
+        if (!params || !inputs) return;
         if (!productionId) return;
         setBusy(true);
         setError(null);
@@ -182,7 +183,7 @@ function CostingPage() {
                             ))}
                         </TextField>
                         <Box sx={{ flex: 1 }} />
-                        <Button startIcon={<RefreshRoundedIcon />} onClick={apply} disabled={busy || !inputs}>
+                        <Button startIcon={<RefreshRoundedIcon />} onClick={apply} disabled={busy || !params || !inputs}>
                             Appliquer / recalculer
                         </Button>
                         <Button
@@ -201,13 +202,13 @@ function CostingPage() {
 
                     {params && inputs && (
                         <Grid container spacing={2} sx={{ mb: 2 }}>
-                            <Grid item xs={12} md={6}>
+                            <Grid item xs={12} lg={6}>
                                 <CostParametersForm
                                     values={params} disabled={busy}
                                     onChange={(k, v) => setParams((prev) => ({ ...prev, [k]: v }))}
                                 />
                             </Grid>
-                            <Grid item xs={12} md={6}>
+                            <Grid item xs={12} lg={6}>
                                 <ProductionInputsForm
                                     values={inputs} disabled={busy}
                                     onChange={(k, v) => setInputs((prev) => ({ ...prev, [k]: v }))}
@@ -219,16 +220,16 @@ function CostingPage() {
                     {result && (
                         <Box>
                             <Grid container spacing={2} sx={{ mb: 2 }}>
-                                <Grid item xs={6} sm={3}>
+                                <Grid item xs={6} md={3}>
                                     <MetricCard label="Coût total production HT" value={eur0(result.total_ht)} accent />
                                 </Grid>
-                                <Grid item xs={6} sm={3}>
+                                <Grid item xs={6} md={3}>
                                     <MetricCard label="Coût total TTC" value={eur0(result.total_ttc)} />
                                 </Grid>
-                                <Grid item xs={6} sm={3}>
+                                <Grid item xs={6} md={3}>
                                     <MetricCard label="Cartes du lot" value={cards.length} />
                                 </Grid>
-                                <Grid item xs={6} sm={3}>
+                                <Grid item xs={6} md={3}>
                                     <MetricCard
                                         label="Coût unitaire HT"
                                         value={cards.length === 1 ? eur(cards[0].unit_cost_ht) : '—'}

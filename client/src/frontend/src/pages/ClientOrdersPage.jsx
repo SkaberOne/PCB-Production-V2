@@ -15,6 +15,7 @@ import {
     Divider,
     IconButton,
     MenuItem,
+    Snackbar,
     Stack,
     Tab,
     Table,
@@ -32,6 +33,7 @@ import DeleteOutlineRoundedIcon from '@mui/icons-material/DeleteOutlineRounded';
 import ExpandMoreRoundedIcon from '@mui/icons-material/ExpandMoreRounded';
 import apiClient from '../api/client';
 import PageHeader from '../components/common/PageHeader';
+import ConfirmDialog from '../components/common/ConfirmDialog';
 import { colors } from '../theme';
 
 const STATUS_LABELS = { OPEN: 'Ouverte', READY: 'Prête', DELIVERED: 'Livrée', CANCELLED: 'Annulée' };
@@ -40,6 +42,7 @@ const STATUS_COLOR = { OPEN: 'warning', READY: 'success', DELIVERED: 'default', 
 function ClientOrdersPage() {
     const [tab, setTab] = React.useState(0);
     const [error, setError] = React.useState(null);
+    const [success, setSuccess] = React.useState(null);
     const [refs, setRefs] = React.useState([]);
     const [refRevisions, setRefRevisions] = React.useState({});
     const [machines, setMachines] = React.useState([]);
@@ -69,7 +72,7 @@ function ClientOrdersPage() {
             setRefs(Array.from(byId.values()));
             setRefRevisions(revs);
             setMachines(Array.isArray(m.data) ? m.data : []);
-        } catch (e) { /* ignore */ }
+        } catch (e) { setError(e?.response?.data?.detail || 'Chargement des références / machines impossible.'); }
     }, []);
 
     React.useEffect(() => { loadShared(); }, [loadShared]);
@@ -80,7 +83,22 @@ function ClientOrdersPage() {
                 title="Commandes client / machine"
                 subtitle="Clients, leurs commandes et machines, préparation de boîte. Catalogue de machines."
             />
-            {error ? <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>{error}</Alert> : null}
+            <Snackbar
+                open={Boolean(error)}
+                autoHideDuration={7000}
+                onClose={() => setError(null)}
+                anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+            >
+                <Alert severity="error" variant="filled" onClose={() => setError(null)} sx={{ width: '100%' }}>{error}</Alert>
+            </Snackbar>
+            <Snackbar
+                open={Boolean(success)}
+                autoHideDuration={3000}
+                onClose={() => setSuccess(null)}
+                anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+            >
+                <Alert severity="success" variant="filled" onClose={() => setSuccess(null)} sx={{ width: '100%' }}>{success}</Alert>
+            </Snackbar>
 
             <Tabs value={tab} onChange={(_e, v) => { setTab(v); if (v === 0) setClientsRefresh((x) => x + 1); }} sx={{ mb: 2, borderBottom: `1px solid ${colors.border}` }}>
                 <Tab label="Clients" />
@@ -89,10 +107,10 @@ function ClientOrdersPage() {
             </Tabs>
 
             <Box sx={{ display: tab === 0 ? 'block' : 'none' }}>
-                <ClientsTab refs={refs} refRevisions={refRevisions} machines={machines} setError={setError} onNeedRefresh={loadShared} refresh={clientsRefresh} />
+                <ClientsTab refs={refs} refRevisions={refRevisions} machines={machines} setError={setError} setSuccess={setSuccess} onNeedRefresh={loadShared} refresh={clientsRefresh} />
             </Box>
             <Box sx={{ display: tab === 1 ? 'block' : 'none' }}>
-                <MachinesTab refs={refs} refRevisions={refRevisions} setError={setError} onChanged={loadShared} />
+                <MachinesTab refs={refs} refRevisions={refRevisions} setError={setError} setSuccess={setSuccess} onChanged={loadShared} />
             </Box>
             <Box sx={{ display: tab === 2 ? 'block' : 'none' }}>
                 <ImportOrderTab refs={refs} setError={setError} onImported={() => { loadShared(); setClientsRefresh((x) => x + 1); }} />
@@ -102,7 +120,7 @@ function ClientOrdersPage() {
 }
 
 // ══════════════════════════ Onglet Clients ══════════════════════════
-function ClientsTab({ refs, refRevisions, machines, setError, onNeedRefresh, refresh }) {
+function ClientsTab({ refs, refRevisions, machines, setError, setSuccess, onNeedRefresh, refresh }) {
     const [clients, setClients] = React.useState(null);
     const [createOpen, setCreateOpen] = React.useState(false);
     const [detailId, setDetailId] = React.useState(null);
@@ -149,7 +167,7 @@ function ClientsTab({ refs, refRevisions, machines, setError, onNeedRefresh, ref
                 </Table>
             </TableContainer>
 
-            <CreateClientDialog open={createOpen} onClose={() => setCreateOpen(false)} onCreated={async () => { setCreateOpen(false); await load(); }} setError={setError} />
+            <CreateClientDialog open={createOpen} onClose={() => setCreateOpen(false)} onCreated={async () => { setCreateOpen(false); await load(); }} setError={setError} setSuccess={setSuccess} />
             <ClientDetailDialog
                 clientId={detailId}
                 refs={refs}
@@ -158,19 +176,20 @@ function ClientsTab({ refs, refRevisions, machines, setError, onNeedRefresh, ref
                 onClose={() => setDetailId(null)}
                 onChanged={async () => { await load(); await onNeedRefresh(); }}
                 setError={setError}
+                setSuccess={setSuccess}
             />
         </Box>
     );
 }
 
-function CreateClientDialog({ open, onClose, onCreated, setError }) {
+function CreateClientDialog({ open, onClose, onCreated, setError, setSuccess }) {
     const [name, setName] = React.useState('');
     const [contact, setContact] = React.useState('');
     const [saving, setSaving] = React.useState(false);
     React.useEffect(() => { if (open) { setName(''); setContact(''); } }, [open]);
     const submit = async () => {
         setSaving(true);
-        try { await apiClient.post('/marketplace/clients', { name: name.trim(), contact: contact.trim() || null }); onCreated(); }
+        try { await apiClient.post('/marketplace/clients', { name: name.trim(), contact: contact.trim() || null }); if (setSuccess) setSuccess('Client créé.'); onCreated(); }
         catch (e) { setError(e?.response?.data?.detail || 'Création client impossible.'); }
         finally { setSaving(false); }
     };
@@ -191,10 +210,11 @@ function CreateClientDialog({ open, onClose, onCreated, setError }) {
     );
 }
 
-function ClientDetailDialog({ clientId, refs, refRevisions, machines, onClose, onChanged, setError }) {
+function ClientDetailDialog({ clientId, refs, refRevisions, machines, onClose, onChanged, setError, setSuccess }) {
     const [data, setData] = React.useState(null);
     const [busy, setBusy] = React.useState(false);
     const [newOrderOpen, setNewOrderOpen] = React.useState(false);
+    const [confirm, setConfirm] = React.useState(null); // { title, message, run }
 
     const load = React.useCallback(async () => {
         if (!clientId) { setData(null); return; }
@@ -211,8 +231,10 @@ function ClientDetailDialog({ clientId, refs, refRevisions, machines, onClose, o
     };
     const prepare = (orderId, lineId, qty) => call(() => apiClient.post(`/marketplace/client-orders/${orderId}/prepare`, { line_id: lineId, qty }));
     const setStatus = (orderId, status) => call(() => apiClient.put(`/marketplace/client-orders/${orderId}`, { status }));
-    const removeOrder = (orderId) => call(() => apiClient.delete(`/marketplace/client-orders/${orderId}`));
-    const removeClient = () => call(async () => { await apiClient.delete(`/marketplace/clients/${clientId}`); onClose(); });
+    const removeOrder = (orderId) => call(async () => { await apiClient.delete(`/marketplace/client-orders/${orderId}`); if (setSuccess) setSuccess('Commande supprimée.'); });
+    const removeClient = () => call(async () => { await apiClient.delete(`/marketplace/clients/${clientId}`); onClose(); if (setSuccess) setSuccess('Client supprimé.'); });
+    const askRemoveOrder = (order) => setConfirm({ title: 'Supprimer la commande', message: `Supprimer la commande « ${order.label} » ? Cette action est irréversible.`, run: () => removeOrder(order.id) });
+    const askRemoveClient = () => setConfirm({ title: 'Supprimer le client', message: `Supprimer le client « ${data?.name || ''} » et ses ${(data?.orders || []).length} commande(s) ? Cette action est irréversible.`, run: removeClient });
 
     const allOrders = data?.orders || [];
     const activeOrders = allOrders.filter((o) => o.status !== 'DELIVERED');
@@ -279,7 +301,7 @@ function ClientDetailDialog({ clientId, refs, refRevisions, machines, onClose, o
                             </Table>
                             <Stack direction="row" justifyContent="flex-end" spacing={1} sx={{ mt: 1 }}>
                                 {order.status !== 'DELIVERED' && <Button size="small" color="success" disabled={busy} onClick={() => setStatus(order.id, 'DELIVERED')}>Marquer livrée</Button>}
-                                <Button size="small" color="error" disabled={busy} onClick={() => removeOrder(order.id)}>Supprimer</Button>
+                                <Button size="small" color="error" disabled={busy} onClick={() => askRemoveOrder(order)}>Supprimer</Button>
                             </Stack>
                         </AccordionDetails>
                     </Accordion>
@@ -354,10 +376,18 @@ function ClientDetailDialog({ clientId, refs, refRevisions, machines, onClose, o
                 </Accordion>
             </DialogContent>
             <DialogActions sx={{ justifyContent: 'space-between' }}>
-                <Button color="error" onClick={removeClient} disabled={busy}>Supprimer le client</Button>
+                <Button color="error" onClick={askRemoveClient} disabled={busy}>Supprimer le client</Button>
                 <Button color="inherit" onClick={onClose} disabled={busy}>Fermer</Button>
             </DialogActions>
 
+            <ConfirmDialog
+                open={Boolean(confirm)}
+                title={confirm?.title || ''}
+                message={confirm?.message || ''}
+                confirmLabel="Supprimer"
+                onConfirm={() => { const r = confirm?.run; setConfirm(null); if (r) r(); }}
+                onClose={() => setConfirm(null)}
+            />
             <NewOrderDialog
                 open={newOrderOpen}
                 clientId={clientId}
@@ -461,7 +491,7 @@ function NewOrderDialog({ open, clientId, refs, refRevisions, machines, onClose,
 }
 
 // ══════════════════════════ Onglet Machines ══════════════════════════
-function MachinesTab({ refs, refRevisions, setError, onChanged }) {
+function MachinesTab({ refs, refRevisions, setError, setSuccess, onChanged }) {
     const [models, setModels] = React.useState(null);
     const [editing, setEditing] = React.useState(null); // {id?...} ou 'new'
 
@@ -508,14 +538,16 @@ function MachinesTab({ refs, refRevisions, setError, onChanged }) {
                 onClose={() => setEditing(null)}
                 onSaved={async () => { setEditing(null); await load(); await onChanged(); }}
                 setError={setError}
+                setSuccess={setSuccess}
             />
         </Box>
     );
 }
 
-function MachineEditDialog({ model, refs, refRevisions, onClose, onSaved, setError }) {
+function MachineEditDialog({ model, refs, refRevisions, onClose, onSaved, setError, setSuccess }) {
     const isNew = model === 'new';
     const open = Boolean(model);
+    const [confirmDel, setConfirmDel] = React.useState(false);
     const [name, setName] = React.useState('');
     const [cards, setCards] = React.useState([{ ref: null, revision: '', qty: '1' }]);
     const [saving, setSaving] = React.useState(false);
@@ -541,6 +573,7 @@ function MachineEditDialog({ model, refs, refRevisions, onClose, onSaved, setErr
         try {
             if (isNew) await apiClient.post('/marketplace/machine-models', payload);
             else await apiClient.put(`/marketplace/machine-models/${model.id}`, payload);
+            if (setSuccess) setSuccess(isNew ? 'Machine créée.' : 'Machine enregistrée.');
             onSaved();
         } catch (e) { setError(e?.response?.data?.detail || 'Enregistrement machine impossible.'); }
         finally { setSaving(false); }
@@ -548,12 +581,13 @@ function MachineEditDialog({ model, refs, refRevisions, onClose, onSaved, setErr
 
     const remove = async () => {
         setSaving(true);
-        try { await apiClient.delete(`/marketplace/machine-models/${model.id}`); onSaved(); }
+        try { await apiClient.delete(`/marketplace/machine-models/${model.id}`); if (setSuccess) setSuccess('Machine supprimée.'); onSaved(); }
         catch (e) { setError(e?.response?.data?.detail || 'Suppression impossible.'); }
         finally { setSaving(false); }
     };
 
     return (
+        <>
         <Dialog open={open} onClose={() => !saving && onClose()} maxWidth="sm" fullWidth>
             <DialogTitle>{isNew ? 'Nouvelle machine' : model?.name}</DialogTitle>
             <DialogContent dividers>
@@ -589,13 +623,22 @@ function MachineEditDialog({ model, refs, refRevisions, onClose, onSaved, setErr
                 </Stack>
             </DialogContent>
             <DialogActions sx={{ justifyContent: 'space-between' }}>
-                <Box>{!isNew && <Button color="error" onClick={remove} disabled={saving}>Supprimer</Button>}</Box>
+                <Box>{!isNew && <Button color="error" onClick={() => setConfirmDel(true)} disabled={saving}>Supprimer</Button>}</Box>
                 <Box>
                     <Button color="inherit" onClick={onClose} disabled={saving}>Annuler</Button>
                     <Button variant="contained" color="success" onClick={submit} disabled={saving || !name.trim()}>Enregistrer</Button>
                 </Box>
             </DialogActions>
         </Dialog>
+        <ConfirmDialog
+            open={confirmDel}
+            title="Supprimer la machine"
+            message={`Supprimer le modèle machine « ${model?.name || ''} » ? Cette action est irréversible.`}
+            confirmLabel="Supprimer"
+            onConfirm={() => { setConfirmDel(false); remove(); }}
+            onClose={() => setConfirmDel(false)}
+        />
+        </>
     );
 }
 
