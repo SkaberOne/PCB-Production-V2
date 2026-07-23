@@ -39,3 +39,8 @@ Recommandation orch : **A puis B** (attendre + re-push, sinon inspecter les rég
 ## Réponse / décision (destinataire)
 
 ## Suite (émetteur, après application)
+
+## Reponse / decision (destinataire) - RESOLU 2026-07-23
+
+Cause = incident GitHub (Actions panne partielle ; Pull Requests + Webhooks degrades), PAS le repo. Decision Eric : attendre le retablissement.
+Apres retablissement d'Actions : la PR #91 a rattrape son HEAD (cb80aee) et la CI est VERTE (pytest + npm test + e2e, verifie via API check-runs). 013 merge dans dev (merge manuel, DoD CI verte respectee). Echange clos.
