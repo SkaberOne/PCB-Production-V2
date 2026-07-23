@@ -21,6 +21,7 @@ import {
 } from '@mui/material';
 import apiClient from '../api/client';
 import PageHeader from '../components/common/PageHeader';
+import { normalizeRevisionCode, formatRevisionLabel } from '../utils/revision';
 import ProductionSuiviBar from '../components/dashboard/ProductionSuiviBar';
 import { colors } from '../theme';
 
@@ -152,7 +153,7 @@ function BoardStockPage() {
                                     {row.below_min ? <Chip size="small" label="sous min." color="error" sx={{ ml: 0.75 }} /> : null}
                                 </TableCell>
                                 <TableCell>
-                                    {row.revision ? <Chip size="small" label={row.revision} variant="outlined" /> : <span style={{ color: colors.textSecondary }}>—</span>}
+                                    {normalizeRevisionCode(row.revision) ? <Chip size="small" label={formatRevisionLabel(row.revision)} variant="outlined" /> : <span style={{ color: colors.textSecondary }}>Sans révision</span>}
                                 </TableCell>
                                 <TableCell align="right" sx={{ fontWeight: 600 }}>{row.qty_in_stock}</TableCell>
                                 <TableCell align="right" sx={{ color: colors.textSecondary }}>{row.min_stock}</TableCell>
@@ -186,7 +187,7 @@ function BoardStockPage() {
             <Dialog open={Boolean(editing)} onClose={() => !saving && setEditing(null)} maxWidth="sm" fullWidth>
                 <DialogTitle>
                     {editing?.reference}
-                    {editing?.revision ? <Chip size="small" label={editing.revision} variant="outlined" sx={{ ml: 1 }} /> : null}
+                    {normalizeRevisionCode(editing?.revision) ? <Chip size="small" label={formatRevisionLabel(editing.revision)} variant="outlined" sx={{ ml: 1 }} /> : null}
                     <Typography variant="body2" sx={{ color: colors.textSecondary }}>
                         Prix Costing de référence : {eur(editing?.reference_unit_cost_ht)}
                     </Typography>
