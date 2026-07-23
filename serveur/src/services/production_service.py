@@ -192,10 +192,15 @@ class ProductionService:
         available_positions = [position for position in range(1, machine.num_positions + 1) if position not in used_positions]
 
         if len(available_positions) < len(sorted_components):
-            logger.warning(
-                "Not enough available positions. Need %s, have %s",
-                len(sorted_components),
-                len(available_positions),
+            overflow = sorted_components[len(available_positions):]
+            refs = ", ".join(
+                str(c.get("component_reference") or c.get("component_id"))
+                for c in overflow
+            )
+            raise ValueError(
+                f"Capacite machine insuffisante : {len(sorted_components)} composant(s) "
+                f"pour {len(available_positions)} position(s) libre(s). "
+                f"Composant(s) non assignable(s) : {refs}"
             )
 
         assignment_details = []

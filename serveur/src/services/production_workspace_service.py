@@ -11,7 +11,12 @@ from ..models.bom import BomRevision
 from ..models.commands import Command
 from ..models.costing import ProductionCostInput, ProductionCosting
 from ..models.machines import PnpManualPlacement, PnpMachine, PnpSlotPin
-from ..models.production import Production, ProductionBomRevision
+from ..models.production import (
+    Production,
+    ProductionBomRevision,
+    ProductionComponentProgress,
+    ProductionRun,
+)
 
 
 class ProductionWorkspaceService:
@@ -617,6 +622,16 @@ class ProductionWorkspaceService:
         ).delete(synchronize_session=False)
         db.query(PnpManualPlacement).filter(
             PnpManualPlacement.production_id == production_id
+        ).delete(synchronize_session=False)
+        # Lots de production + avancement composant (FK NOT NULL, sans cascade) : sans
+        # purge, la suppression plante en SQL Server (IntegrityError). Les StockMovement
+        # (journal de stock, source de vérité) ne sont PAS supprimés — leur
+        # production_run_id est nullable et sans FK, donc sans impact.
+        db.query(ProductionComponentProgress).filter(
+            ProductionComponentProgress.production_id == production_id
+        ).delete(synchronize_session=False)
+        db.query(ProductionRun).filter(
+            ProductionRun.production_id == production_id
         ).delete(synchronize_session=False)
 
         db.delete(production)
