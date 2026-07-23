@@ -8,22 +8,22 @@ import {
     DialogActions,
     DialogContent,
     DialogTitle,
+    InputAdornment,
     Stack,
-    Table,
-    TableBody,
-    TableCell,
-    TableContainer,
-    TableHead,
-    TableRow,
     TextField,
     Typography,
 } from '@mui/material';
 import AddRoundedIcon from '@mui/icons-material/AddRounded';
+import SearchRoundedIcon from '@mui/icons-material/SearchRounded';
+import DeleteSweepRoundedIcon from '@mui/icons-material/DeleteSweepRounded';
 import apiClient, { extractApiError } from '../api/client';
 import PageHeader from '../components/common/PageHeader';
 import ConfirmDialog from '../components/common/ConfirmDialog';
 import CardDetailDialog from '../components/library/CardDetailDialog';
+import CardCatalogTable from '../components/library/CardCatalogTable';
+import BulkDeleteReportDialog from '../components/library/BulkDeleteReportDialog';
 import { DEFAULT_UNCATEGORIZED_CATEGORY, groupStoredBomFiles } from '../utils/bomFileExplorer';
+import { matchesQuery } from '../utils/textSearch';
 import { colors } from '../theme';
 
 function eur(v) {
@@ -34,9 +34,8 @@ function eur(v) {
 
 /**
  * Catalogue de cartes unifié (ADR 0018 + prompt 001). Entrée unique du catalogue :
- * la fiche par carte regroupe métadonnées (nom / code KELENN / type / catégorie),
- * composition d'assemblage, et les révisions/BOM de la carte (ouverture dans la
- * Revue BOM éditable, suppression). L'onglet « BOM enregistrées » a été fusionné ici.
+ * la fiche par carte regroupe métadonnées, composition d'assemblage et révisions/BOM.
+ * Prompt 020 : recherche réf/nom, suppression unitaire et multiple (avec rapport).
  */
 function CardCatalogPage({ embedded = false }) {
     const [rows, setRows] = React.useState(null);
@@ -47,6 +46,11 @@ function CardCatalogPage({ embedded = false }) {
     const [categoryDialogOpen, setCategoryDialogOpen] = React.useState(false);
     const [newCategoryName, setNewCategoryName] = React.useState('');
     const [pendingDelete, setPendingDelete] = React.useState(null);
+    const [search, setSearch] = React.useState('');
+    const [selectedIds, setSelectedIds] = React.useState(() => new Set());
+    const [pendingCardDelete, setPendingCardDelete] = React.useState(null);
+    const [bulkConfirmOpen, setBulkConfirmOpen] = React.useState(false);
+    const [report, setReport] = React.useState(null);
 
     const load = React.useCallback(async () => {
         setError(null);
@@ -66,7 +70,6 @@ function CardCatalogPage({ embedded = false }) {
     }, []);
     React.useEffect(() => { load(); }, [load]);
 
-    // Révisions/BOM groupées par référence de carte (repris de la bibliothèque BOM).
     const nodeByReferenceId = React.useMemo(() => {
         const grouped = groupStoredBomFiles(files, []);
         const map = new Map();
@@ -80,11 +83,36 @@ function CardCatalogPage({ embedded = false }) {
         return Array.from(names).sort();
     }, [categories]);
 
-    // Garde la carte en cours d'édition synchronisée après un reload.
     const editingCard = React.useMemo(() => {
         if (!editing) return null;
         return (rows || []).find((r) => r.bom_reference_id === editing.bom_reference_id) || editing;
     }, [editing, rows]);
+
+    // Filtrage réf + nom (insensible casse/accents), côté client.
+    const filteredRows = React.useMemo(() => {
+        if (rows === null) return null;
+        return rows.filter((r) => matchesQuery(search, [r.reference, r.name]));
+    }, [rows, search]);
+
+    const filteredIds = React.useMemo(
+        () => (filteredRows || []).map((r) => r.bom_reference_id),
+        [filteredRows],
+    );
+    const selectedVisible = filteredIds.filter((id) => selectedIds.has(id));
+    const allSelected = filteredIds.length > 0 && selectedVisible.length === filteredIds.length;
+    const someSelected = selectedVisible.length > 0;
+
+    const toggleRow = (id) => setSelectedIds((prev) => {
+        const next = new Set(prev);
+        if (next.has(id)) next.delete(id); else next.add(id);
+        return next;
+    });
+    const toggleAll = () => setSelectedIds((prev) => {
+        const next = new Set(prev);
+        if (allSelected) filteredIds.forEach((id) => next.delete(id));
+        else filteredIds.forEach((id) => next.add(id));
+        return next;
+    });
 
     const assemblies = (rows || []).filter((r) => r.card_type === 'ASSEMBLY').length;
 
@@ -113,6 +141,38 @@ function CardCatalogPage({ embedded = false }) {
         }
     };
 
+    // Suppression unitaire d'une carte entière (depuis la fiche).
+    const confirmCardDelete = async () => {
+        const card = pendingCardDelete;
+        if (!card) return;
+        setPendingCardDelete(null);
+        try {
+            await apiClient.delete(`/bom/references/${card.bom_reference_id}`);
+            setSelectedIds((prev) => { const n = new Set(prev); n.delete(card.bom_reference_id); return n; });
+            setEditing(null);
+            await load();
+        } catch (e) {
+            setError(extractApiError(e));
+        }
+    };
+
+    // Suppression multiple : rapport supprimées / ignorées (liées).
+    const confirmBulkDelete = async () => {
+        setBulkConfirmOpen(false);
+        const ids = filteredIds.filter((id) => selectedIds.has(id));
+        if (ids.length === 0) return;
+        try {
+            const res = await apiClient.delete('/bom/references', { data: { ids } });
+            setReport(res.data || { deleted: [], skipped: [] });
+            setSelectedIds(new Set());
+            await load();
+        } catch (e) {
+            setError(extractApiError(e));
+        }
+    };
+
+    const selectedCount = selectedVisible.length;
+
     const headerActions = (
         <Button variant="outlined" startIcon={<AddRoundedIcon />} onClick={() => setCategoryDialogOpen(true)}>
             Catégorie
@@ -122,9 +182,7 @@ function CardCatalogPage({ embedded = false }) {
     return (
         <Box>
             {embedded ? (
-                <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 1.5 }}>
-                    {headerActions}
-                </Box>
+                <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 1.5 }}>{headerActions}</Box>
             ) : (
                 <PageHeader
                     title="Catalogue des cartes"
@@ -134,56 +192,40 @@ function CardCatalogPage({ embedded = false }) {
             )}
             {error ? <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>{error}</Alert> : null}
 
-            <Stack direction="row" spacing={1.5} sx={{ mb: 2 }} flexWrap="wrap" useFlexGap>
-                <Chip label={`${(rows || []).length} carte(s)`} variant="outlined" />
+            <Stack direction="row" spacing={1.5} sx={{ mb: 2 }} alignItems="center" flexWrap="wrap" useFlexGap>
+                <TextField
+                    size="small"
+                    placeholder="Rechercher (référence ou nom)…"
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    sx={{ minWidth: 280, flex: 1 }}
+                    inputProps={{ 'aria-label': 'Rechercher une carte' }}
+                    InputProps={{ startAdornment: (<InputAdornment position="start"><SearchRoundedIcon fontSize="small" /></InputAdornment>) }}
+                />
+                <Chip label={`${(filteredRows || []).length} carte(s)`} variant="outlined" />
                 <Chip label={`${assemblies} assemblage(s)`} variant="outlined" />
+                {selectedCount > 0 ? (
+                    <Button
+                        variant="contained"
+                        color="error"
+                        startIcon={<DeleteSweepRoundedIcon />}
+                        onClick={() => setBulkConfirmOpen(true)}
+                    >
+                        Supprimer la sélection ({selectedCount})
+                    </Button>
+                ) : null}
             </Stack>
 
-            <TableContainer sx={{ border: `1px solid ${colors.border}`, borderRadius: 1 }}>
-                <Table size="small" stickyHeader>
-                    <TableHead>
-                        <TableRow>
-                            <TableCell>Référence</TableCell>
-                            <TableCell>Nom</TableCell>
-                            <TableCell>Code KELENN</TableCell>
-                            <TableCell>Type</TableCell>
-                            <TableCell>Catégorie</TableCell>
-                            <TableCell>Révisions</TableCell>
-                            <TableCell align="right">Prix / carte</TableCell>
-                        </TableRow>
-                    </TableHead>
-                    <TableBody>
-                        {rows === null ? (
-                            <TableRow><TableCell colSpan={7} sx={{ py: 3, textAlign: 'center', color: colors.textSecondary }}>Chargement…</TableCell></TableRow>
-                        ) : rows.length === 0 ? (
-                            <TableRow><TableCell colSpan={7} sx={{ py: 3, textAlign: 'center', color: colors.textSecondary }}>Aucune carte.</TableCell></TableRow>
-                        ) : rows.map((row) => (
-                            <TableRow key={row.bom_reference_id} hover onClick={() => setEditing(row)} sx={{ cursor: 'pointer' }}>
-                                <TableCell sx={{ fontWeight: 600 }}>{row.reference}</TableCell>
-                                <TableCell>{row.name || <span style={{ color: colors.textSecondary }}>—</span>}</TableCell>
-                                <TableCell>{row.part_number || <span style={{ color: colors.textSecondary }}>—</span>}</TableCell>
-                                <TableCell>
-                                    {row.card_type === 'ASSEMBLY'
-                                        ? <Chip size="small" label={`Assemblage (${row.assembly_items.length})`} color="secondary" variant="outlined" />
-                                        : <Chip size="small" label="Simple" variant="outlined" />}
-                                </TableCell>
-                                <TableCell>{row.category || <span style={{ color: colors.textSecondary }}>—</span>}</TableCell>
-                                <TableCell>
-                                    {(row.revisions || []).length
-                                        ? row.revisions.map((r) => <Chip key={r} size="small" label={r} variant="outlined" sx={{ mr: 0.5 }} />)
-                                        : <span style={{ color: colors.textSecondary }}>—</span>}
-                                </TableCell>
-                                <TableCell align="right">
-                                    {eur(row.unit_price)}
-                                    {row.card_type === 'ASSEMBLY' && !row.price_complete
-                                        ? <Chip size="small" label="incomplet" color="warning" variant="outlined" sx={{ ml: 0.5 }} />
-                                        : null}
-                                </TableCell>
-                            </TableRow>
-                        ))}
-                    </TableBody>
-                </Table>
-            </TableContainer>
+            <CardCatalogTable
+                rows={filteredRows}
+                selectedIds={selectedIds}
+                onToggleRow={toggleRow}
+                onToggleAll={toggleAll}
+                allSelected={allSelected}
+                someSelected={someSelected}
+                onRowClick={setEditing}
+                formatPrice={eur}
+            />
 
             <CardDetailDialog
                 card={editingCard}
@@ -193,6 +235,7 @@ function CardCatalogPage({ embedded = false }) {
                 onClose={() => setEditing(null)}
                 onSaved={async () => { await load(); setEditing(null); }}
                 onDeleteRevision={(item) => setPendingDelete(item)}
+                onDeleteCard={(c) => setPendingCardDelete(c)}
                 onReload={load}
                 setError={setError}
             />
@@ -204,9 +247,7 @@ function CardCatalogPage({ embedded = false }) {
                         Les catégories servent à organiser les cartes du catalogue.
                     </Typography>
                     <TextField
-                        autoFocus
-                        fullWidth
-                        size="small"
+                        autoFocus fullWidth size="small"
                         placeholder="Ex : Cartes principales"
                         aria-label="Nom de la nouvelle catégorie"
                         value={newCategoryName}
@@ -223,16 +264,32 @@ function CardCatalogPage({ embedded = false }) {
             <ConfirmDialog
                 open={Boolean(pendingDelete)}
                 title="Supprimer cette révision ?"
-                message={
-                    pendingDelete
-                        ? `La révision ${pendingDelete.revision} (${pendingDelete.side}) de ${pendingDelete.reference} sera définitivement supprimée. Cette action est irréversible.`
-                        : ''
-                }
-                confirmLabel="Supprimer"
-                severity="error"
-                onConfirm={confirmDelete}
-                onClose={() => setPendingDelete(null)}
+                message={pendingDelete
+                    ? `La révision ${pendingDelete.revision} (${pendingDelete.side}) de ${pendingDelete.reference} sera définitivement supprimée. Cette action est irréversible.`
+                    : ''}
+                confirmLabel="Supprimer" severity="error"
+                onConfirm={confirmDelete} onClose={() => setPendingDelete(null)}
             />
+
+            <ConfirmDialog
+                open={Boolean(pendingCardDelete)}
+                title="Supprimer la carte ?"
+                message={pendingCardDelete
+                    ? `Supprimer la carte ${pendingCardDelete.reference}${pendingCardDelete.name ? ` — ${pendingCardDelete.name}` : ''} et ses ${(pendingCardDelete.revisions || []).length} révision(s) ? Action irréversible. Refusée si la carte est liée (production, stock, commande, assemblage).`
+                    : ''}
+                confirmLabel="Supprimer" severity="error"
+                onConfirm={confirmCardDelete} onClose={() => setPendingCardDelete(null)}
+            />
+
+            <ConfirmDialog
+                open={bulkConfirmOpen}
+                title="Supprimer la sélection ?"
+                message={`${selectedCount} carte(s) sélectionnée(s) seront supprimées. Les cartes liées (production, stock, commande, assemblage) seront ignorées. Action irréversible.`}
+                confirmLabel="Supprimer" severity="error"
+                onConfirm={confirmBulkDelete} onClose={() => setBulkConfirmOpen(false)}
+            />
+
+            <BulkDeleteReportDialog report={report} onClose={() => setReport(null)} />
         </Box>
     );
 }

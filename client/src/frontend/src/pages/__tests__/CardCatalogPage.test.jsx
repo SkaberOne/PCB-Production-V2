@@ -139,3 +139,98 @@ describe('CardCatalogPage — fusion Cartes + édition (prompt 001)', () => {
         });
     });
 });
+
+// ── Prompt 020 : recherche + suppression unitaire/multiple ────────────────────
+
+const CARDS_020 = [
+    { bom_reference_id: 1, reference: 'AMPLI_GEN6', name: 'Ampli', part_number: 'KT01', card_type: 'SIMPLE', category: null, revisions: ['REV_A'], unit_price: 12.5, price_complete: true, assembly_items: [] },
+    { bom_reference_id: 2, reference: 'FILTRE_X', name: 'Filtre à café', part_number: 'KT02', card_type: 'SIMPLE', category: null, revisions: ['REV_A'], unit_price: 8, price_complete: true, assembly_items: [] },
+    { bom_reference_id: 3, reference: 'CARTE_LIEE', name: 'Reliée', part_number: 'KT03', card_type: 'SIMPLE', category: null, revisions: ['REV_A'], unit_price: 5, price_complete: true, assembly_items: [] },
+];
+
+function mockGet020() {
+    axios.get.mockImplementation((url) => {
+        if (url === '/marketplace/cards') return Promise.resolve({ data: CARDS_020 });
+        if (url === '/bom/files') return Promise.resolve({ data: { items: [] } });
+        if (url === '/bom/categories') return Promise.resolve({ data: { items: [] } });
+        return Promise.resolve({ data: {} });
+    });
+}
+
+describe('CardCatalogPage — prompt 020 (recherche + suppression)', () => {
+    let restoreConsoleError;
+    beforeEach(() => {
+        jest.clearAllMocks();
+        restoreConsoleError = suppressActDeprecatedWarning();
+        mockGet020();
+        axios.put.mockResolvedValue({ data: {} });
+        axios.patch.mockResolvedValue({ data: {} });
+        axios.post.mockResolvedValue({ data: {} });
+        axios.delete.mockResolvedValue({ data: {} });
+    });
+    afterEach(() => { restoreConsoleError?.(); });
+
+    it('filtre par référence ET par nom (insensible accents)', async () => {
+        renderPage();
+        expect(await screen.findByText('AMPLI_GEN6')).toBeInTheDocument();
+        const search = screen.getByLabelText('Rechercher une carte');
+        // par nom, avec accent absent dans la requête
+        fireEvent.change(search, { target: { value: 'cafe' } });
+        expect(screen.getByText('FILTRE_X')).toBeInTheDocument();
+        expect(screen.queryByText('AMPLI_GEN6')).not.toBeInTheDocument();
+        // par référence
+        fireEvent.change(search, { target: { value: 'ampli' } });
+        expect(screen.getByText('AMPLI_GEN6')).toBeInTheDocument();
+        expect(screen.queryByText('FILTRE_X')).not.toBeInTheDocument();
+    });
+
+    it('« tout sélectionner » agit sur le résultat filtré + bulk delete + rapport', async () => {
+        axios.delete.mockResolvedValue({ data: { deleted: [{ id: 1, reference: 'AMPLI_GEN6' }], skipped: [{ id: 3, reference: 'CARTE_LIEE', reasons: ['du stock cartes (quantité > 0)'] }] } });
+        renderPage();
+        await screen.findByText('AMPLI_GEN6');
+        // filtre pour ne garder que AMPLI, puis tout sélectionner (sur filtré)
+        const search = screen.getByLabelText('Rechercher une carte');
+        fireEvent.change(search, { target: { value: 'ampli' } });
+        fireEvent.click(screen.getByLabelText('Tout sélectionner'));
+        // action bulk visible avec le compte
+        const bulkBtn = screen.getByRole('button', { name: /Supprimer la sélection \(1\)/ });
+        fireEvent.click(bulkBtn);
+        // confirmation
+        fireEvent.click(screen.getByRole('button', { name: 'Supprimer' }));
+        await waitFor(() => {
+            expect(axios.delete).toHaveBeenCalledWith('/bom/references', { data: { ids: [1] } });
+        });
+        // rapport affiché
+        expect(await screen.findByText('Rapport de suppression')).toBeInTheDocument();
+        expect(screen.getByText(/1 supprimée\(s\), 1 ignorée\(s\)/)).toBeInTheDocument();
+        expect(screen.getByText(/CARTE_LIEE/)).toBeInTheDocument();
+    });
+
+    it('sélection multiple par cases individuelles', async () => {
+        renderPage();
+        await screen.findByText('AMPLI_GEN6');
+        fireEvent.click(screen.getByLabelText('Sélectionner AMPLI_GEN6'));
+        fireEvent.click(screen.getByLabelText('Sélectionner FILTRE_X'));
+        expect(screen.getByRole('button', { name: /Supprimer la sélection \(2\)/ })).toBeInTheDocument();
+    });
+
+    it('suppression unitaire depuis la fiche (DELETE /bom/references/{id})', async () => {
+        renderPage();
+        fireEvent.click(await screen.findByText('AMPLI_GEN6'));
+        fireEvent.click(await screen.findByRole('button', { name: 'Supprimer la carte' }));
+        // ConfirmDialog carte (bouton confirm = « Supprimer »)
+        fireEvent.click(screen.getByRole('button', { name: 'Supprimer' }));
+        await waitFor(() => {
+            expect(axios.delete).toHaveBeenCalledWith('/bom/references/1');
+        });
+    });
+
+    it('affiche une erreur si la carte est liée (409)', async () => {
+        axios.delete.mockRejectedValue({ response: { status: 409, data: { detail: 'Carte AMPLI_GEN6 non supprimable : liee a du stock cartes.' } } });
+        renderPage();
+        fireEvent.click(await screen.findByText('AMPLI_GEN6'));
+        fireEvent.click(await screen.findByRole('button', { name: 'Supprimer la carte' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Supprimer' }));
+        expect(await screen.findByText(/non supprimable/)).toBeInTheDocument();
+    });
+});

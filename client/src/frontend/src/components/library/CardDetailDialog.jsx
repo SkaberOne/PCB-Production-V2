@@ -41,6 +41,7 @@ function CardDetailDialog({
     onClose,
     onSaved,
     onDeleteRevision,
+    onDeleteCard,
     onReload,
     setError,
 }) {
@@ -200,9 +201,19 @@ function CardDetailDialog({
                     </Box>
                 </Stack>
             </DialogContent>
-            <DialogActions>
-                <Button color="inherit" onClick={onClose} disabled={saving}>Fermer</Button>
-                <Button variant="contained" color="success" onClick={save} disabled={saving}>Enregistrer</Button>
+            <DialogActions sx={{ justifyContent: 'space-between' }}>
+                <Button
+                    color="error"
+                    startIcon={<DeleteOutlineRoundedIcon />}
+                    onClick={() => onDeleteCard && onDeleteCard(card)}
+                    disabled={saving || !onDeleteCard}
+                >
+                    Supprimer la carte
+                </Button>
+                <Box>
+                    <Button color="inherit" onClick={onClose} disabled={saving} sx={{ mr: 1 }}>Fermer</Button>
+                    <Button variant="contained" color="success" onClick={save} disabled={saving}>Enregistrer</Button>
+                </Box>
             </DialogActions>
         </Dialog>
     );
