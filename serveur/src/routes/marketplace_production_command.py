@@ -14,6 +14,9 @@ from ..schemas.marketplace import (
     SyncProductionCommandRequest,
 )
 from ..services.production_command_service import ProductionCommandService
+import logging
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["production-command"])
 
@@ -33,10 +36,11 @@ def sync_production_command(
         )
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc))
-    except Exception as exc:  # pragma: no cover - defensive
-        raise HTTPException(status_code=500, detail=f"Error syncing production command: {exc}")
-
-
+    except HTTPException:
+        raise
+    except Exception:  # pragma: no cover - defensive
+        logger.exception("Error syncing production command")
+        raise HTTPException(status_code=500, detail="Erreur interne du serveur.")
 @router.get("/productions/{production_id}/command")
 def get_production_command(production_id: int, db: Session = Depends(get_db)):
     """Return the implicit command summary (with received quantities)."""

@@ -8,7 +8,7 @@ le parseur n'exclut rien.
 """
 
 import re
-import xml.etree.ElementTree as ET
+import defusedxml.ElementTree as ET
 from typing import Dict, List, Optional
 
 from .parser_base import CaoParser

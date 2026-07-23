@@ -92,6 +92,10 @@ class Settings(BaseSettings):
     sql_server_password: str = ""
     sql_server_database: str = "ECB_Production"
     sql_server_driver: str = "ODBC Driver 17 for SQL Server"
+    # Chiffrement TLS de la connexion SQL (écart D-TLS) : configurable via
+    # SQL_ENCRYPT. Défaut "yes" (sécurisé). En LAN, peut être ramené à "no" si
+    # la négociation TLS du driver 17.10+ est trop lente/instable (erreur 87).
+    sql_encrypt: str = "yes"
 
     # Database URL (computed property — not a settings field)
     @property
@@ -109,15 +113,15 @@ class Settings(BaseSettings):
         # (@ : / etc.) qui cassaient silencieusement la connexion (écart D7).
         user = quote_plus(self.sql_server_user)
         password = quote_plus(self.sql_server_password)
-        # Encrypt=no + TrustServerCertificate=yes : l'ODBC Driver 17.10+ chiffre
-        # par défaut et fait une négociation TLS lente (8-22 s) qui échoue parfois
-        # (erreur 87) au démarrage sous charge. En LAN avec SQL Server local/de
-        # confiance, on désactive le chiffrement → connexion ~2 s, fiable.
+        # Encrypt configurable (SQL_ENCRYPT, défaut "yes") + TrustServerCertificate=yes.
+        # Historique : le driver 17.10+ chiffre par défaut et fait parfois une
+        # négociation TLS lente (8-22 s) / erreur 87 au démarrage ; en LAN sur SQL
+        # Server de confiance, SQL_ENCRYPT=no rétablit une connexion ~2 s.
         return (
             f"mssql+pyodbc://{user}:{password}"
             f"@{self.sql_server_host}:{self.sql_server_port}/{self.sql_server_database}"
             f"?driver={self.sql_server_driver.replace(' ', '+')}"
-            f"&Encrypt=no&TrustServerCertificate=yes"
+            f"&Encrypt={self.sql_encrypt}&TrustServerCertificate=yes"
         )
 
     # Logging

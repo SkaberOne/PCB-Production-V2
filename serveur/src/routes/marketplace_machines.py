@@ -1,5 +1,6 @@
 """Marketplace machine routes."""
 
+import logging
 from typing import List, Optional
 
 from urllib.parse import quote
@@ -22,6 +23,8 @@ from ..services.assignment_service import AssignmentService
 from ..services.production_stock_service import ProductionStockService
 from ..services.production_progress_service import ProductionProgressService
 from ..services.stock_service import StockService
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/machines")
 
@@ -63,8 +66,11 @@ def create_machine(
         return {"message": "Machine created", "machine_id": machine.id}
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error creating machine: {str(e)}")
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Error creating machine")
+        raise HTTPException(status_code=500, detail="Erreur interne du serveur.")
 
 
 @router.get("/{machine_id}")
@@ -90,8 +96,11 @@ def get_machine_summary(
         return summary
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error getting machine summary: {str(e)}")
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Error getting machine summary")
+        raise HTTPException(status_code=500, detail="Erreur interne du serveur.")
 
 
 @router.patch("/{machine_id}/productions/{production_id}/bom-order")
@@ -115,8 +124,11 @@ def update_machine_production_bom_order(
         }
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error updating BOM order: {str(e)}")
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Error updating BOM order")
+        raise HTTPException(status_code=500, detail="Erreur interne du serveur.")
 
 
 @router.post("/{machine_id}/productions/{production_id}/validate-order")
@@ -134,8 +146,11 @@ def validate_machine_production_order(
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error validating production order: {str(e)}")
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Error validating production order")
+        raise HTTPException(status_code=500, detail="Erreur interne du serveur.")
 
 
 @router.post("/{machine_id}/productions/{production_id}/produce", response_model=RunOut)
@@ -156,8 +171,11 @@ def produce_production(
         )
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
-    except Exception as e:  # pragma: no cover - defensive
-        raise HTTPException(status_code=500, detail=f"Error producing: {str(e)}")
+    except HTTPException:
+        raise
+    except Exception:  # pragma: no cover - defensive
+        logger.exception("Error producing")
+        raise HTTPException(status_code=500, detail="Erreur interne du serveur.")
 
 
 @router.get("/{machine_id}/productions/{production_id}/runs", response_model=List[RunOut])
@@ -232,8 +250,11 @@ def get_machine_production_feeder_plan(
         return ProductionProgressService.enrich_component_id_tree(db, production_id, plan)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error calculating feeder plan: {str(e)}")
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Error calculating feeder plan")
+        raise HTTPException(status_code=500, detail="Erreur interne du serveur.")
 
 
 @router.post("/{machine_id}/productions/{production_id}/slot-pins")
@@ -258,8 +279,11 @@ def set_machine_slot_pin(
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error pinning slot: {str(e)}")
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Error pinning slot")
+        raise HTTPException(status_code=500, detail="Erreur interne du serveur.")
 
 
 @router.delete("/{machine_id}/productions/{production_id}/slot-pins/{component_id}")
@@ -279,8 +303,11 @@ def clear_machine_slot_pin(
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error clearing slot pin: {str(e)}")
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Error clearing slot pin")
+        raise HTTPException(status_code=500, detail="Erreur interne du serveur.")
 
 
 @router.post("/{machine_id}/productions/{production_id}/manual-placements")
@@ -302,8 +329,11 @@ def set_machine_manual_placement(
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error setting manual placement: {str(e)}")
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Error setting manual placement")
+        raise HTTPException(status_code=500, detail="Erreur interne du serveur.")
 
 
 @router.get("/{machine_id}/productions/{production_id}/export")
@@ -329,8 +359,11 @@ def export_machine_production_config(
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error exporting PnP config: {str(e)}")
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Error exporting PnP config")
+        raise HTTPException(status_code=500, detail="Erreur interne du serveur.")
 
     disposition = f"attachment; filename=\"{filename}\"; filename*=UTF-8''{quote(filename)}"
     return Response(
@@ -359,8 +392,11 @@ def list_machines(
             "limit": limit,
             "offset": offset,
         }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error listing machines: {str(e)}")
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Error listing machines")
+        raise HTTPException(status_code=500, detail="Erreur interne du serveur.")
 
 
 @router.put("/{machine_id}", response_model=dict)
@@ -388,8 +424,11 @@ def update_machine(
         return {"message": "Machine updated"}
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error updating machine: {str(e)}")
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Error updating machine")
+        raise HTTPException(status_code=500, detail="Erreur interne du serveur.")
 
 
 @router.delete("/{machine_id}")
@@ -405,8 +444,11 @@ def delete_machine(
         return {"message": "Machine deleted"}
     except HTTPException:
         raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error deleting machine: {str(e)}")
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Error deleting machine")
+        raise HTTPException(status_code=500, detail="Erreur interne du serveur.")
 
 
 @router.get("/{machine_id}/plans/{plan_id}/capacity")
@@ -425,5 +467,8 @@ def check_machine_capacity(
         return capacity_check
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error checking capacity: {str(e)}")
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Error checking capacity")
+        raise HTTPException(status_code=500, detail="Erreur interne du serveur.")

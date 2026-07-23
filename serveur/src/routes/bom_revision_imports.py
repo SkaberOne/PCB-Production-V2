@@ -26,6 +26,9 @@ from .bom_support import (
     _try_save_revision_snapshot,
     bom_service,
 )
+import logging
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["bom"])
 
@@ -182,9 +185,10 @@ async def import_bom_file(
     except HTTPException:
         db.rollback()
         raise
-    except Exception as exc:
+    except Exception:
         db.rollback()
-        raise HTTPException(status_code=500, detail=f"Import failed: {exc}")
+        logger.exception("Import failed")
+        raise HTTPException(status_code=500, detail="Erreur interne du serveur.")
     finally:
         if tmp_path and os.path.exists(tmp_path):
             os.unlink(tmp_path)
@@ -317,8 +321,9 @@ async def import_cao_files(
     except HTTPException:
         db.rollback()
         raise
-    except Exception as exc:
+    except Exception:
         db.rollback()
-        raise HTTPException(status_code=500, detail=f"Import CAO échoué : {exc}")
+        logger.exception("Import CAO échoué")
+        raise HTTPException(status_code=500, detail="Erreur interne du serveur.")
     finally:
         shutil.rmtree(tmp_dir, ignore_errors=True)

@@ -11,6 +11,9 @@ from ..schemas.marketplace import (
     UpdatePlanAssignmentRequest,
 )
 from ..services.production_service import ProductionService
+import logging
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/{command_id}/plans")
 
@@ -32,10 +35,11 @@ def create_production_plan(
         return {"message": "Production plan created", "plan_id": plan.id}
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
-    except Exception as exc:
-        raise HTTPException(status_code=500, detail=f"Error creating plan: {exc}")
-
-
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Error creating plan")
+        raise HTTPException(status_code=500, detail="Erreur interne du serveur.")
 @router.get("")
 def list_command_plans(
     command_id: int,
@@ -48,10 +52,11 @@ def list_command_plans(
             "data": [{"id": p.id, "machine_id": p.machine_id, "created_at": p.created_at.isoformat()} for p in plans],
             "total": len(plans),
         }
-    except Exception as exc:
-        raise HTTPException(status_code=500, detail=f"Error listing plans: {exc}")
-
-
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Error listing plans")
+        raise HTTPException(status_code=500, detail="Erreur interne du serveur.")
 @router.get("/{plan_id}/summary")
 def get_plan_summary(
     command_id: int,
@@ -63,10 +68,11 @@ def get_plan_summary(
         return ProductionService.get_plan_summary(db=db, plan_id=plan_id)
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc))
-    except Exception as exc:
-        raise HTTPException(status_code=500, detail=f"Error getting plan summary: {exc}")
-
-
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Error getting plan summary")
+        raise HTTPException(status_code=500, detail="Erreur interne du serveur.")
 @router.post("/{plan_id}/auto-assign")
 def auto_assign_components(
     command_id: int,
@@ -89,10 +95,11 @@ def auto_assign_components(
         }
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
-    except Exception as exc:
-        raise HTTPException(status_code=500, detail=f"Error auto-assigning: {exc}")
-
-
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Error auto-assigning")
+        raise HTTPException(status_code=500, detail="Erreur interne du serveur.")
 @router.post("/{plan_id}/assignments")
 def manual_assign_component(
     command_id: int,
@@ -112,10 +119,11 @@ def manual_assign_component(
         return {"message": "Component assigned", "assignment_id": assignment.id}
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
-    except Exception as exc:
-        raise HTTPException(status_code=500, detail=f"Error assigning component: {exc}")
-
-
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Error assigning component")
+        raise HTTPException(status_code=500, detail="Erreur interne du serveur.")
 @router.put("/{plan_id}/assignments/{assignment_id}")
 def update_plan_assignment(
     command_id: int,
@@ -135,10 +143,11 @@ def update_plan_assignment(
         return {"message": "Assignment updated", "assignment_id": assignment.id}
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
-    except Exception as exc:
-        raise HTTPException(status_code=500, detail=f"Error updating assignment: {exc}")
-
-
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Error updating assignment")
+        raise HTTPException(status_code=500, detail="Erreur interne du serveur.")
 @router.delete("/{plan_id}/assignments/{assignment_id}")
 def remove_plan_assignment(
     command_id: int,
@@ -154,10 +163,9 @@ def remove_plan_assignment(
         return {"message": "Assignment removed"}
     except HTTPException:
         raise
-    except Exception as exc:
-        raise HTTPException(status_code=500, detail=f"Error removing assignment: {exc}")
-
-
+    except Exception:
+        logger.exception("Error removing assignment")
+        raise HTTPException(status_code=500, detail="Erreur interne du serveur.")
 @router.post("/{plan_id}/validate")
 def validate_plan_completeness(
     command_id: int,
@@ -169,10 +177,11 @@ def validate_plan_completeness(
         return ProductionService.validate_plan_completeness(db=db, plan_id=plan_id)
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc))
-    except Exception as exc:
-        raise HTTPException(status_code=500, detail=f"Error validating plan: {exc}")
-
-
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Error validating plan")
+        raise HTTPException(status_code=500, detail="Erreur interne du serveur.")
 @router.delete("/{plan_id}")
 def delete_production_plan(
     command_id: int,
@@ -187,5 +196,6 @@ def delete_production_plan(
         return {"message": "Production plan deleted"}
     except HTTPException:
         raise
-    except Exception as exc:
-        raise HTTPException(status_code=500, detail=f"Error deleting plan: {exc}")
+    except Exception:
+        logger.exception("Error deleting plan")
+        raise HTTPException(status_code=500, detail="Erreur interne du serveur.")

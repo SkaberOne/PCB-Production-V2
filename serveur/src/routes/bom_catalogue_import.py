@@ -10,6 +10,7 @@ bibliothèque les composants manquants (**MPN vide**). Eagle-only ; KiCad listé
 
 import os
 import tempfile
+from pathlib import Path
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -134,10 +135,24 @@ def import_catalogue(
     db: Session = Depends(get_db),
 ):
     """Scanne le dépôt et importe les révisions Eagle absentes (ou aperçu si dry_run)."""
-    configured_root = StockService.get_projects_root_path(db)
-    root = (root_path or configured_root or "").strip()
-    if not root:
+    configured_root = (StockService.get_projects_root_path(db) or "").strip()
+    if not configured_root:
         raise HTTPException(status_code=422, detail="Aucun dossier des projets configuré (Paramètres).")
+
+    # Confinement strict : le client ne peut pas énumérer un dossier arbitraire du
+    # serveur. Un override `root_path` n'est accepté que s'il désigne la racine
+    # configurée ou un de ses sous-dossiers (résolu, anti-traversée).
+    base = Path(configured_root).resolve()
+    if root_path and root_path.strip():
+        candidate = Path(root_path.strip()).resolve()
+        if candidate != base and base not in candidate.parents:
+            raise HTTPException(
+                status_code=403,
+                detail="Le dossier demandé est hors du dépôt des projets configuré.",
+            )
+        root = str(candidate)
+    else:
+        root = str(base)
 
     scan = scan_catalogue(root)
     if not scan.exists:

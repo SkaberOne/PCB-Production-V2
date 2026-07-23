@@ -1,5 +1,6 @@
 """Component and footprint mapping endpoints for the BOM API."""
 
+import logging
 import json
 import os
 import tempfile
@@ -50,6 +51,8 @@ from .bom_support import (
     machine_footprint_catalog_service,
 )
 from ..utils.catalog_cache import invalidate_component_type_rules, invalidate_footprint_mappings
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["bom"])
 
@@ -909,11 +912,10 @@ async def import_machine_footprints(file: UploadFile = File(...), db: Session = 
     except HTTPException:
         db.rollback()
         raise
-    except Exception as exc:
+    except Exception:
         db.rollback()
-        raise HTTPException(status_code=500, detail=f"Machine-footprint import failed: {exc}")
-
-
+        logger.exception("Machine-footprint import failed")
+        raise HTTPException(status_code=500, detail="Erreur interne du serveur.")
 @router.post("/components/library/import", response_model=ComponentLibraryImportResponse)
 async def import_component_library(file: UploadFile = File(...), db: Session = Depends(get_db)):
     """Import a component master library from an Excel workbook."""
@@ -940,9 +942,10 @@ async def import_component_library(file: UploadFile = File(...), db: Session = D
     except HTTPException:
         db.rollback()
         raise
-    except Exception as exc:
+    except Exception:
         db.rollback()
-        raise HTTPException(status_code=500, detail=f"Component library import failed: {exc}")
+        logger.exception("Component library import failed")
+        raise HTTPException(status_code=500, detail="Erreur interne du serveur.")
     finally:
         if tmp_path and os.path.exists(tmp_path):
             os.unlink(tmp_path)

@@ -78,6 +78,13 @@ async def lifespan(app: FastAPI):
 
 def create_app() -> FastAPI:
     """Build and configure the FastAPI application."""
+    # Sécurité : en production, refuser de démarrer sans API_KEY (sinon l'API
+    # /api/* resterait ouverte sans authentification).
+    if settings.api_env.lower() == "production" and not (settings.api_key or "").strip():
+        raise RuntimeError(
+            "API_KEY manquante en production : définissez API_KEY dans .env "
+            "(l'API resterait ouverte sans authentification)."
+        )
     # En production (api_env=production, posé par Electron pour le backend
     # packagé), on n'expose pas /docs ni /redoc (cartographie API — écart D10).
     docs_enabled = settings.api_env.lower() != "production"
@@ -107,7 +114,9 @@ def create_app() -> FastAPI:
     app.add_middleware(
         CORSMiddleware,
         allow_origins=build_allowed_origins(),
-        allow_credentials=True,
+        # Auth via en-tête X-API-Key (pas de cookies) → credentials désactivés :
+        # neutralise le risque d'une origine "null" (Electron file://) créditée.
+        allow_credentials=False,
         allow_methods=["*"],
         allow_headers=["*"],
         expose_headers=["Content-Disposition"],

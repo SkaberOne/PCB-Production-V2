@@ -21,6 +21,9 @@ from ..services.suppliers import (
     FarnellConnector,
     RsConnector,
 )
+import logging
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/supplier-offers", tags=["supplier-offers"])
 
@@ -153,10 +156,11 @@ def refresh_offers(
     try:
         offers = SupplierOfferService.refresh_offers(db, request.component_ids)
         return {"offers": offers}
-    except Exception as exc:  # pragma: no cover - defensive
-        raise HTTPException(status_code=500, detail=f"Error refreshing offers: {exc}")
-
-
+    except HTTPException:
+        raise
+    except Exception:  # pragma: no cover - defensive
+        logger.exception("Error refreshing offers")
+        raise HTTPException(status_code=500, detail="Erreur interne du serveur.")
 @router.get("/best")
 def best_offers(
     component_ids: str = Query(..., description="Comma-separated component ids"),
