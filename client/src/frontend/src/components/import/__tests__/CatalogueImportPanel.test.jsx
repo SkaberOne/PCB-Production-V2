@@ -59,3 +59,37 @@ describe('CatalogueImportPanel — import catalogue (011)', () => {
         ));
     });
 });
+
+// -- Prompt 021 : rapport des dossiers ignores avec raison --------------------
+
+const REPORT_021 = {
+    root_path: '\\\\rs\\Elec', dry_run: true, cards_scanned: 1,
+    revisions_imported: 0, components_created: 0,
+    skipped_dirs: ['Archives', 'KT400004 SansRev'],
+    skipped: [
+        { name: 'Archives', reason: 'not_a_card', label: 'Pas une carte (dossier hors convention KT)' },
+        { name: 'KT400004 SansRev', reason: 'no_revision', label: 'Aucune révision Rev.X / fichier CAO exploitable' },
+    ],
+    rows: [
+        { reference: 'KT200026', name: '', revision: 'A', status: 'importable', message: '' },
+    ],
+};
+
+describe('CatalogueImportPanel — rapport des dossiers ignorés (021)', () => {
+    beforeEach(() => {
+        jest.clearAllMocks();
+        apiClient.get.mockResolvedValue({ data: { projects_root_path: '\\\\rs\\Elec\\Projets' } });
+        apiClient.post.mockResolvedValue({ data: REPORT_021 });
+    });
+
+    it('affiche chaque dossier ignoré avec sa raison (dry-run et import)', async () => {
+        render(<CatalogueImportPanel />);
+        fireEvent.click(screen.getByTestId('catalogue-dryrun'));
+        const block = await screen.findByTestId('catalogue-skipped');
+        expect(block).toHaveTextContent('2 dossier(s) ignoré(s)');
+        expect(block).toHaveTextContent('Archives — Pas une carte (dossier hors convention KT)');
+        expect(block).toHaveTextContent('KT400004 SansRev — Aucune révision Rev.X / fichier CAO exploitable');
+        // La référence seule (nom vide) est bien importable, pas ignorée.
+        expect(screen.getByText('KT200026')).toBeInTheDocument();
+    });
+});

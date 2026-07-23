@@ -201,5 +201,6 @@ def import_catalogue(
         revisions_imported=revisions_imported,
         components_created=components_created,
         skipped_dirs=scan.skipped_dirs,
+        skipped=[{"name": d.name, "reason": d.reason, "label": d.label} for d in scan.skipped],
         rows=rows,
     )
