@@ -9,6 +9,8 @@ import GuideBanner from '../components/common/GuideBanner';
 import AssemblyModeDialog from '../components/dashboard/AssemblyModeDialog';
 import CreateProductionDialog from '../components/dashboard/CreateProductionDialog';
 import DashboardStatCards from '../components/dashboard/DashboardStatCards';
+import DashboardMiniStat from '../components/dashboard/DashboardMiniStat';
+import ProductionSessionStats from '../components/dashboard/ProductionSessionStats';
 import DeleteProductionDialog from '../components/dashboard/DeleteProductionDialog';
 import ProductionsTable from '../components/dashboard/ProductionsTable';
 import ProductionSummaryCards from '../components/dashboard/ProductionSummaryCards';
@@ -19,6 +21,7 @@ import RenameProductionDialog from '../components/dashboard/RenameProductionDial
 import { useBomSession } from '../context/BomSessionContext';
 import useDashboardProductionActions from '../hooks/useDashboardProductionActions';
 import useDashboardProductions from '../hooks/useDashboardProductions';
+import useDashboardOverview from '../hooks/useDashboardOverview';
 import { getBomSessionStats } from '../utils/bomSession';
 
 function DashboardPage() {
@@ -108,50 +111,7 @@ function DashboardPage() {
         setActionLoadingId,
     });
 
-    const statCards = [
-        {
-            label: 'Production chargée',
-            value: activeProduction?.name || '--',
-            hint: activeProduction
-                ? `${activeProduction.bomCount || 0} BOM liée(s)`
-                : 'Sélectionne une production pour travailler par lot.',
-            icon: PrecisionManufacturingRoundedIcon,
-            color: '#059669',
-            onClick: activeProduction ? () => navigate('/bom') : null,
-        },
-        {
-            label: 'Productions créées',
-            value: productions.length,
-            hint: 'Nombre total de productions actuellement enregistrées.',
-            icon: StorageRoundedIcon,
-            color: '#10b981',
-            onClick: null,
-        },
-        {
-            label: 'Points à vérifier',
-            value: currentBom
-                ? sessionStats.reviewCount
-                : (bomStats ? bomStats.items_to_verify : '--'),
-            hint: 'Lignes sans empreinte PnP ou type composant à confirmer. Cliquer pour filtrer.',
-            icon: WarningRoundedIcon,
-            color: '#f59e0b',
-            onClick: (currentBom || bomStats) && activeProduction
-                ? () => navigate('/bom?filter=to_verify')
-                : null,
-        },
-        {
-            label: 'Empreintes PnP',
-            value: currentBom
-                ? sessionStats.mappedFootprintsCount
-                : (bomStats ? bomStats.items_with_footprint_pnp : '--'),
-            hint: 'Nombre de lignes ayant déjà une empreinte PnP renseignée. Cliquer pour filtrer.',
-            icon: CheckCircleRoundedIcon,
-            color: '#34d399',
-            onClick: (currentBom || bomStats) && activeProduction
-                ? () => navigate('/bom?filter=has_footprint')
-                : null,
-        },
-    ];
+    const { statCards, miniStats } = useDashboardOverview(navigate);
 
     const handleSortChange = React.useCallback((field) => {
         setSortField((current) => {
@@ -221,7 +181,9 @@ function DashboardPage() {
 
             <DashboardStatCards cards={statCards} />
 
-            <Grid container spacing={3}>
+            <DashboardMiniStat stats={miniStats} />
+
+            <Grid container spacing={3} id="dashboard-productions">
                 <Grid item xs={12} lg={8}>
                     <ProductionsTable
                         productions={productions}
@@ -246,6 +208,13 @@ function DashboardPage() {
                     />
                 </Grid>
                 <Grid item xs={12} lg={4}>
+                    <ProductionSessionStats
+                        currentBom={currentBom}
+                        sessionStats={sessionStats}
+                        bomStats={bomStats}
+                        activeProduction={activeProduction}
+                        onNavigate={navigate}
+                    />
                     <ProductionSummaryCards activeProductionId={activeProduction?.id} />
                 </Grid>
             </Grid>

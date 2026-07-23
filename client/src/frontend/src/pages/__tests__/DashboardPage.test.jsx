@@ -188,3 +188,76 @@ describe('DashboardPage', () => {
         expect(screen.getAllByText('prod-archive').length).toBeGreaterThan(0);
     });
 });
+
+
+// ── Prompt 024 : vue d'ensemble globale ───────────────────────────────────────
+
+const OVERVIEW = {
+    catalogue: { references: 86, revisions: 251 },
+    stock: { cartes_en_stock: 22, references_distinctes: 3, valeur: 7008.42, a_prix: true },
+    stock_bas: 0,
+    productions_en_cours: { total: 3, active: 1, draft: 2 },
+    commandes_clients_a_preparer: { total: 2, open: 1, ready: 1 },
+    cartes_a_debugger: 1,
+    machines: 0,
+};
+
+function mockOverview(overrides = {}) {
+    const data = { ...OVERVIEW, ...overrides };
+    axios.get.mockImplementation((url) => {
+        if (url === '/reports/dashboard-overview') return Promise.resolve({ data });
+        if (url === '/marketplace/productions') return Promise.resolve({ data: { items: [] } });
+        if (url === '/reports/productions-summary') return Promise.resolve({ data: [] });
+        return Promise.resolve({ data: {} });
+    });
+}
+
+describe('DashboardPage — vue d\'ensemble globale (024)', () => {
+    let restoreConsoleError;
+    beforeEach(() => {
+        window.localStorage.clear();
+        jest.clearAllMocks();
+        jest.useFakeTimers();
+        restoreConsoleError = suppressActDeprecatedWarning();
+        axios.patch.mockResolvedValue({ data: {} });
+        axios.post.mockResolvedValue({ data: {} });
+        axios.delete.mockResolvedValue({ data: {} });
+    });
+    afterEach(() => {
+        act(() => { jest.runOnlyPendingTimers(); });
+        restoreConsoleError?.();
+        jest.useRealTimers();
+        window.localStorage.clear();
+    });
+
+    it('rangée 1 : 4 cases globales avec les valeurs de l\'agrégat', async () => {
+        mockOverview();
+        renderDashboard();
+        // Attendre que l'agrégat soit chargé (la valeur n'apparaît qu'après le fetch).
+        expect(await screen.findByText('86')).toBeInTheDocument();   // références
+        expect(screen.getByText('Cartes au catalogue')).toBeInTheDocument();
+        expect(screen.getByText('251 révision(s)')).toBeInTheDocument();
+        expect(screen.getByText('Cartes en stock')).toBeInTheDocument();
+        expect(screen.getByText('22')).toBeInTheDocument();          // cartes en stock
+        expect(screen.getByText('Alertes stock bas')).toBeInTheDocument();
+        expect(screen.getByText('aucune sous le minimum')).toBeInTheDocument();
+        expect(screen.getAllByText('Productions en cours').length).toBeGreaterThanOrEqual(1);
+        expect(screen.getByText('1 active(s) · 2 brouillon(s)')).toBeInTheDocument();
+        await waitFor(() => expect(axios.get).toHaveBeenCalledWith('/reports/dashboard-overview'));
+    });
+
+    it('bandeau : 3 mini-stats (commandes / à débugger / machines)', async () => {
+        mockOverview();
+        renderDashboard();
+        expect(await screen.findByText('1 ouverte(s) · 1 prête(s)')).toBeInTheDocument();
+        expect(screen.getByText('Commandes clients à préparer')).toBeInTheDocument();
+        expect(screen.getByText('Cartes à débugger')).toBeInTheDocument();
+        expect(screen.getByText('Modèles machines')).toBeInTheDocument();
+    });
+
+    it('« Alertes stock bas » : hint « à réapprovisionner » quand > 0', async () => {
+        mockOverview({ stock_bas: 4 });
+        renderDashboard();
+        expect(await screen.findByText('4 à réapprovisionner')).toBeInTheDocument();
+    });
+});
