@@ -42,6 +42,10 @@ function DashboardPage() {
     const [searchQuery, setSearchQuery] = React.useState('');
     const [sortField, setSortField] = React.useState('updated_at');
     const [sortDir, setSortDir] = React.useState('desc');
+    // Clé de rafraîchissement du panneau « Productions en cours » (028 #4) :
+    // toute mutation production recharge `productions` → on la bumpe pour que
+    // ProductionSummaryCards se re-fetch (nouveau nom après renommage, etc.).
+    const [productionsRefreshKey, setProductionsRefreshKey] = React.useState(0);
 
     const {
         bomStats,
@@ -159,6 +163,13 @@ function DashboardPage() {
         return list;
     }, [productions, searchQuery, sortField, sortDir]);
 
+    // `productions` n'est remplacé que par un rechargement (mount, SSE, ou après
+    // une mutation via loadProductions) — on bumpe alors la clé du panneau
+    // « Productions en cours » pour qu'il reflète le nouvel état (028 #4).
+    React.useEffect(() => {
+        setProductionsRefreshKey((k) => k + 1);
+    }, [productions]);
+
     return (
         <Stack spacing={4}>
             {feedback.message ? <Alert severity={feedback.type}>{feedback.message}</Alert> : null}
@@ -217,7 +228,7 @@ function DashboardPage() {
                         activeProduction={activeProduction}
                         onNavigate={navigate}
                     />
-                    <ProductionSummaryCards activeProductionId={activeProduction?.id} />
+                    <ProductionSummaryCards activeProductionId={activeProduction?.id} refreshKey={productionsRefreshKey} />
                 </Grid>
             </Grid>
 
