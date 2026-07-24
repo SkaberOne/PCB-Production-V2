@@ -95,8 +95,19 @@ function CatalogueImportPanel() {
                 <Box>
                     <Stack direction="row" spacing={1} sx={{ mb: 1.5 }} flexWrap="wrap" useFlexGap>
                         <Chip label={`${report.cards_scanned} carte(s) scannée(s)`} variant="outlined" />
-                        <Chip label={`${report.revisions_imported} révision(s) importée(s)`} sx={{ color: '#22c55e' }} variant="outlined" />
-                        <Chip label={`${report.components_created} composant(s) créé(s)`} variant="outlined" />
+                        {report.dry_run ? (
+                            <Chip
+                                data-testid="catalogue-a-importer"
+                                label={`${report.a_importer ?? 0} révision(s) à importer`}
+                                variant="outlined"
+                                sx={{ color: (report.a_importer ?? 0) > 0 ? '#22c55e' : colors.textSecondary, fontWeight: 600 }}
+                            />
+                        ) : (
+                            <>
+                                <Chip label={`${report.revisions_imported} révision(s) importée(s)`} sx={{ color: '#22c55e' }} variant="outlined" />
+                                <Chip label={`${report.components_created} composant(s) créé(s)`} variant="outlined" />
+                            </>
+                        )}
                         <Chip label={report.dry_run ? 'Aperçu (rien écrit)' : 'Import réel'} color={report.dry_run ? 'default' : 'success'} />
                     </Stack>
                     {(report.skipped?.length || report.skipped_dirs?.length) ? (

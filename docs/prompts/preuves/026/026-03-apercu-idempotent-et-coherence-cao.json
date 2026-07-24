@@ -1,0 +1,19 @@
+﻿{
+    "scenario":  "Apercu (dry-run) en etat idempotent, apres import - staging :8001",
+    "dry_run":  true,
+    "cards_scanned":  83,
+    "a_importer":  0,
+    "a_importer_details":  [
+
+                           ],
+    "revisions_imported_field":  0,
+    "skipped_dirs_count":  49,
+    "error_rows":  [
+                       {
+                           "reference":  "KT180474",
+                           "revision":  "C",
+                           "status":  "error",
+                           "message":  "not well-formed (invalid token): line 953, column 87"
+                       }
+                   ]
+}

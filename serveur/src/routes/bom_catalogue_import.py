@@ -99,13 +99,20 @@ def _register_missing_components(db: Session, revision_id: int) -> int:
     return created
 
 
-def _import_card_revision(db, footprint_lookup, *, reference, name, revision, files, card_type):
-    """Importe une révision Eagle (toutes ses faces) + crée les composants. → nb composants."""
+def _parse_revision_faces(files, footprint_lookup):
+    """Parse + valide toutes les faces d'une révision Eagle, **sans persistance**.
+
+    Mutualise le contrôle d'importabilité entre l'aperçu (dry-run) et l'import
+    réel (prompt 026) : une révision « à importer » à l'aperçu est exactement une
+    révision que l'import réel saura importer. Lève ``ValueError`` (avec un motif
+    lisible) si un fichier CAO est illisible / invalide — même verdict, même
+    message, dans les deux modes. Aucune écriture DB ni partage (tmp local seul).
+    """
     preparation = prepare_cao_import(files)
     if preparation is None or not preparation.supported or not preparation.faces:
         raise ValueError("aucun composant exploitable")
 
-    components_created = 0
+    parsed = []
     for face in preparation.faces:
         fd, tmp_path = tempfile.mkstemp(suffix=".txt")
         try:
@@ -117,15 +124,24 @@ def _import_card_revision(db, footprint_lookup, *, reference, name, revision, fi
             is_valid, validation_errors = bom_service.validate_bom_data(import_result.items)
             if not is_valid:
                 raise ValueError("; ".join(validation_errors[:3]) or "payload invalide")
-            response = _persist_import_result(
-                db, import_result,
-                reference=reference, revision=revision, side=face.side,
-                name=name, card_type=card_type,
-            )
-            components_created += _register_missing_components(db, response.bom_revision_id)
+            parsed.append((face, import_result))
         finally:
             if os.path.exists(tmp_path):
                 os.unlink(tmp_path)
+    return parsed
+
+
+def _import_card_revision(db, footprint_lookup, *, reference, name, revision, files, card_type):
+    """Importe une révision Eagle (toutes ses faces) + crée les composants. → nb composants."""
+    parsed = _parse_revision_faces(files, footprint_lookup)
+    components_created = 0
+    for face, import_result in parsed:
+        response = _persist_import_result(
+            db, import_result,
+            reference=reference, revision=revision, side=face.side,
+            name=name, card_type=card_type,
+        )
+        components_created += _register_missing_components(db, response.bom_revision_id)
     return components_created
 
 
@@ -161,7 +177,9 @@ def import_catalogue(
         raise HTTPException(status_code=422, detail=f"Dossier racine introuvable : {root}")
 
     existing = _existing_revision_keys(db)
-    footprint_lookup = None if dry_run else _get_footprint_lookup(db)
+    # Calculé aussi en aperçu : le dry-run parse réellement pour ne compter
+    # « à importer » que les révisions que l'import réel saura importer (026).
+    footprint_lookup = _get_footprint_lookup(db)
 
     rows = []
     revisions_imported = 0
@@ -178,7 +196,11 @@ def import_catalogue(
             elif not rev.supported or not rev.files:
                 rows.append({**base, "status": "empty"})
             elif dry_run:
-                rows.append({**base, "status": "importable"})
+                try:
+                    _parse_revision_faces(rev.files, footprint_lookup)
+                    rows.append({**base, "status": "importable"})
+                except Exception as exc:  # noqa: BLE001 - même verdict que l'import réel
+                    rows.append({**base, "status": "error", "message": str(exc)})
             else:
                 try:
                     created = _import_card_revision(
@@ -194,12 +216,23 @@ def import_catalogue(
                     db.rollback()
                     rows.append({**base, "status": "error", "message": str(exc)})
 
+    # Aperçu : ce qui SERAIT importé = les révisions marquées « importable »
+    # (Eagle absente de la base). Ce compte coïncide avec ce que fera l'import
+    # réel immédiat (même état de base et de partage). Prompt 026.
+    importable_rows = [r for r in rows if r.get("status") == "importable"]
+    a_importer_details = [
+        {"reference": r["reference"], "revision": r["revision"], "name": r["name"]}
+        for r in importable_rows
+    ]
+
     return CatalogueImportResponse(
         root_path=root,
         dry_run=dry_run,
         cards_scanned=len(scan.cards),
         revisions_imported=revisions_imported,
         components_created=components_created,
+        a_importer=len(importable_rows),
+        a_importer_details=a_importer_details,
         skipped_dirs=scan.skipped_dirs,
         skipped=[{"name": d.name, "reason": d.reason, "label": d.label} for d in scan.skipped],
         rows=rows,

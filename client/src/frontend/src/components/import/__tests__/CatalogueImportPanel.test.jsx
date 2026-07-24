@@ -16,6 +16,8 @@ jest.mock('../../../api/client', () => ({
 const REPORT = {
     root_path: '\\\\rs\\Elec', dry_run: true, cards_scanned: 3,
     revisions_imported: 0, components_created: 0,
+    a_importer: 1,
+    a_importer_details: [{ reference: 'KT190562', revision: 'A', name: 'NanoSH MK2' }],
     skipped_dirs: ['Archives'],
     rows: [
         { reference: 'KT190562', name: 'NanoSH MK2', revision: 'A', status: 'importable', message: '' },
@@ -57,6 +59,22 @@ describe('CatalogueImportPanel — import catalogue (011)', () => {
             '/bom/import-catalogue', null,
             expect.objectContaining({ params: expect.objectContaining({ dry_run: false }) }),
         ));
+    });
+
+    // Prompt 026 : l'aperçu annonce ce qui SERAIT importé.
+    it('affiche la tuile « à importer » avec la bonne valeur en aperçu (026)', async () => {
+        render(<CatalogueImportPanel />);
+        fireEvent.click(screen.getByTestId('catalogue-dryrun'));
+        const tile = await screen.findByTestId('catalogue-a-importer');
+        expect(tile).toHaveTextContent('1 révision(s) à importer');
+    });
+
+    it('la tuile « à importer » annonce 0 quand rien à importer (idempotence, 026)', async () => {
+        apiClient.post.mockResolvedValue({ data: { ...REPORT, a_importer: 0, a_importer_details: [], rows: [] } });
+        render(<CatalogueImportPanel />);
+        fireEvent.click(screen.getByTestId('catalogue-dryrun'));
+        const tile = await screen.findByTestId('catalogue-a-importer');
+        expect(tile).toHaveTextContent('0 révision(s) à importer');
     });
 });
 
