@@ -466,7 +466,7 @@ function AppShell({ pages, children }) {
                     onClose={() => setBackendDown(false)}
                     sx={{ width: '100%' }}
                 >
-                    Backend non disponible — vérifiez que le serveur API est lancé sur le port 8000.
+                    Backend non disponible — vérifiez que le serveur API est démarré.
                 </Alert>
             </Snackbar>
         </Box>

@@ -59,7 +59,7 @@ function stockChip(stock) {
  * /reports/productions-summary) — avancement cartes, stock, commande, machine,
  * postes présents. Rafraîchi en silence sur les événements stock (SSE).
  */
-function ProductionSummaryCards({ activeProductionId }) {
+function ProductionSummaryCards({ activeProductionId, refreshKey }) {
     const [items, setItems] = React.useState(null); // null = chargement initial
     const [error, setError] = React.useState(null);
     const [produceFor, setProduceFor] = React.useState(null); // production du dialog lot
@@ -92,6 +92,15 @@ function ProductionSummaryCards({ activeProductionId }) {
 
     React.useEffect(() => { load(); }, [load]);
     useEventStream('stock', React.useCallback(() => { load(true); }, [load]));
+
+    // Rafraîchissement à la demande (prompt 028 #4) : quand `refreshKey` change
+    // (mutation d'une production — renommage, archivage…), on re-fetch en
+    // silence pour refléter le nouvel état sans clic manuel sur « Actualiser ».
+    const didMountRef = React.useRef(false);
+    React.useEffect(() => {
+        if (!didMountRef.current) { didMountRef.current = true; return; }
+        load(true);
+    }, [refreshKey, load]);
 
     return (
         <Card sx={{ backgroundColor: '#18181b', border: '1px solid #1f2937' }}>
