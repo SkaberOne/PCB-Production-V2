@@ -1,0 +1,11 @@
+﻿{
+    "scenario":  "Aller-retour archiver -\u003e desarchiver (staging :8001) - prompt 027",
+    "production":  {
+                       "id":  17,
+                       "name":  "ZZ-TEST-027-DESARCHIVER"
+                   },
+    "etape_1_avant_desarchivage":  "ARCHIVED",
+    "etape_2_reponse_patch_status_DRAFT":  "DRAFT",
+    "etape_3_get_apres":  "DRAFT",
+    "note":  "Le PATCH {status: DRAFT} depuis ARCHIVED repasse la production en brouillon; GET confirme DRAFT (critere d\u0027acceptation). Aucune perte : name conserve."
+}
