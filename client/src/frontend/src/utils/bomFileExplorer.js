@@ -70,6 +70,7 @@ export function groupStoredBomFiles(items = [], knownCategories = []) {
             categoryEntry.references.set(referenceKey, {
                 bomReferenceId: item.bom_reference_id,
                 reference: referenceKey,
+                name: item.name || '',
                 revisions: new Map(),
             });
         }
@@ -102,6 +103,7 @@ export function groupStoredBomFiles(items = [], knownCategories = []) {
         references: Array.from(categoryEntry.references.values()).map((referenceEntry) => ({
             bomReferenceId: referenceEntry.bomReferenceId,
             reference: referenceEntry.reference,
+            name: referenceEntry.name || '',
             revisions: Array.from(referenceEntry.revisions.values()).map((revisionEntry) => ({
                 revision: revisionEntry.revision,
                 items: revisionEntry.items.sort((left, right) => (left.side || '').localeCompare(right.side || '')),

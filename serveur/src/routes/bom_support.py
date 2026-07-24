@@ -530,6 +530,7 @@ def _build_revision_session_payload(
 def _build_stored_file_entry(revision: BomRevision) -> BomStoredFileSchema:
     """Serialize a stored BOM file entry for the file-browser UI."""
     reference_name = revision.reference.reference if revision.reference else ""
+    reference_label = revision.reference.name if revision.reference else None
     reference_category = revision.reference.category if revision.reference else None
     file_path = bom_file_service.get_file_path(reference_name, revision.revision, _enum_value(revision.type))
 
@@ -537,6 +538,7 @@ def _build_stored_file_entry(revision: BomRevision) -> BomStoredFileSchema:
         bom_reference_id=revision.bom_ref_id,
         bom_revision_id=revision.id,
         reference=reference_name,
+        name=reference_label,
         category=reference_category,
         revision=revision.revision,
         side=_enum_value(revision.type),

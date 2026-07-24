@@ -33,6 +33,7 @@ import {
     toggleStoredBomSelection,
 } from '../../utils/bomFileExplorer';
 import { hydrateStoredBomSelection } from '../../utils/productionWorkspace';
+import { formatCardLabel } from '../../utils/formatCardLabel';
 
 // ── Styles partagés ──────────────────────────────────────────────────────────
 const cardSx = {
@@ -99,7 +100,7 @@ const LibraryReferenceGroup = React.memo(function LibraryReferenceGroup({
     selectedRevisionIds,
     onToggle,
 }) {
-    const [open, setOpen] = React.useState(true);
+    const [open, setOpen] = React.useState(false); // replié par défaut (029)
 
     const allItems = React.useMemo(
         () => referenceEntry.revisions.flatMap((rev) => rev.items),
@@ -152,7 +153,7 @@ const LibraryReferenceGroup = React.memo(function LibraryReferenceGroup({
                     sx={{ color: '#d4d4d8', fontWeight: 600, flex: 1, cursor: 'pointer' }}
                     onClick={() => setOpen((v) => !v)}
                 >
-                    {referenceEntry.reference}
+                    {formatCardLabel(referenceEntry.reference, referenceEntry.name)}
                 </Typography>
                 {checkedCount > 0 && (
                     <Chip

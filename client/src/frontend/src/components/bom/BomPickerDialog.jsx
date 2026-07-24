@@ -18,6 +18,7 @@ import {
     Typography,
 } from '@mui/material';
 import apiClient from '../../api/client';
+import { formatCardLabel } from '../../utils/formatCardLabel';
 
 /**
  * Dialog de sélection multiple des BOM enregistrées à ajouter à la session
@@ -65,7 +66,7 @@ function BomPickerDialog({ open, onClose, onConfirm, alreadySelectedIds = [] }) 
         const query = search.trim().toLowerCase();
         if (!query) return items;
         return items.filter((item) => (
-            `${item.reference || ''} ${item.revision || ''} ${item.side || ''} ${item.category || ''}`
+            `${item.reference || ''} ${item.name || ''} ${item.revision || ''} ${item.side || ''} ${item.category || ''}`
                 .toLowerCase()
                 .includes(query)
         ));
@@ -132,7 +133,7 @@ function BomPickerDialog({ open, onClose, onConfirm, alreadySelectedIds = [] }) 
                                         />
                                     </ListItemIcon>
                                     <ListItemText
-                                        primary={`${item.reference || '—'} · ${item.revision || ''} · ${item.side || ''}`}
+                                        primary={`${formatCardLabel(item.reference, item.name) || '—'} · ${item.revision || ''} · ${item.side || ''}`}
                                         secondary={isAlready
                                             ? 'Déjà dans la session'
                                             : (item.category || item.file_name || '')}

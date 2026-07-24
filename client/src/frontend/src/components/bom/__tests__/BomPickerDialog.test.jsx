@@ -72,4 +72,18 @@ describe('BomPickerDialog', () => {
         // Le bouton Ajouter reste désactivé tant que rien de nouveau n'est coché.
         expect(screen.getByRole('button', { name: /Ajouter/ })).toBeDisabled();
     });
+
+    it('affiche « référence — nom » quand la carte a un nom, référence seule sinon (029)', async () => {
+        axios.get.mockResolvedValue({ data: { items: [
+            { bom_revision_id: 70, reference: 'AMPLI_GEN6', name: 'Ampli Gen 6', revision: 'REV_A', side: 'TOP', status: 'ACTIVE' },
+            { bom_revision_id: 71, reference: 'LEGACY_CARD', revision: 'REV_A', side: 'TOP', status: 'ACTIVE' },
+        ] } });
+        render(<BomPickerDialog open onClose={() => {}} onConfirm={() => {}} alreadySelectedIds={[]} />);
+        await waitFor(() => {
+            expect(screen.getByText(/AMPLI_GEN6 — Ampli Gen 6 · REV_A · TOP/)).toBeInTheDocument();
+        });
+        // Carte sans nom : référence seule, pas de « — » orphelin.
+        expect(screen.getByText(/LEGACY_CARD · REV_A · TOP/)).toBeInTheDocument();
+        expect(screen.queryByText(/LEGACY_CARD —/)).not.toBeInTheDocument();
+    });
 });
