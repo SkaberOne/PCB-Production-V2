@@ -1,5 +1,5 @@
 import React from 'react';
-import apiClient from '../../api/client';
+import apiClient, { extractApiError } from '../../api/client';
 import ConfirmDialog from '../common/ConfirmDialog';
 import ContentCopyRoundedIcon from '@mui/icons-material/ContentCopyRounded';
 import DownloadRoundedIcon from '@mui/icons-material/DownloadRounded';
@@ -562,7 +562,7 @@ function ReglesTypePanel() {
             setComponentTypeRules([]);
             setComponentTypeRuleFeedback({
                 status: 'error',
-                message: error.response?.data?.detail || error.response?.data?.message || error.message || 'Erreur lors du chargement des règles de type',
+                message: extractApiError(error) || 'Erreur lors du chargement des règles de type',
                 details: [],
             });
         } finally {
@@ -645,7 +645,7 @@ function ReglesTypePanel() {
         } catch (error) {
             setComponentTypeRuleFeedback({
                 status: 'error',
-                message: error.response?.data?.detail || error.response?.data?.message || error.message || 'Erreur lors de la sauvegarde de la règle',
+                message: extractApiError(error) || 'Erreur lors de la sauvegarde de la règle',
                 details: [],
             });
         } finally {
@@ -685,7 +685,7 @@ function ReglesTypePanel() {
         } catch (error) {
             setComponentTypeRuleFeedback({
                 status: 'error',
-                message: error.response?.data?.detail || error.response?.data?.message || error.message || 'Erreur lors de la création de la règle',
+                message: extractApiError(error) || 'Erreur lors de la création de la règle',
                 details: [],
             });
         } finally {
@@ -712,7 +712,7 @@ function ReglesTypePanel() {
         } catch (error) {
             setComponentTypeRuleFeedback({
                 status: 'error',
-                message: error.response?.data?.detail || error.response?.data?.message || error.message || 'Erreur lors de la suppression de la règle',
+                message: extractApiError(error) || 'Erreur lors de la suppression de la règle',
                 details: [],
             });
         } finally {
@@ -749,7 +749,7 @@ function ReglesTypePanel() {
         } catch (error) {
             setComponentTypeRuleFeedback({
                 status: 'error',
-                message: error.response?.data?.detail || error.response?.data?.message || error.message || 'Erreur lors de la réinitialisation des règles',
+                message: extractApiError(error) || 'Erreur lors de la réinitialisation des règles',
                 details: [],
             });
         } finally {
@@ -785,7 +785,7 @@ function ReglesTypePanel() {
         } catch (error) {
             setComponentTypeRuleFeedback({
                 status: 'error',
-                message: error.response?.data?.detail || error.response?.data?.message || error.message || 'Erreur lors de la duplication de la règle',
+                message: extractApiError(error) || 'Erreur lors de la duplication de la règle',
                 details: [],
             });
         } finally {
@@ -815,7 +815,7 @@ function ReglesTypePanel() {
         } catch (error) {
             setComponentTypeRuleFeedback({
                 status: 'error',
-                message: error.response?.data?.detail || error.response?.data?.message || error.message || "Erreur lors de l'export des règles de type",
+                message: extractApiError(error) || "Erreur lors de l'export des règles de type",
                 details: [],
             });
         } finally {
@@ -845,7 +845,7 @@ function ReglesTypePanel() {
         } catch (error) {
             setComponentTypeRuleFeedback({
                 status: 'error',
-                message: error.response?.data?.detail || error.response?.data?.message || error.message || "Erreur lors de l'import des règles de type",
+                message: extractApiError(error) || "Erreur lors de l'import des règles de type",
                 details: [],
             });
         } finally {
@@ -898,7 +898,7 @@ function ReglesTypePanel() {
         } catch (error) {
             setComponentTypeRuleFeedback({
                 status: 'error',
-                message: error.response?.data?.detail || error.response?.data?.message || error.message || "Erreur lors du réordonnancement des règles",
+                message: extractApiError(error) || "Erreur lors du réordonnancement des règles",
                 details: [],
             });
             await loadComponentTypeRules();
@@ -934,7 +934,7 @@ function ReglesTypePanel() {
         } catch (error) {
             setComponentTypeRuleFeedback({
                 status: 'error',
-                message: error.response?.data?.detail || error.response?.data?.message || error.message || "Erreur lors de la restauration de l'historique",
+                message: extractApiError(error) || "Erreur lors de la restauration de l'historique",
                 details: [],
             });
         } finally {
@@ -1028,7 +1028,7 @@ function ReglesTypePanel() {
         } catch (error) {
             setComponentTypeRuleFeedback({
                 status: 'error',
-                message: error.response?.data?.detail || error.response?.data?.message || error.message || 'Erreur lors de la restauration partielle',
+                message: extractApiError(error) || 'Erreur lors de la restauration partielle',
                 details: [],
             });
         } finally {

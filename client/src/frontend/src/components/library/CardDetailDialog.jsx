@@ -18,7 +18,7 @@ import {
 } from '@mui/material';
 import AddRoundedIcon from '@mui/icons-material/AddRounded';
 import DeleteOutlineRoundedIcon from '@mui/icons-material/DeleteOutlineRounded';
-import apiClient from '../../api/client';
+import apiClient, { extractApiError } from '../../api/client';
 import { colors } from '../../theme';
 import BomLibraryDetail from './BomLibraryDetail';
 import { DEFAULT_UNCATEGORIZED_CATEGORY } from '../../utils/bomFileExplorer';
@@ -114,7 +114,7 @@ function CardDetailDialog({
             }
             onSaved();
         } catch (e) {
-            setError(e?.response?.data?.detail || 'Enregistrement impossible.');
+            setError(extractApiError(e) || 'Enregistrement impossible.');
         } finally {
             setSaving(false);
         }
