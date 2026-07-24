@@ -69,6 +69,7 @@ def list_saved_bom_files(
         revisions_query = revisions_query.filter(
             or_(
                 func.lower(BomReference.reference).like(search_pattern),
+                func.lower(func.coalesce(BomReference.name, "")).like(search_pattern),
                 func.lower(func.coalesce(BomReference.category, "")).like(search_pattern),
             )
         )

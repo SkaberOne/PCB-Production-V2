@@ -85,4 +85,16 @@ describe('bomFileExplorer helpers', () => {
         expect(grouped[0].references[0].reference).toBe('TRIAMP');
         expect(grouped[0].references[0].revisions[0].items).toHaveLength(2);
     });
+
+    it('expose le nom de la carte au niveau du groupe référence (029)', () => {
+        const grouped = groupStoredBomFiles([
+            { bom_reference_id: 5, bom_revision_id: 51, category: 'AMPLI', reference: 'AMPLI_GEN6', name: 'Ampli Gen 6', revision: 'A', side: 'TOP' },
+            { bom_reference_id: 6, bom_revision_id: 61, category: 'AMPLI', reference: 'LEGACY', revision: 'A', side: 'TOP' },
+        ]);
+        const refs = grouped[0].references;
+        const withName = refs.find((r) => r.reference === 'AMPLI_GEN6');
+        const legacy = refs.find((r) => r.reference === 'LEGACY');
+        expect(withName.name).toBe('Ampli Gen 6');
+        expect(legacy.name).toBe(''); // carte legacy sans nom
+    });
 });

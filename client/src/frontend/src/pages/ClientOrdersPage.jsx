@@ -35,6 +35,7 @@ import apiClient from '../api/client';
 import PageHeader from '../components/common/PageHeader';
 import ConfirmDialog from '../components/common/ConfirmDialog';
 import { colors } from '../theme';
+import { formatCardLabel } from '../utils/formatCardLabel';
 
 const STATUS_LABELS = { OPEN: 'Ouverte', READY: 'Prête', DELIVERED: 'Livrée', CANCELLED: 'Annulée' };
 const STATUS_COLOR = { OPEN: 'warning', READY: 'success', DELIVERED: 'default', CANCELLED: 'error' };
@@ -62,7 +63,7 @@ function ClientOrdersPage() {
             const byId = new Map();
             const revs = {};
             rows.forEach((x) => {
-                if (!byId.has(x.bom_reference_id)) byId.set(x.bom_reference_id, { id: x.bom_reference_id, label: x.reference });
+                if (!byId.has(x.bom_reference_id)) byId.set(x.bom_reference_id, { id: x.bom_reference_id, label: formatCardLabel(x.reference, x.name), reference: x.reference, name: x.name || '' });
                 if (x.revision) {
                     revs[x.bom_reference_id] = revs[x.bom_reference_id] || [];
                     if (!revs[x.bom_reference_id].includes(x.revision)) revs[x.bom_reference_id].push(x.revision);

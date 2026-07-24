@@ -220,6 +220,9 @@ class BomStoredFileSchema(BaseModel):
     bom_reference_id: int
     bom_revision_id: int
     reference: str
+    # Nom lisible de la carte (prompt 029) — pour afficher « réf — nom ». Peut
+    # être vide pour les cartes legacy sans nom.
+    name: Optional[str] = None
     category: Optional[str] = None
     revision: str
     side: str
