@@ -235,6 +235,22 @@ function useDashboardProductionActions({
         }
     }, [activeProductionId, clearActiveProduction, loadProductions, setActionLoadingId, setFeedback]);
 
+    // Désarchivage (prompt 027) : repasse une production ARCHIVED en DRAFT pour
+    // la réintégrer dans « Productions créées ». On ne réactive jamais
+    // directement en ACTIVE (invariant d'unicité de la production active).
+    const handleUnarchiveProduction = React.useCallback(async (production) => {
+        setActionLoadingId(production.id);
+        try {
+            await apiClient.patch(`/marketplace/productions/${production.id}`, { status: 'DRAFT' });
+            setFeedback({ type: 'success', message: `Production « ${production.name} » réactivée (brouillon).` });
+            await loadProductions({ preserveFeedback: true });
+        } catch (requestError) {
+            setFeedback({ type: 'error', message: requestError.response?.data?.detail || 'Erreur lors de la réactivation' });
+        } finally {
+            setActionLoadingId(null);
+        }
+    }, [loadProductions, setActionLoadingId, setFeedback]);
+
     const handleDuplicateProduction = React.useCallback(async (production) => {
         setActionLoadingId(production.id);
         try {
@@ -310,6 +326,7 @@ function useDashboardProductionActions({
         handleCloseRenameDialog,
         handleConfirmRename,
         handleArchiveProduction,
+        handleUnarchiveProduction,
         handleDuplicateProduction,
         handleCloseReactivationDialog,
         handleConfirmReactivation,

@@ -1,5 +1,6 @@
 import React from 'react';
 import ArchiveRoundedIcon from '@mui/icons-material/ArchiveRounded';
+import UnarchiveRoundedIcon from '@mui/icons-material/UnarchiveRounded';
 import BackHandRoundedIcon from '@mui/icons-material/BackHandRounded';
 import ContentCopyRoundedIcon from '@mui/icons-material/ContentCopyRounded';
 import DeleteOutlineRoundedIcon from '@mui/icons-material/DeleteOutlineRounded';
@@ -109,6 +110,7 @@ const DashboardProductionRow = React.memo(function DashboardProductionRow({
     onRequestDeleteProduction,
     onRequestRenameProduction,
     onRequestArchiveProduction,
+    onRequestUnarchiveProduction,
     onRequestDuplicateProduction,
     onRequestAssemblyMode,
 }) {
@@ -136,6 +138,10 @@ const DashboardProductionRow = React.memo(function DashboardProductionRow({
         setMenuAnchor(null);
         onRequestArchiveProduction(production);
     }, [onRequestArchiveProduction, production]);
+    const handleUnarchive = React.useCallback(() => {
+        setMenuAnchor(null);
+        onRequestUnarchiveProduction(production);
+    }, [onRequestUnarchiveProduction, production]);
     const handleDuplicate = React.useCallback(() => {
         setMenuAnchor(null);
         onRequestDuplicateProduction(production);
@@ -273,6 +279,12 @@ const DashboardProductionRow = React.memo(function DashboardProductionRow({
                             <MenuItem onClick={handleArchive}>
                                 <ListItemIcon><ArchiveRoundedIcon fontSize="small" sx={{ color: '#f59e0b' }} /></ListItemIcon>
                                 <ListItemText sx={{ color: '#f59e0b' }}>Archiver</ListItemText>
+                            </MenuItem>
+                        )}
+                        {isArchived && (
+                            <MenuItem onClick={handleUnarchive}>
+                                <ListItemIcon><UnarchiveRoundedIcon fontSize="small" sx={{ color: '#34d399' }} /></ListItemIcon>
+                                <ListItemText sx={{ color: '#34d399' }}>Désarchiver</ListItemText>
                             </MenuItem>
                         )}
                         <MenuItem onClick={handleDelete}>

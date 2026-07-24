@@ -41,6 +41,7 @@ function ProductionsTable({
     onRequestDeleteProduction,
     onRequestRenameProduction,
     onRequestArchiveProduction,
+    onRequestUnarchiveProduction,
     onRequestDuplicateProduction,
     onRequestAssemblyMode,
 }) {
@@ -170,6 +171,7 @@ function ProductionsTable({
                                     onRequestDeleteProduction={onRequestDeleteProduction}
                                     onRequestRenameProduction={onRequestRenameProduction}
                                     onRequestArchiveProduction={onRequestArchiveProduction}
+                                    onRequestUnarchiveProduction={onRequestUnarchiveProduction}
                                     onRequestDuplicateProduction={onRequestDuplicateProduction}
                                     onRequestAssemblyMode={onRequestAssemblyMode}
                                 />

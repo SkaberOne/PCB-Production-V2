@@ -93,6 +93,7 @@ function DashboardPage() {
         handleCloseRenameDialog,
         handleConfirmRename,
         handleArchiveProduction,
+        handleUnarchiveProduction,
         handleDuplicateProduction,
         handleCloseReactivationDialog,
         handleConfirmReactivation,
@@ -203,6 +204,7 @@ function DashboardPage() {
                         onRequestDeleteProduction={handleRequestDeleteProduction}
                         onRequestRenameProduction={handleRequestRenameProduction}
                         onRequestArchiveProduction={handleArchiveProduction}
+                        onRequestUnarchiveProduction={handleUnarchiveProduction}
                         onRequestDuplicateProduction={handleDuplicateProduction}
                         onRequestAssemblyMode={handleRequestAssemblyMode}
                     />
