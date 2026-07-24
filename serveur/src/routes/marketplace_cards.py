@@ -10,7 +10,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from ..database import get_db
-from ..services.card_catalog_service import CardCatalogService
+from ..services.card_catalog_service import CardCatalogService, CardReferenceConflict
 
 router = APIRouter(tags=["cards"])
 
@@ -19,6 +19,7 @@ class CardUpdate(BaseModel):
     name: Optional[str] = Field(default=None, max_length=200)
     part_number: Optional[str] = Field(default=None, max_length=100)
     card_type: Optional[str] = None  # SIMPLE | ASSEMBLY
+    reference: Optional[str] = Field(default=None, min_length=1, max_length=100)
 
 
 class AssemblyItemInput(BaseModel):
@@ -53,7 +54,10 @@ def update_card(bom_reference_id: int, request: CardUpdate, db: Session = Depend
             name=request.name,
             part_number=request.part_number,
             card_type=request.card_type,
+            reference=request.reference,
         )
+    except CardReferenceConflict as exc:
+        raise HTTPException(status_code=409, detail=str(exc))
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
 
