@@ -12,6 +12,26 @@ import BugReportRoundedIcon from '@mui/icons-material/BugReportRounded';
  *
  * The `context` prop is shown in the error message for easier debugging.
  */
+/**
+ * Défense en profondeur (prompt 030) : garantit qu'un message d'erreur est
+ * TOUJOURS rendu comme une chaîne. Un objet/tableau (ex. `detail` Pydantic 422)
+ * ne doit jamais atteindre le rendu React (sinon erreur #31 « Objects are not
+ * valid as a React child »).
+ */
+export function toDisplayMessage(value) {
+    if (value == null) return 'Erreur inattendue';
+    if (typeof value === 'string') return value;
+    if (typeof value === 'number' || typeof value === 'boolean') return String(value);
+    // Erreur JS classique → son message ; sinon sérialisation lisible en repli.
+    if (value instanceof Error && typeof value.message === 'string') return value.message;
+    try {
+        const json = JSON.stringify(value);
+        return json && json !== '{}' ? json : 'Erreur inattendue';
+    } catch (e) {
+        return String(value);
+    }
+}
+
 class ErrorBoundary extends React.Component {
     constructor(props) {
         super(props);
@@ -40,7 +60,8 @@ class ErrorBoundary extends React.Component {
         }
 
         const { context } = this.props;
-        const message = this.state.error?.message || 'Erreur inattendue';
+        // Toujours une chaîne (jamais un objet) — défense en profondeur (030).
+        const message = toDisplayMessage(this.state.error?.message ?? this.state.error);
 
         return (
             <Box

@@ -7,7 +7,7 @@ import {
     Tab,
     Tabs,
 } from '@mui/material';
-import apiClient from '../../api/client';
+import apiClient, { extractApiError } from '../../api/client';
 import useEventStream from '../../hooks/useEventStream';
 import StockInventoryTab from './StockInventoryTab';
 import StockReceptionTab from './StockReceptionTab';
@@ -38,7 +38,7 @@ function StockPanel() {
             setRows(Array.isArray(stockRes.data) ? stockRes.data : []);
             setGlobalLoss(String(settingsRes.data?.global_loss_pct ?? 0));
         } catch (err) {
-            if (!silent) setError(err?.response?.data?.detail || 'Impossible de charger le stock.');
+            if (!silent) setError(extractApiError(err) || 'Impossible de charger le stock.');
         } finally {
             if (!silent) setLoading(false);
         }
@@ -58,7 +58,7 @@ function StockPanel() {
             });
             setFeedback('Coefficient de perte global enregistré.');
         } catch (err) {
-            setError(err?.response?.data?.detail || 'Échec de la sauvegarde du coefficient.');
+            setError(extractApiError(err) || 'Échec de la sauvegarde du coefficient.');
         }
     };
 

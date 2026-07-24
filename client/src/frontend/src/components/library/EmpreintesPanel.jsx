@@ -1,5 +1,5 @@
 import React from 'react';
-import apiClient from '../../api/client';
+import apiClient, { extractApiError } from '../../api/client';
 import StorageRoundedIcon from '@mui/icons-material/StorageRounded';
 import UploadFileRoundedIcon from '@mui/icons-material/UploadFileRounded';
 import {
@@ -56,7 +56,7 @@ function EmpreintesPanel() {
             setMachineFootprintLookup({});
             setMachineFootprintFeedback({
                 status: 'error',
-                message: error.response?.data?.detail || error.response?.data?.message || error.message || 'Erreur lors du chargement du catalogue MachineFootprint',
+                message: extractApiError(error) || 'Erreur lors du chargement du catalogue MachineFootprint',
                 details: [],
             });
         } finally {
@@ -112,7 +112,7 @@ function EmpreintesPanel() {
         } catch (error) {
             setMachineFootprintFeedback({
                 status: 'error',
-                message: error.response?.data?.detail || error.response?.data?.message || error.message || "Erreur lors de l'import du catalogue MachineFootprint",
+                message: extractApiError(error) || "Erreur lors de l'import du catalogue MachineFootprint",
                 details: [],
             });
         } finally {

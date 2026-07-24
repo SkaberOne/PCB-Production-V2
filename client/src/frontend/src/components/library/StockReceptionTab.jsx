@@ -17,7 +17,7 @@ import {
 import AddRoundedIcon from '@mui/icons-material/AddRounded';
 import AddCircleOutlineRoundedIcon from '@mui/icons-material/AddCircleOutlineRounded';
 import UndoRoundedIcon from '@mui/icons-material/UndoRounded';
-import apiClient from '../../api/client';
+import apiClient, { extractApiError } from '../../api/client';
 import { compactCellSx, compactTableContainerSx, compactTableSx } from '../../utils/compactTable';
 import StockReceptionCreateDialog from './StockReceptionCreateDialog';
 import { componentLabel, fpOf } from './stockHelpers';
@@ -92,7 +92,7 @@ function StockReceptionTab({ rows, onRefresh, onError, onFeedback }) {
             await loadRecent();
             await onRefresh();
         } catch (err) {
-            onError(err?.response?.data?.detail || 'Échec de la réception.');
+            onError(extractApiError(err) || 'Échec de la réception.');
         } finally {
             setRecBusy(false);
         }
@@ -107,7 +107,7 @@ function StockReceptionTab({ rows, onRefresh, onError, onFeedback }) {
             await loadRecent();
             await onRefresh();
         } catch (err) {
-            onError(err?.response?.data?.detail || "Échec de l'annulation.");
+            onError(extractApiError(err) || "Échec de l'annulation.");
         } finally {
             setCancelBusy(null);
         }

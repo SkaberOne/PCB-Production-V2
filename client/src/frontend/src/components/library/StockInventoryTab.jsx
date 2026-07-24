@@ -20,7 +20,7 @@ import {
 } from '@mui/material';
 import DeleteOutlineRoundedIcon from '@mui/icons-material/DeleteOutlineRounded';
 import SearchRoundedIcon from '@mui/icons-material/SearchRounded';
-import apiClient from '../../api/client';
+import apiClient, { extractApiError } from '../../api/client';
 import BomStockDialog from '../bom/BomStockDialog';
 import DeleteComponentDialog from './DeleteComponentDialog';
 import StockCorrectionDialog from './StockCorrectionDialog';
@@ -118,7 +118,7 @@ function StockInventoryTab({
             onFeedback('Stock déclaré (recomptage enregistré).');
             await onRefresh();
         } catch (err) {
-            onError(err?.response?.data?.detail || 'Échec de la déclaration de stock.');
+            onError(extractApiError(err) || 'Échec de la déclaration de stock.');
         }
     };
 
@@ -172,7 +172,7 @@ function StockInventoryTab({
             onFeedback('Correction / seuils enregistrés.');
             await onRefresh();
         } catch (err) {
-            onError(err?.response?.data?.detail || 'Échec de la correction.');
+            onError(extractApiError(err) || 'Échec de la correction.');
         }
     };
 

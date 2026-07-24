@@ -1,5 +1,5 @@
 import React from 'react';
-import apiClient from '../../api/client';
+import apiClient, { extractApiError } from '../../api/client';
 import DownloadRoundedIcon from '@mui/icons-material/DownloadRounded';
 import LibraryBooksRoundedIcon from '@mui/icons-material/LibraryBooksRounded';
 import UploadFileRoundedIcon from '@mui/icons-material/UploadFileRounded';
@@ -212,7 +212,7 @@ function ComposantsPanel() {
             setTotalComponents(0);
             setLibraryFeedback({
                 status: 'error',
-                message: error.response?.data?.detail || error.response?.data?.message || error.message || 'Erreur lors du chargement des composants',
+                message: extractApiError(error) || 'Erreur lors du chargement des composants',
                 details: [],
             });
         } finally {
@@ -243,7 +243,7 @@ function ComposantsPanel() {
         } catch (error) {
             setLibraryFeedback({
                 status: 'error',
-                message: error.response?.data?.detail || error.response?.data?.message || error.message || 'Erreur lors du rattrapage automatique des types',
+                message: extractApiError(error) || 'Erreur lors du rattrapage automatique des types',
                 details: [],
             });
         } finally {
@@ -264,7 +264,7 @@ function ComposantsPanel() {
             setMachineFootprintLookup({});
             setMachineFootprintFeedback({
                 status: 'error',
-                message: error.response?.data?.detail || error.response?.data?.message || error.message || 'Erreur lors du chargement du catalogue MachineFootprint',
+                message: extractApiError(error) || 'Erreur lors du chargement du catalogue MachineFootprint',
                 details: [],
             });
         } finally {
@@ -417,7 +417,7 @@ function ComposantsPanel() {
             } else {
                 setEditorFeedback({
                     status: 'error',
-                    message: (typeof detail === 'string' && detail) || error.message || 'Erreur lors de la mise à jour du composant',
+                    message: extractApiError(error) || 'Erreur lors de la mise à jour du composant',
                     details: [],
                 });
             }
@@ -489,7 +489,7 @@ function ComposantsPanel() {
         } catch (error) {
             setLibraryFeedback({
                 status: 'error',
-                message: error.response?.data?.detail || error.response?.data?.message || error.message || "Erreur lors de l'import de la bibliothèque composants",
+                message: extractApiError(error) || "Erreur lors de l'import de la bibliothèque composants",
                 details: [],
             });
         } finally {
@@ -515,7 +515,7 @@ function ComposantsPanel() {
         } catch (error) {
             setLibraryFeedback({
                 status: 'error',
-                message: error.response?.data?.detail || error.response?.data?.message || error.message || "Erreur lors de l'export de la bibliothèque composants",
+                message: extractApiError(error) || "Erreur lors de l'export de la bibliothèque composants",
                 details: [],
             });
         } finally {

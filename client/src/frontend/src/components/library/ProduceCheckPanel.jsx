@@ -21,7 +21,7 @@ import {
 } from '@mui/material';
 import CheckCircleRoundedIcon from '@mui/icons-material/CheckCircleRounded';
 import RadioButtonUncheckedRoundedIcon from '@mui/icons-material/RadioButtonUncheckedRounded';
-import apiClient from '../../api/client';
+import apiClient, { extractApiError } from '../../api/client';
 import BomStockDialog from '../bom/BomStockDialog';
 import LifecycleBadge from '../common/LifecycleBadge';
 import useEventStream from '../../hooks/useEventStream';
@@ -72,7 +72,7 @@ function ProduceCheckPanel({ productionId = null, productionMachineId = null }) 
             setRuns(Array.isArray(runsRes.data) ? runsRes.data : []);
             if (!silent) setBoards(String(rep.data?.board_count ?? ''));
         } catch (err) {
-            if (!silent) setError(err?.response?.data?.detail || 'Impossible de charger l’analyse.');
+            if (!silent) setError(extractApiError(err) || 'Impossible de charger l’analyse.');
         } finally {
             if (!silent) setLoading(false);
         }
@@ -95,7 +95,7 @@ function ProduceCheckPanel({ productionId = null, productionMachineId = null }) 
                 const res = await apiClient.get('/marketplace/productions');
                 setProductions(res.data?.items || []);
             } catch (err) {
-                setError(err?.response?.data?.detail || 'Impossible de charger les productions.');
+                setError(extractApiError(err) || 'Impossible de charger les productions.');
             }
         })();
     }, [embedded, productionId, loadReport]);
@@ -118,7 +118,7 @@ function ProduceCheckPanel({ productionId = null, productionMachineId = null }) 
             setFeedback('Production clôturée : mouvements de sortie enregistrés.');
             await loadReport(selectedId);
         } catch (err) {
-            setError(err?.response?.data?.detail || 'Échec de la clôture de production.');
+            setError(extractApiError(err) || 'Échec de la clôture de production.');
         }
     };
 
@@ -128,7 +128,7 @@ function ProduceCheckPanel({ productionId = null, productionMachineId = null }) 
             setFeedback('Lot annulé : sorties contre-passées.');
             await loadReport(selectedId);
         } catch (err) {
-            setError(err?.response?.data?.detail || 'Échec de l’annulation du lot.');
+            setError(extractApiError(err) || 'Échec de l’annulation du lot.');
         }
     };
 
@@ -183,7 +183,7 @@ function ProduceCheckPanel({ productionId = null, productionMachineId = null }) 
             setFeedback('Stock déclaré : inventaire mis à jour.');
             if (selectedId) await loadReport(selectedId);
         } catch (err) {
-            setError(err?.response?.data?.detail || 'Échec de la déclaration de stock.');
+            setError(extractApiError(err) || 'Échec de la déclaration de stock.');
         }
     };
 
@@ -203,7 +203,7 @@ function ProduceCheckPanel({ productionId = null, productionMachineId = null }) 
                 )),
             } : prev));
         } catch (err) {
-            setError(err?.response?.data?.detail || 'Échec de la vérification du stock.');
+            setError(extractApiError(err) || 'Échec de la vérification du stock.');
         }
     };
 
@@ -221,7 +221,7 @@ function ProduceCheckPanel({ productionId = null, productionMachineId = null }) 
             setFeedback(`${ids.length} ligne(s) marquée(s) comme vérifiée(s).`);
             await loadReport(embedded ? productionId : selectedId);
         } catch (err) {
-            setError(err?.response?.data?.detail || 'Échec de la validation en lot.');
+            setError(extractApiError(err) || 'Échec de la validation en lot.');
         }
     };
 

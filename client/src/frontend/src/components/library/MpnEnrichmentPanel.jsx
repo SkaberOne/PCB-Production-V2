@@ -144,7 +144,7 @@ function MpnEnrichmentPanel({ commandId = null, onApplied = null, autoLoad = fal
         } catch (error) {
             setFeedback({
                 severity: 'error',
-                message: error?.response?.data?.detail || 'Échec du chargement des propositions MPN.',
+                message: extractApiError(error) || 'Échec du chargement des propositions MPN.',
             });
         } finally {
             setBusy(false);
@@ -224,7 +224,7 @@ function MpnEnrichmentPanel({ commandId = null, onApplied = null, autoLoad = fal
         } catch (error) {
             setFeedback({
                 severity: 'error',
-                message: extractApiError(error) || error?.response?.data?.detail || 'Échec de la recherche en ligne.',
+                message: extractApiError(error) || extractApiError(error) || 'Échec de la recherche en ligne.',
             });
         } finally {
             setSearchingLive(false);
@@ -252,7 +252,7 @@ function MpnEnrichmentPanel({ commandId = null, onApplied = null, autoLoad = fal
             updateRow(componentId, { busy: false });
             setFeedback({
                 severity: 'error',
-                message: error?.response?.data?.detail || `Échec de l'écriture du MPN (composant ${componentId}).`,
+                message: extractApiError(error) || `Échec de l'écriture du MPN (composant ${componentId}).`,
             });
         }
     };
@@ -285,7 +285,7 @@ function MpnEnrichmentPanel({ commandId = null, onApplied = null, autoLoad = fal
         } catch (error) {
             setFeedback({
                 severity: 'error',
-                message: error?.response?.data?.detail || "Échec de l'application en lot.",
+                message: extractApiError(error) || "Échec de l'application en lot.",
             });
         } finally {
             setBatchBusy(false);
