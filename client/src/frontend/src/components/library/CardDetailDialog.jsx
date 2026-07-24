@@ -46,6 +46,7 @@ function CardDetailDialog({
     setError,
 }) {
     const open = Boolean(card);
+    const [reference, setReference] = React.useState('');
     const [name, setName] = React.useState('');
     const [partNumber, setPartNumber] = React.useState('');
     const [cardType, setCardType] = React.useState('SIMPLE');
@@ -56,6 +57,7 @@ function CardDetailDialog({
 
     React.useEffect(() => {
         if (!open) return;
+        setReference(card.reference || '');
         setName(card.name || '');
         setPartNumber(card.part_number || '');
         setCardType(card.card_type || 'SIMPLE');
@@ -90,6 +92,7 @@ function CardDetailDialog({
         setSaving(true);
         try {
             await apiClient.put(`/marketplace/cards/${card.bom_reference_id}`, {
+                reference: reference.trim(),
                 name: name.trim() || null,
                 part_number: partNumber.trim() || null,
                 card_type: cardType,
@@ -128,6 +131,7 @@ function CardDetailDialog({
             <DialogContent dividers>
                 <Stack spacing={2} sx={{ mt: 0.5 }}>
                     <Typography variant="subtitle2">Métadonnées</Typography>
+                    <TextField fullWidth size="small" label="Référence" value={reference} onChange={(e) => setReference(e.target.value)} helperText="Référence catalogue unique, ex. KT240576" inputProps={{ 'aria-label': 'Référence' }} />
                     <TextField fullWidth size="small" label="Nom de la carte" value={name} onChange={(e) => setName(e.target.value)} />
                     <TextField fullWidth size="small" label="Code KELENN (notre référence)" value={partNumber} onChange={(e) => setPartNumber(e.target.value)} helperText="Sert au matching des commandes PDF (ex. KT240576)" />
                     <Stack direction="row" spacing={2} flexWrap="wrap" useFlexGap>

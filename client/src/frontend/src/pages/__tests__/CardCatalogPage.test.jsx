@@ -286,3 +286,46 @@ describe('CardCatalogPage — refus suppression détaillé (023)', () => {
         expect(screen.getByText(/commande client CMD-0003/)).toBeInTheDocument();
     });
 });
+
+// ── Prompt 025 : éditer la référence d'une carte ──────────────────────────────
+
+describe('CardCatalogPage — édition de la référence (025)', () => {
+    let restoreConsoleError;
+    beforeEach(() => {
+        jest.clearAllMocks();
+        restoreConsoleError = suppressActDeprecatedWarning();
+        mockGet(); // carte AMPLI_GEN6 (id 7)
+        axios.put.mockResolvedValue({ data: {} });
+        axios.patch.mockResolvedValue({ data: {} });
+        axios.post.mockResolvedValue({ data: {} });
+        axios.delete.mockResolvedValue({ data: {} });
+    });
+    afterEach(() => { restoreConsoleError?.(); });
+
+    it('le champ Référence est éditable et envoyé dans le PUT', async () => {
+        renderPage();
+        fireEvent.click(await screen.findByText('AMPLI_GEN6'));
+        const refInput = await screen.findByLabelText('Référence');
+        expect(refInput).toHaveValue('AMPLI_GEN6');
+        fireEvent.change(refInput, { target: { value: 'AMPLI_GEN6_V2' } });
+        fireEvent.click(screen.getByRole('button', { name: 'Enregistrer' }));
+        await waitFor(() => {
+            expect(axios.put).toHaveBeenCalledWith(
+                '/marketplace/cards/7',
+                expect.objectContaining({ reference: 'AMPLI_GEN6_V2' }),
+            );
+        });
+    });
+
+    it('référence déjà prise → 409 affiché sans fermer le pop-up', async () => {
+        axios.put.mockRejectedValue({ response: { status: 409, data: { detail: 'Référence « AMPLI_GEN6_V2 » déjà utilisée par une autre carte' } } });
+        renderPage();
+        fireEvent.click(await screen.findByText('AMPLI_GEN6'));
+        const refInput = await screen.findByLabelText('Référence');
+        fireEvent.change(refInput, { target: { value: 'AMPLI_GEN6_V2' } });
+        fireEvent.click(screen.getByRole('button', { name: 'Enregistrer' }));
+        expect(await screen.findByText(/déjà utilisée/)).toBeInTheDocument();
+        // pop-up conservé (le champ Nom est toujours présent)
+        expect(screen.getByLabelText('Nom de la carte')).toBeInTheDocument();
+    });
+});

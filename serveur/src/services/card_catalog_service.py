@@ -8,10 +8,19 @@ si assemblage. Source de vérité unique, pas de table parallèle.
 
 from typing import Dict, List, Optional
 
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, joinedload
 
 from ..models.bom import AssemblyItem, BomReference, BomRevision, Component
 from ..models.costing import ProductionCosting
+from .bom_file_service import BomFileService
+
+
+bom_file_service = BomFileService()
+
+
+class CardReferenceConflict(Exception):
+    """La référence de carte demandée est déjà utilisée (prompt 025) → 409."""
 
 _ASSEMBLY = "ASSEMBLY"
 _SIMPLE = "SIMPLE"
@@ -163,10 +172,31 @@ class CardCatalogService:
         name: Optional[str] = None,
         part_number: Optional[str] = None,
         card_type: Optional[str] = None,
+        reference: Optional[str] = None,
     ) -> Dict:
         ref = db.query(BomReference).filter(BomReference.id == bom_reference_id).first()
         if ref is None:
             raise ValueError(f"Carte {bom_reference_id} introuvable")
+        # Référence catalogue (prompt 025) : éditable, unique, snapshots déplacés.
+        old_reference = None
+        new_reference = None
+        if reference is not None:
+            candidate = reference.strip()
+            if not candidate:
+                raise ValueError("La référence ne peut pas être vide")
+            if candidate != ref.reference:
+                clash = (
+                    db.query(BomReference)
+                    .filter(BomReference.reference == candidate, BomReference.id != ref.id)
+                    .first()
+                )
+                if clash is not None:
+                    raise CardReferenceConflict(
+                        f"Référence « {candidate} » déjà utilisée par une autre carte"
+                    )
+                old_reference = ref.reference
+                new_reference = candidate
+                ref.reference = candidate
         if name is not None:
             ref.name = name.strip() or None
         if part_number is not None:
@@ -182,7 +212,20 @@ class CardCatalogService:
             ref.part_number = pn
         if card_type is not None:
             ref.card_type = _norm_type(card_type)
-        db.commit()
+        try:
+            db.commit()
+        except IntegrityError:
+            db.rollback()
+            raise CardReferenceConflict(
+                f"Référence « {new_reference} » déjà utilisée par une autre carte"
+            )
+        # Déplacer les snapshots internes vers la nouvelle référence (best-effort ;
+        # jamais d'écriture sur le partage \\rs\Elec\... — stockage interne seul).
+        if old_reference and new_reference:
+            try:
+                bom_file_service.rename_reference_tree(old_reference, new_reference)
+            except Exception:  # noqa: BLE001 — snapshots best-effort
+                pass
         return cls.get_card(db, bom_reference_id)
 
     # ───────────────────────── Assemblage ─────────────────────────
