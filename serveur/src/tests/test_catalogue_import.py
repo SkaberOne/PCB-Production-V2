@@ -163,3 +163,72 @@ def test_import_catalogue_requires_root(tmp_path):
     resp = client.post("/api/bom/import-catalogue",
                        params={"dry_run": True, "root_path": ""})
     assert resp.status_code == 422
+
+
+# ── Endpoint : aperçu annonce « à importer » (prompt 026) ────────────────────
+def test_import_catalogue_dry_run_annonce_a_importer(tmp_path):
+    """L'aperçu doit annoncer un nombre NON NUL de révisions à importer, égal à
+    ce que fera l'import réel immédiat, sans rien écrire (prompt 026)."""
+    root = str(tmp_path)
+    _make_conception(root, "KT190562 - NanoSH MK2", "A", _eagle_files())
+    _make_conception(root, "KT190562 - NanoSH MK2", "B", _eagle_files())
+    _make_conception(root, "KT200001 - KiCad Board", "A",
+                     [("board.kicad_pcb", None), ("board.kicad_sch", None)])
+    _configure_root(root)
+
+    # Aperçu : 2 révisions Eagle absentes → a_importer == 2 (KiCad exclu).
+    preview = client.post("/api/bom/import-catalogue",
+                          params={"dry_run": True, "root_path": root})
+    assert preview.status_code == 200, preview.text
+    p = preview.json()
+    importable = [r for r in p["rows"] if r["status"] == "importable"]
+    assert p["a_importer"] == 2
+    assert p["a_importer"] == len(importable)
+    detail_keys = {(d["reference"], d["revision"]) for d in p["a_importer_details"]}
+    assert detail_keys == {("KT190562", "A"), ("KT190562", "B")}
+    # Aperçu = aucune écriture DB.
+    assert _ref_exists("KT190562") is False
+
+    # Import réel : le nombre importé coïncide avec l'aperçu.
+    real = client.post("/api/bom/import-catalogue",
+                       params={"dry_run": False, "root_path": root})
+    assert real.status_code == 200, real.text
+    assert real.json()["revisions_imported"] == p["a_importer"]
+
+    # Idempotence : nouvel aperçu → plus rien à importer.
+    again = client.post("/api/bom/import-catalogue",
+                        params={"dry_run": True, "root_path": root})
+    assert again.status_code == 200, again.text
+    a = again.json()
+    assert a["a_importer"] == 0
+    assert a["a_importer_details"] == []
+
+
+def test_import_catalogue_dry_run_exclut_cao_illisible(tmp_path):
+    """Aperçu et import réel donnent le MÊME verdict sur un CAO illisible : la
+    révision corrompue est « error » (pas « à importer »), donc a_importer ne
+    compte que ce que l'import saura vraiment importer (prompt 026)."""
+    root = str(tmp_path)
+    _make_conception(root, "KT190562 - NanoSH MK2", "A", _eagle_files())
+    broken = _make_conception(root, "KT999999 - Corrompue", "A", _eagle_files())
+    # Corrompt les fichiers CAO → XML non valide, comme un fichier réel abîmé.
+    for fname in ("OTR.brd", "OTR.sch"):
+        with open(os.path.join(broken, fname), "w", encoding="utf-8") as fh:
+            fh.write("<?xml version='1.0'?><eagle><bad token=></eagle>")
+    _configure_root(root)
+
+    preview = client.post("/api/bom/import-catalogue",
+                          params={"dry_run": True, "root_path": root})
+    assert preview.status_code == 200, preview.text
+    p = preview.json()
+    statuses = {(r["reference"], r["revision"]): r["status"] for r in p["rows"]}
+    assert statuses[("KT190562", "A")] == "importable"
+    assert statuses[("KT999999", "A")] == "error"     # illisible → pas « à importer »
+    assert p["a_importer"] == 1                        # seule la carte valide
+
+    real = client.post("/api/bom/import-catalogue",
+                       params={"dry_run": False, "root_path": root})
+    d = real.json()
+    assert d["revisions_imported"] == p["a_importer"] == 1  # coïncidence exacte
+    rstat = {(r["reference"], r["revision"]): r["status"] for r in d["rows"]}
+    assert rstat[("KT999999", "A")] == "error"

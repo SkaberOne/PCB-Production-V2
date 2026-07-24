@@ -392,6 +392,10 @@ class CatalogueImportResponse(BaseModel):
     cards_scanned: int
     revisions_imported: int
     components_created: int
+    # Aperçu (dry-run) : ce qui SERAIT importé (révisions Eagle absentes). Nul en
+    # import réel (les révisions passent en « imported »). Prompt 026.
+    a_importer: int = 0
+    a_importer_details: List[dict] = Field(default_factory=list)
     skipped_dirs: List[str] = Field(default_factory=list)
     skipped: List[CatalogueSkippedDir] = Field(default_factory=list)
     rows: List[dict] = Field(default_factory=list)
